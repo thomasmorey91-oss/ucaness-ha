@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Aperçu des cartes UCANESS HOME ASSISTANT (hors Home Assistant)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin: 0; background: #030B20; }
+  .stub { box-sizing: border-box; min-height: 44px; padding: 8px 10px; background: rgba(22,40,72,0.78); color: #FFFFFF; font: 14px 'Times New Roman', Tinos, serif; display: flex; justify-content: space-between; align-items: center; }
+  .stub span { color: #00FFFF; }
+</style>
+<script>
+  // Données inventées : aucune mesure réelle.
+  const now = new Date().toISOString();
+  const s = (state, unit, extra) => ({ state: String(state), attributes: Object.assign({ unit_of_measurement: unit }, extra || {}), last_updated: now, last_changed: now });
+  window.fakeHass = {
+    locale: { language: 'fr' },
+    language: 'fr',
+    states: {
+      'sensor.uhome_puissance_solaire': s(1240, 'W'),
+      'sensor.uhome_tension_solaire': s(352.4, 'V'),
+      'sensor.uhome_puissance_reseau': s(0, 'W'),
+      'sensor.uhome_tension_reseau': s(231.6, 'V'),
+      'sensor.uhome_frequence_reseau': s(50.0, 'Hz'),
+      'sensor.uhome_puissance_batterie': s(820, 'W'),
+      'sensor.uhome_tension_batterie': s(52.3, 'V'),
+      'sensor.uhome_courant_batterie': s(15.7, 'A'),
+      'sensor.uhome_puissance_maison': s(420, 'W'),
+      'sensor.uhome_soc': s(42, '%'),
+      'input_number.jarvis_batterie_plancher': s(10, '%'),
+      'input_number.jarvis_batterie_capacite': s(10, 'kWh'),
+      'binary_sensor.uhome_connexion_cloud': s('on'),
+      'binary_sensor.uhome_defaut_batterie': s('off'),
+      'binary_sensor.uhome_temperature_hors_plage': s('on'),
+      'binary_sensor.jarvis_heures_creuses': s('off'),
+    },
+  };
+  // Remplace les outils de Home Assistant : chaque carte enfant devient une ligne simple.
+  window.loadCardHelpers = async () => ({
+    createCardElement(conf) {
+      if (String(conf.type).startsWith('custom:')) {
+        const card = document.createElement(conf.type.slice(7));
+        card.setConfig(conf);
+        return card;
+      }
+      const el = document.createElement('div');
+      el.className = 'stub';
+      Object.defineProperty(el, 'hass', { set(h) {
+        const st = conf.entity && h && h.states[conf.entity];
+        el.innerHTML = `${conf.name || conf.title || conf.type}<span>${st ? st.state : ''}</span>`;
+      } });
+      return el;
+    },
+  });
+</script>
+<script type="module">
+  import '../www/ucaness/ucaness-cards.js';
+  const layout = document.createElement('ucaness-layout-card');
+  const panel = (title, names, extra) => Object.assign({ type: 'custom:ucaness-panel-card', title, cards: names.map((n) => ({ type: 'tile', name: n })) }, extra || {});
+  layout.setConfig({
+    header: {
+      title: 'UCANESS HOME ASSISTANT', site: 'Maison',
+      tabs: [{ title: 'Maison', path: '/apercu.html' }, { title: 'Batterie', path: '/batterie', entity: 'sensor.uhome_soc' }],
+      connectivity_entity: 'binary_sensor.uhome_connexion_cloud',
+      alert_entities: ['binary_sensor.uhome_defaut_batterie', 'binary_sensor.uhome_temperature_hors_plage'],
+      subtitle: 'heures pleines',
+    },
+    columns: [
+      { width: '300px', cards: [panel('Climatisation', ['Rez-de-chaussée', 'Étage']), panel('Eau chaude', ['Ballon', 'Sèche-serviettes']), panel('Piscine', ['Filtration'])] },
+      { width: '1fr', cards: [{ type: 'custom:ucaness-flow-card' }, panel('Appareils', ['Lave-linge', 'Lave-vaisselle'])] },
+      { width: '300px', cards: [panel('Volets', ['Tous les volets']), panel('Portail · Garage', ['Portail', 'Porte de garage']), { type: 'custom:ucaness-panel-card', slides: [{ title: 'Sécurité', cards: [{ type: 'tile', name: 'Alarme' }] }, { title: 'Caméras', cards: [{ type: 'tile', name: 'Portier' }] }] }, { type: 'custom:ucaness-soc-card' }] },
+    ],
+  });
+  document.body.appendChild(layout);
+  layout.hass = window.fakeHass;
+  setTimeout(() => { layout.hass = window.fakeHass; document.body.dataset.ready = '1'; }, 300);
+</script>
+</head>
+<body></body>
+</html>

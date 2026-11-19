@@ -37,7 +37,7 @@ Trois packages Home Assistant qui utilisent l'intégration `ucaness` de ce dép�
    | UCANESS : puissance batterie | `sensor.uhome_puissance_batterie` |
    | UCANESS : puissance maison | `sensor.uhome_puissance_maison` |
    | UCANESS : puissance réseau estimée | `sensor.uhome_puissance_reseau` |
-   | UCANESS : puissance MPPT 1 / MPPT 2 | `sensor.uhome_puissance_mppt_1` / `_2` |
+   | UCANESS : puissance MPPT 1 / MPPT 2 | `sensor.uhome_puissance_mppt_1` / `sensor.uhome_puissance_mppt_2` |
    | UCANESS : production solaire aujourd'hui | `sensor.uhome_production_solaire_aujourdhui` |
    | UCANESS : soutirage réseau total | `sensor.uhome_soutirage_reseau_total` |
    | UCANESS : mode de fonctionnement | `sensor.uhome_mode` |
