@@ -1,0 +1,54 @@
+# Thème « UCANESS » : couleurs et police du portail UCANESS, pour les cartes standard
+# de Home Assistant placées dans le tableau de bord UCANESS HOME ASSISTANT.
+# À copier dans config/themes/ (avec `frontend: themes: !include_dir_merge_named themes/`).
+# La police Tinos (métriquement identique à Times New Roman) est chargée par ucaness-cards.js.
+UCANESS:
+  # Police
+  primary-font-family: "'Times New Roman', Tinos, 'Liberation Serif', serif"
+  paper-font-common-base_-_font-family: "'Times New Roman', Tinos, 'Liberation Serif', serif"
+  ha-font-family-body: "'Times New Roman', Tinos, 'Liberation Serif', serif"
+  ha-font-family-heading: "'Times New Roman', Tinos, 'Liberation Serif', serif"
+
+  # Fonds
+  primary-background-color: "#030B20"
+  secondary-background-color: "#071A3A"
+  lovelace-background: "radial-gradient(ellipse at 50% 42%, #0D2A58 0%, #071A3A 48%, #030B20 100%)"
+  card-background-color: "rgba(22, 40, 72, 0.78)"
+  ha-card-background: "rgba(22, 40, 72, 0.78)"
+  ha-card-border-radius: "0px"
+  ha-card-border-width: "0px"
+  ha-card-box-shadow: "none"
+  divider-color: "rgba(125, 171, 205, 0.18)"
+
+  # Textes
+  primary-text-color: "#FFFFFF"
+  secondary-text-color: "#7DABCD"
+  text-primary-color: "#FFFFFF"
+  disabled-text-color: "#4E6C93"
+
+  # Accents
+  primary-color: "#00D1D6"
+  accent-color: "#2AB7E2"
+  state-icon-color: "#9CC9F5"
+  state-active-color: "#00D1D6"
+  success-color: "#2ECC71"
+  warning-color: "#F39C12"
+  error-color: "#E5484D"
+  info-color: "#2AB7E2"
+
+  # Barres de l'application
+  app-header-background-color: "#061B3D"
+  app-header-text-color: "#FFFFFF"
+  sidebar-background-color: "#061B3D"
+  sidebar-text-color: "#CFE0F5"
+  sidebar-icon-color: "#7DABCD"
+  sidebar-selected-text-color: "#00D1D6"
+  sidebar-selected-icon-color: "#00D1D6"
+
+  # Variables des cartes UCANESS (facultatif : valeurs par défaut dans ucaness-cards.js)
+  ucaness-label: "#02E8EA"
+  ucaness-value: "#00FFFF"
+  ucaness-tab: "#00D1D6"
+  ucaness-tab-border: "#446E74"
+  ucaness-orange: "#F39C12"
+  ucaness-green: "#2ECC71"
