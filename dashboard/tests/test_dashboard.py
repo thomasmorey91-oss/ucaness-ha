@@ -91,6 +91,12 @@ def test_theme_ucaness():
     assert theme["UCANESS"]["primary-color"].upper() == "#00D1D6"
 
 
+def test_version_des_cartes_dans_le_readme():
+    version = re.search(r"const UC_VERSION = '([0-9.]+)'", JS.read_text(encoding="utf-8")).group(1)
+    readme = (DASH_DIR / "README.md").read_text(encoding="utf-8")
+    assert f"ucaness-cards.js?v={version}`" in readme, "mettre à jour l'adresse de la ressource dans le README"
+
+
 # ---------------------------------------------------------------- générateur de maison
 
 def test_generateur_maison_exemple():
@@ -150,7 +156,8 @@ def test_aucune_donnee_personnelle_dans_le_dossier():
 # ---------------------------------------------------------------- rendu dans Chrome
 
 @pytest.fixture(scope="module")
-def page():
+def site():
+    """Serveur local du dossier dashboard/ et Chrome sans fenêtre : (navigateur, adresse de base)."""
     sync_api = pytest.importorskip("playwright.sync_api")
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(DASH_DIR))
     handler.log_message = lambda *a, **k: None
@@ -162,16 +169,32 @@ def page():
         except Exception as err:  # navigateur absent
             server.shutdown()
             pytest.skip(f"Chrome indisponible : {err}")
-        pg = browser.new_page(viewport={"width": 1280, "height": 800})
-        errors = []
-        pg.on("pageerror", lambda e: errors.append(str(e)))
-        pg.goto(f"http://127.0.0.1:{server.server_address[1]}/tests/apercu.html")
-        pg.wait_for_selector("body[data-ready='1']", timeout=5000)
-        pg.wait_for_timeout(400)
-        pg.errors = errors
-        yield pg
+        yield browser, f"http://127.0.0.1:{server.server_address[1]}"
         browser.close()
     server.shutdown()
+
+
+def open_page(site, path: str, width: int = 1280, height: int = 800, context=None):
+    browser, base = site
+    if context is None:
+        pg = browser.new_page(viewport={"width": width, "height": height})
+    else:                                    # contexte partagé : même stockage local d'une page à l'autre
+        pg = context.new_page()
+        pg.set_viewport_size({"width": width, "height": height})
+    errors = []
+    pg.on("pageerror", lambda e: errors.append(str(e)))
+    pg.goto(f"{base}{path}")
+    pg.wait_for_selector("body[data-ready='1']", timeout=5000)
+    pg.wait_for_timeout(400)
+    pg.errors = errors
+    return pg
+
+
+@pytest.fixture(scope="module")
+def page(site):
+    pg = open_page(site, "/tests/apercu.html")
+    yield pg
+    pg.close()
 
 
 FLOW = "document.querySelector('ucaness-layout-card').shadowRoot.querySelector('ucaness-flow-card').shadowRoot"
@@ -249,3 +272,145 @@ def test_carrousel_et_onglets(page):
         header.shadowRoot.querySelectorAll('.tab')[1].click();
     })""")
     assert path == "/batterie"
+
+
+# ---------------------------------------------------------------- texte repliable, onglets, mode allégé
+
+NOTE = """(id) => {
+    function all(root, sel, out = []) {
+        root.querySelectorAll(sel).forEach(e => out.push(e));
+        root.querySelectorAll('*').forEach(e => { if (e.shadowRoot) all(e.shadowRoot, sel, out); });
+        return out;
+    }
+    return all(document, 'ucaness-note-card').find(n => n._config.id === id);
+}"""
+
+
+def note_state(pg, note_id: str) -> dict:
+    return pg.evaluate(f"""(id) => {{
+        const n = ({NOTE})(id);
+        const r = n.shadowRoot, clip = r.querySelector('.clip'), more = r.querySelector('.more'), less = r.querySelector('.less');
+        return {{ cut: clip.classList.contains('cut'), open: clip.classList.contains('open'), max: clip.style.maxHeight,
+                  height: clip.getBoundingClientRect().height, full: r.querySelector('.slot').scrollHeight,
+                  more: getComputedStyle(more).display !== 'none', less: !less.hidden && getComputedStyle(less).display !== 'none',
+                  expanded: more.getAttribute('aria-expanded'), children: r.querySelector('.slot').children.length }};
+    }}""", note_id)
+
+
+@pytest.fixture(scope="module")
+def cartes(site):
+    pg = open_page(site, "/tests/cartes.html")
+    yield pg
+    pg.close()
+
+
+def test_cartes_sans_erreur(cartes):
+    assert cartes.errors == []
+
+
+def test_texte_court_non_replie(cartes):
+    st = note_state(cartes, "court")
+    assert not st["cut"] and not st["more"] and not st["less"]
+
+
+def test_texte_long_replie_puis_deplie(cartes):
+    st = note_state(cartes, "long")
+    assert st["cut"] and st["more"] and not st["less"]
+    assert st["max"] == "100px" and st["height"] <= 100      # 4 lignes : 4 × 21 + 16 px
+    assert st["full"] > 200
+    cartes.evaluate(f"(id) => ({NOTE})(id).shadowRoot.querySelector('.more').click()", "long")
+    st = note_state(cartes, "long")
+    assert st["open"] and st["less"] and st["expanded"] == "true"
+    assert abs(st["height"] - st["full"]) < 2                 # tout le texte est visible
+    cartes.evaluate(f"(id) => ({NOTE})(id).shadowRoot.querySelector('.less').click()", "long")
+    st = note_state(cartes, "long")
+    assert not st["open"] and st["more"] and st["height"] <= 100
+
+
+def test_appui_sur_le_texte_le_deplie(cartes):
+    cartes.evaluate(f"(id) => ({NOTE})(id).shadowRoot.querySelector('.clip').click()", "reconfig")
+    assert note_state(cartes, "reconfig")["open"]
+    cartes.evaluate(f"(id) => ({NOTE})(id).shadowRoot.querySelector('.less').click()", "reconfig")
+    assert not note_state(cartes, "reconfig")["open"]
+
+
+def test_lien_dans_un_texte_replie(cartes):
+    """Le lien est dans le shadow DOM de la carte markdown : il s'ouvre sans déplier le texte."""
+    cartes.evaluate(f"""(id) => ({NOTE})(id).shadowRoot.querySelector('faux-markdown').shadowRoot.querySelector('a').click()""", "lien")
+    assert cartes.evaluate("location.hash") == "#lien-suivi"
+    st = note_state(cartes, "lien")
+    assert st["cut"] and not st["open"]
+
+
+def test_nouvelle_configuration_sans_doublon(cartes):
+    """Home Assistant peut rappeler setConfig avant la fin de la construction : un seul texte affiché."""
+    cartes.evaluate(f"""(id) => {{
+        const n = ({NOTE})(id);
+        const c = Object.assign({{}}, n._config);
+        n.setConfig(c); n.setConfig(c);
+    }}""", "reconfig")
+    cartes.wait_for_timeout(300)
+    st = note_state(cartes, "reconfig")
+    assert st["children"] == 1 and st["cut"] and st["max"] == "79px"
+
+
+def test_texte_replie_sur_telephone(site):
+    pg = open_page(site, "/tests/cartes.html", width=390, height=844)
+    try:
+        assert pg.errors == []
+        st = note_state(pg, "long")
+        assert st["cut"] and st["max"] == "58px"              # mobile_lines : 2 × 21 + 16 px
+        assert note_state(pg, "reconfig")["max"] == "79px"    # sans mobile_lines : lines
+    finally:
+        pg.close()
+
+
+def test_panneau_a_onglets(cartes):
+    got = cartes.evaluate("""() => {
+        const layout = document.querySelector('ucaness-layout-card').shadowRoot;
+        const panel = [...layout.querySelectorAll('ucaness-panel-card')].find(p => p.shadowRoot.querySelector('.tabs'));
+        const r = panel.shadowRoot;
+        const buttons = [...r.querySelectorAll('.tabs button')];
+        const visible = () => [...r.querySelectorAll('.slide')].map(s => !s.hidden);
+        const before = visible();
+        buttons[1].click();
+        return { labels: buttons.map(b => b.textContent.trim()), icons: r.querySelectorAll('.tabs ha-icon').length,
+                 before, after: visible(), selected: buttons.map(b => b.getAttribute('aria-selected')),
+                 title: r.querySelector('.titlebar h2').textContent, dots: !!r.querySelector('.dots'), timer: !!panel._timer };
+    }""")
+    assert got["labels"] == ["Principe", "Cette nuit", "Santé"] and got["icons"] == 2
+    assert got["before"] == [True, False, False] and got["after"] == [False, True, False]
+    assert got["selected"] == ["false", "true", "false"]
+    assert got["title"] == "Détails" and not got["dots"] and not got["timer"]   # pas de défilement automatique
+
+
+def test_redessin_limite_aux_entites_de_la_carte(cartes):
+    got = cartes.evaluate("""async () => {
+        const { ucChanged } = await import('../www/ucaness/ucaness-cards.js');
+        const a = { state: '1' }, b = { state: '2' }, autre = { state: 'x' };
+        const card = {};
+        return [
+            ucChanged(card, { states: { 'sensor.a': a, 'sensor.autre': autre } }, ['sensor.a']),
+            ucChanged(card, { states: { 'sensor.a': a, 'sensor.autre': { state: 'y' } } }, ['sensor.a']),
+            ucChanged(card, { states: { 'sensor.a': b } }, ['sensor.a']),
+            ucChanged(card, { states: { 'sensor.a': b } }, ['sensor.a', 'sensor.b']),
+        ];
+    }""")
+    assert got == [True, False, True, True]
+
+
+def test_mode_allege_memorise(site):
+    browser, _ = site
+    ctx = browser.new_context()
+    try:
+        for query, expected in (("?leger=1", True), ("", True), ("?leger=0", False), ("", False)):
+            pg = open_page(site, f"/tests/cartes.html{query}", context=ctx)
+            got = pg.evaluate("""async () => {
+                const { UC_LIGHT } = await import('../www/ucaness/ucaness-cards.js');
+                const css = document.querySelector('ucaness-layout-card').shadowRoot.querySelector('style').textContent;
+                return { light: UC_LIGHT, css: /\* \{ animation: none !important; transition: none !important; \}/.test(css) };
+            }""")
+            assert got == {"light": expected, "css": expected}, query or "sans paramètre"
+            pg.close()
+    finally:
+        ctx.close()
