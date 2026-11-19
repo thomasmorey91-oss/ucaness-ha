@@ -1,0 +1,93 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connexion au portail UCANESS",
+        "description": "Intégration NON OFFICIELLE. Lecture seule par défaut : l'onduleur n'est piloté (mode, plages de charge) que si l'option « Écriture autorisée » est activée. L'« ID EMS » figure dans le portail, encadré « Détails » de votre installation.",
+        "data": {
+          "email": "E-mail du compte UCANESS",
+          "password": "Mot de passe UCANESS",
+          "device_code": "ID EMS de l'appareil"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnexion à UCANESS",
+        "description": "La session a été refusée. Saisissez à nouveau le mot de passe UCANESS.",
+        "data": {
+          "password": "Mot de passe UCANESS"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Identifiants refusés par UCANESS.",
+      "device_not_found": "Appareil introuvable avec cet ID EMS.",
+      "cannot_connect": "Portail UCANESS injoignable."
+    },
+    "abort": {
+      "already_configured": "Cet appareil est déjà configuré.",
+      "reauth_successful": "Reconnexion réussie."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options UCANESS",
+        "description": "La clé d'application est fournie par UCanpower (API tierce). Laissez le secret vide pour garder celui déjà enregistré. « Écriture autorisée » permet à Home Assistant de changer le mode (autoconsommation ou arbitrage horaire) et les plages de charge, rien d'autre.",
+        "data": {
+          "scan_interval": "Fréquence d'interrogation du cloud (secondes, 30 au minimum)",
+          "app_key": "Clé d'application UCanpower (app_key)",
+          "app_secret": "Secret d'application UCanpower (app_secret)",
+          "write_enabled": "Écriture autorisée (mode et plages de charge seulement)"
+        }
+      }
+    }
+  },
+  "services": {
+    "tester_api": {
+      "name": "Tester l'API UCanpower",
+      "description": "Contrôle en lecture seule de l'API tierce signée : identifiant d'appareil, modèle d'onduleur, mode et plages. Rien n'est envoyé à l'onduleur.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Appareil",
+          "description": "Entrée UCANESS à utiliser (facultatif s'il n'y a qu'un appareil)."
+        }
+      }
+    },
+    "definir_plages_charge": {
+      "name": "Définir les plages de charge",
+      "description": "Programme jusqu'à 3 plages de charge du mode arbitrage horaire (HHMM). Les autres plages de charge et toutes les plages de décharge sont vidées. Exige « Écriture autorisée ».",
+      "fields": {
+        "config_entry_id": {
+          "name": "Appareil",
+          "description": "Entrée UCANESS à utiliser (facultatif s'il n'y a qu'un appareil)."
+        },
+        "plages": {
+          "name": "Plages",
+          "description": "Liste de {debut, fin} au format HHMM, par exemple 2300 à 2359 puis 0000 à 0130."
+        }
+      }
+    },
+    "definir_mode": {
+      "name": "Définir le mode",
+      "description": "Passe l'onduleur en autoconsommation ou en arbitrage horaire. Le mode Backup est refusé. Exige « Écriture autorisée ».",
+      "fields": {
+        "config_entry_id": {
+          "name": "Appareil",
+          "description": "Entrée UCANESS à utiliser (facultatif s'il n'y a qu'un appareil)."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "Autoconsommation ou arbitrage horaire."
+        }
+      }
+    }
+  },
+  "selector": {
+    "mode": {
+      "options": {
+        "autoconsommation": "Autoconsommation",
+        "arbitrage_horaire": "Arbitrage horaire"
+      }
+    }
+  }
+}

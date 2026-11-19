@@ -1,0 +1,36 @@
+tester_api:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: ucaness
+
+definir_plages_charge:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: ucaness
+    plages:
+      required: true
+      example: '[{"debut": "2300", "fin": "2359"}, {"debut": "0000", "fin": "0130"}]'
+      selector:
+        object:
+
+definir_mode:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: ucaness
+    mode:
+      required: true
+      selector:
+        select:
+          options:
+            - autoconsommation
+            - arbitrage_horaire
+          translation_key: mode

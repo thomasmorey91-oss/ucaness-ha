@@ -1,0 +1,15 @@
+{
+ "timezone": 3600,
+ "inverter_model": "mr",
+ "pcs": {
+  "mr": {
+   "bat_grid_dod": 900,
+   "bat_charge_current": 1000,
+   "grid_power": 600,
+   "bat_discharge_power": 600,
+   "battery_return_difference": 100,
+   "charge_time1_start": 100,
+   "charge_time1_end": 300
+  }
+ }
+}

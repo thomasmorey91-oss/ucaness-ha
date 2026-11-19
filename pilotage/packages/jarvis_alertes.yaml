@@ -1,0 +1,214 @@
+# =============================================================================
+# Détection des défauts de l'installation solaire et de la batterie
+# -----------------------------------------------------------------------------
+# Toutes les alertes passent par le script jarvis_notifier (3 niveaux : info,
+# a_surveiller, intervention). Le service de notification du téléphone se renseigne dans
+# l'entrée « Alertes : service de notification » (par exemple mobile_app_mon_telephone,
+# sans le préfixe notify.).
+# L'interrupteur « Alertes Jarvis actives » est éteint par défaut : l'allumer une fois les
+# seuils vérifiés.
+# =============================================================================
+
+input_boolean:
+  jarvis_alertes_actives:
+    name: "Alertes Jarvis actives"
+    icon: mdi:bell-ring
+
+input_text:
+  jarvis_mode_attendu:
+    name: "Batterie : mode de fonctionnement attendu"
+    max: 60
+  jarvis_service_notification:
+    name: "Alertes : service de notification (ex. mobile_app_mon_telephone)"
+    max: 100
+
+script:
+  jarvis_notifier:
+    alias: "Jarvis · Notifier"
+    mode: queued
+    fields:
+      niveau:
+        description: "info, a_surveiller ou intervention"
+      titre:
+        description: "Titre court"
+      message:
+        description: "Texte de l'alerte"
+    sequence:
+      - condition: state
+        entity_id: input_boolean.jarvis_alertes_actives
+        state: "on"
+      - action: logbook.log
+        data:
+          name: "Jarvis alerte ({{ niveau }})"
+          message: "{{ titre }} : {{ message }}"
+      - condition: template
+        value_template: "{{ states('input_text.jarvis_service_notification') not in ['', 'unknown', 'unavailable'] }}"
+      - action: "notify.{{ states('input_text.jarvis_service_notification') | replace('notify.', '') }}"
+        data:
+          title: >
+            {{ {'info': 'ℹ️', 'a_surveiller': '⚠️', 'intervention': '🛑'}.get(niveau, '') }} {{ titre }}
+          message: "{{ message }}"
+          data:
+            tag: "jarvis_{{ titre | slugify }}"
+            # Android : priorité haute pour une intervention. iOS : alerte « time-sensitive ».
+            priority: "{{ 'high' if niveau == 'intervention' else 'normal' }}"
+            push:
+              interruption-level: "{{ 'time-sensitive' if niveau == 'intervention' else 'active' }}"
+
+automation:
+  - id: jarvis_alertes_mode_attendu_initial
+    alias: "Jarvis · Alertes : mode attendu initial (une seule fois)"
+    triggers:
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: template
+        value_template: "{{ states('input_text.jarvis_mode_attendu') in ['', 'unknown'] }}"
+    actions:
+      - action: input_text.set_value
+        target: { entity_id: input_text.jarvis_mode_attendu }
+        data: { value: "Match Load Mode" }
+
+  - id: jarvis_alerte_cloud
+    alias: "Jarvis · Alerte : liaison cloud UCANESS perdue"
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.uhome_connexion_cloud
+        to: "off"
+        for: "00:15:00"
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: a_surveiller
+          titre: "Batterie injoignable"
+          message: >
+            Plus de données UCANESS depuis 15 min. L'onduleur continue seul avec ses réglages.
+            Vérifier le Wi-Fi du module EMS de l'onduleur ; le portail UCANESS permet de redémarrer le Wi-Fi à distance.
+
+  - id: jarvis_alerte_defaut_batterie
+    alias: "Jarvis · Alerte : défaut ou alarme batterie"
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.uhome_defaut_batterie
+        to: "on"
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: intervention
+          titre: "Défaut batterie"
+          message: >
+            La batterie signale un défaut ou une alarme
+            (code défaut {{ states('sensor.uhome_code_defaut_batterie') }},
+            code alarme {{ states('sensor.uhome_code_alarme_batterie') }}).
+            Consulter le chapitre 7 du manuel UHome. En cas de surchauffe, d'odeur ou de fumée :
+            appliquer les consignes de sécurité du manuel et appeler l'installateur.
+
+  - id: jarvis_alerte_temperature_batterie
+    alias: "Jarvis · Alerte : température batterie hors plage"
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.uhome_temperature_hors_plage
+        to: "on"
+        for: "00:10:00"
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: a_surveiller
+          titre: "Température batterie"
+          message: >
+            Batterie à {{ states('sensor.uhome_temperature_batterie') }} °C, hors de la plage de charge (0 à 50 °C).
+            La charge est suspendue par l'onduleur.
+
+  - id: jarvis_alerte_soc_fige
+    alias: "Jarvis · Alerte : SOC figé"
+    description: "Le SOC n'a pas bougé depuis 3 h alors que la batterie annonce une puissance."
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: sensor.uhome_soc
+        for: "03:00:00"
+    conditions:
+      - condition: template
+        value_template: "{{ states('sensor.uhome_puissance_batterie') | float(0) | abs > 300 }}"
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: a_surveiller
+          titre: "SOC figé"
+          message: >
+            Le SOC reste à {{ states('sensor.uhome_soc') }} % depuis 3 h alors que la batterie
+            annonce {{ states('sensor.uhome_puissance_batterie') }} W. Mesure ou BMS à vérifier.
+
+  - id: jarvis_alerte_batterie_ne_charge_pas
+    alias: "Jarvis · Alerte : surplus solaire injecté alors que la batterie n'est pas pleine"
+    mode: single
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.uhome_puissance_reseau
+        below: -1000
+        for: "00:30:00"
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.uhome_soc
+        below: 90
+      - condition: state
+        entity_id: binary_sensor.uhome_temperature_hors_plage
+        state: "off"
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: a_surveiller
+          titre: "La batterie ne charge pas"
+          message: >
+            Plus de 1 kW part sur le réseau depuis 30 min (revendu au prix de revente)
+            alors que la batterie n'est qu'à {{ states('sensor.uhome_soc') }} %.
+
+  - id: jarvis_alerte_production_basse
+    alias: "Jarvis · Alerte : production solaire anormalement basse"
+    description: "À 20h, production du jour inférieure à 50 % de la prévision Solcast (si prévision > 5 kWh)."
+    mode: single
+    triggers:
+      - trigger: time
+        at: "20:00:00"
+    conditions:
+      - condition: template
+        value_template: >
+          {% set prev = states('sensor.solcast_pv_forecast_prevision_aujourdhui') | float(0) %}
+          {% set reel = states('sensor.uhome_production_solaire_aujourdhui') | float(0) %}
+          {{ prev > 5 and reel < 0.5 * prev }}
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: a_surveiller
+          titre: "Production solaire basse"
+          message: >
+            {{ states('sensor.uhome_production_solaire_aujourdhui') }} kWh produits pour
+            {{ states('sensor.solcast_pv_forecast_prevision_aujourdhui') }} kWh prévus.
+            Ombrage, salissure, disjoncteur PV ou MPPT à vérifier
+            (MPPT 1 : {{ states('sensor.uhome_puissance_mppt_1') }} W, MPPT 2 : {{ states('sensor.uhome_puissance_mppt_2') }} W).
+
+  - id: jarvis_alerte_mode_inattendu
+    alias: "Jarvis · Alerte : mode de l'onduleur différent du mode attendu"
+    description: "Pendant une recharge de nuit programmée, c'est l'automatisation de retour qui contrôle le mode."
+    mode: single
+    triggers:
+      - trigger: template
+        value_template: >
+          {{ states('sensor.uhome_mode') not in ['unknown', 'unavailable']
+             and states('sensor.uhome_mode') != states('input_text.jarvis_mode_attendu') }}
+        for: "00:10:00"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.jarvis_batterie_plan_actif
+        state: "off"
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: a_surveiller
+          titre: "Mode batterie inattendu"
+          message: >
+            L'onduleur est en « {{ states('sensor.uhome_mode') }} » au lieu de
+            « {{ states('input_text.jarvis_mode_attendu') }} ».

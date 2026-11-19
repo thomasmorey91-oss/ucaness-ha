@@ -1,0 +1,93 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "UCANESS portal login",
+        "description": "UNOFFICIAL integration. Readings only by default; the inverter is controlled (work mode, charge windows) only if 'Write allowed' is enabled in the options. The EMS ID is shown in the portal 'Details' panel.",
+        "data": {
+          "email": "UCANESS account e-mail",
+          "password": "UCANESS password",
+          "device_code": "Device EMS ID"
+        }
+      },
+      "reauth_confirm": {
+        "title": "UCANESS re-authentication",
+        "description": "The session was rejected. Enter your UCANESS password again.",
+        "data": {
+          "password": "UCANESS password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Credentials rejected by UCANESS.",
+      "device_not_found": "No device found with this EMS ID.",
+      "cannot_connect": "UCANESS portal unreachable."
+    },
+    "abort": {
+      "already_configured": "This device is already configured.",
+      "reauth_successful": "Re-authentication successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "UCANESS options",
+        "description": "The application key is given by UCanpower (third-party API). Leave the secret empty to keep the one already saved. 'Write allowed' lets Home Assistant change the work mode (self-consumption or time-of-use) and the charge windows, nothing else.",
+        "data": {
+          "scan_interval": "Cloud polling interval (seconds, minimum 30)",
+          "app_key": "UCanpower application key (app_key)",
+          "app_secret": "UCanpower application secret (app_secret)",
+          "write_enabled": "Write allowed (work mode and charge windows only)"
+        }
+      }
+    }
+  },
+  "services": {
+    "tester_api": {
+      "name": "Test the UCanpower API",
+      "description": "Read-only check of the signed third-party API: device identifier, inverter model, work mode and windows. Nothing is sent to the inverter.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Device",
+          "description": "UCANESS entry to use (optional if only one device)."
+        }
+      }
+    },
+    "definir_plages_charge": {
+      "name": "Set charge windows",
+      "description": "Programs up to 3 charge windows of the time-of-use mode (HHMM). Other charge windows and all discharge windows are cleared. Requires 'Write allowed'.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Device",
+          "description": "UCANESS entry to use (optional if only one device)."
+        },
+        "plages": {
+          "name": "Windows",
+          "description": "List of {debut, fin} in HHMM, for example 2300 to 2359 then 0000 to 0130."
+        }
+      }
+    },
+    "definir_mode": {
+      "name": "Set work mode",
+      "description": "Switches the inverter to self-consumption or time-of-use. Backup is not allowed. Requires 'Write allowed'.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Device",
+          "description": "UCANESS entry to use (optional if only one device)."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "Self-consumption or time-of-use."
+        }
+      }
+    }
+  },
+  "selector": {
+    "mode": {
+      "options": {
+        "autoconsommation": "Self-consumption",
+        "arbitrage_horaire": "Time-of-use (peak shift)"
+      }
+    }
+  }
+}
