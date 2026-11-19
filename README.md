@@ -80,6 +80,7 @@ Chemins d'écriture repérés sur le portail, **volontairement bloqués** : `/de
 pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py   # client et décodage (7 tests)
 pytest -p no:homeassistant -p no:socket tests/test_pilotage.py           # signature, garde-fous, écriture et relecture (25 tests)
 pytest tests/test_ha_integration.py                                       # dans Home Assistant 2026.10 (11 tests)
+pytest dashboard/tests -q                                                 # tableau de bord, générateur de maison, rendu dans Chrome (14 tests)
 ```
 
 ## 8. Pilotage (versions 0.2.x)
@@ -128,6 +129,7 @@ Chaque écriture est journalisée, puis relue sur l'onduleur. Si la relecture ne
 | `custom_components/ucaness/` | L'intégration |
 | `tests/` | Tests de l'intégration |
 | `pilotage/` | Packages Home Assistant de pilotage de nuit de la batterie, règles et calculs (`pilotage/REGLES.md`), guide d'installation (`pilotage/README.md`), tests. Aucune valeur propre à une installation : tout se règle dans les entrées de Home Assistant |
+| `dashboard/` | Tableau de bord « UCANESS HOME ASSISTANT » dans le style du portail UCANESS : maison en direct au centre, pilotage des appareils autour, onglet Batterie (`dashboard/README.md`). Prérequis pour afficher sa propre maison : `dashboard/MAISON.md` |
 | `docs/api-ucanpower.md` | Synthèse de l'API tierce UCanpower et constats sur le modèle `mr` |
 | `tools/` | Sonde en lecture seule à lancer hors de Home Assistant |
 

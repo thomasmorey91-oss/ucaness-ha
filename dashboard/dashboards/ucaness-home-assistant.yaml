@@ -1,0 +1,318 @@
+# Tableau de bord « UCANESS HOME ASSISTANT » (mode YAML).
+# Installation : dashboard/README.md. Personnaliser la maison du centre : dashboard/MAISON.md.
+#
+# Deux sortes d'entités :
+#   - sensor.uhome_*, binary_sensor.uhome_*, input_*.jarvis_* : intégration ucaness et packages de pilotage
+#     de ce dépôt (IDs à obtenir par renommage, voir dashboard/README.md) ;
+#   - climate.*, switch.*, cover.*, camera.* … marquées « EXEMPLE » : vos propres appareils.
+#     Remplacez-les par vos entités ou supprimez la carte correspondante.
+#
+# L'ouverture du portail ou de la porte de garage et le changement de mode de la batterie
+# demandent une confirmation. L'alarme s'arme depuis sa fiche (code éventuel).
+
+title: UCANESS HOME ASSISTANT
+
+views:
+  # ------------------------------------------------------------------ Maison
+  - title: Maison
+    path: maison
+    icon: mdi:home-lightning-bolt
+    theme: UCANESS
+    panel: true
+    cards:
+      - type: custom:ucaness-layout-card
+        header: &entete
+          title: UCANESS HOME ASSISTANT
+          site: Maison
+          tabs:
+            - title: Maison
+              path: /ucaness-maison/maison
+            - title: Batterie
+              path: /ucaness-maison/batterie
+              entity: sensor.uhome_soc
+          connectivity_entity: binary_sensor.uhome_connexion_cloud
+          alert_entities:
+            - binary_sensor.uhome_defaut_batterie
+            - binary_sensor.uhome_temperature_hors_plage
+        columns:
+          # ---- à gauche : confort et eau
+          - width: 300px
+            cards:
+              - type: custom:ucaness-panel-card
+                title: Climatisation
+                cards:
+                  - type: tile
+                    entity: climate.rez_de_chaussee          # EXEMPLE
+                    name: Rez-de-chaussée
+                    features_position: bottom
+                    features:
+                      - type: climate-hvac-modes
+                        hvac_modes: ["off", heat, cool]
+                      - type: target-temperature
+                  - type: tile
+                    entity: climate.etage                    # EXEMPLE
+                    name: Étage
+                    features_position: bottom
+                    features:
+                      - type: climate-hvac-modes
+                        hvac_modes: ["off", heat, cool]
+                      - type: target-temperature
+              - type: custom:ucaness-panel-card
+                title: Eau chaude
+                cards:
+                  - type: tile
+                    entity: switch.ballon_eau_chaude         # EXEMPLE : contact heures creuses / surplus
+                    name: Ballon (marche forcée)
+                    tap_action:
+                      action: toggle
+                  - type: tile
+                    entity: climate.seche_serviettes         # EXEMPLE : thermostat logiciel
+                    name: Sèche-serviettes
+                    features_position: bottom
+                    features:
+                      - type: target-temperature
+              - type: custom:ucaness-panel-card
+                title: Piscine
+                cards:
+                  - type: tile
+                    entity: sensor.temperature_eau_piscine   # EXEMPLE
+                    name: Température de l'eau
+                  - type: tile
+                    entity: switch.pompe_piscine             # EXEMPLE
+                    name: Filtration
+                    tap_action:
+                      action: toggle
+
+          # ---- au centre : la maison en direct et les appareils
+          - width: 1fr
+            cards:
+              - type: custom:ucaness-flow-card
+                # Votre maison (voir dashboard/MAISON.md) :
+                # image: /local/ucaness/ma-maison.png
+                # nodes:
+                #   solar:    {x: 44, y: 11.5}
+                #   inverter: {x: 44, y: 46}
+                #   grid:     {x: 65, y: 11.5}
+                #   battery:  {x: 20, y: 79}
+                #   home:     {x: 60, y: 79}
+                # calibration: true   # grille de calage, à retirer une fois les boules placées
+              - type: custom:ucaness-panel-card
+                title: Appareils
+                cards:
+                  - type: grid
+                    columns: 2
+                    square: false
+                    cards:
+                      - type: tile
+                        entity: sensor.lave_linge_puissance        # EXEMPLE : prise avec mesure
+                        name: Lave-linge
+                      - type: tile
+                        entity: sensor.seche_linge_puissance       # EXEMPLE
+                        name: Sèche-linge
+                      - type: tile
+                        entity: sensor.lave_vaisselle_puissance    # EXEMPLE
+                        name: Lave-vaisselle
+                      - type: tile
+                        entity: sensor.congelateur_puissance       # EXEMPLE : ne jamais couper cette prise
+                        name: Congélateur
+
+          # ---- à droite : ouvertures et sécurité
+          - width: 300px
+            cards:
+              - type: custom:ucaness-panel-card
+                title: Volets
+                cards:
+                  - type: tile
+                    entity: cover.tous_les_volets           # EXEMPLE : groupe de volets
+                    name: Tous les volets
+                    features_position: bottom
+                    features:
+                      - type: cover-open-close
+              - type: custom:ucaness-panel-card
+                title: Portail · Garage
+                cards:
+                  # Pas de boutons rapides ici : ils ne demandent pas de confirmation.
+                  - type: tile
+                    entity: cover.portail                   # EXEMPLE
+                    name: Portail
+                    tap_action:
+                      action: toggle
+                      confirmation:
+                        text: "Ouvrir ou fermer le portail ? Vérifiez que le passage est libre."
+                  - type: tile
+                    entity: cover.porte_garage              # EXEMPLE
+                    name: Porte de garage
+                    tap_action:
+                      action: toggle
+                      confirmation:
+                        text: "Ouvrir ou fermer la porte de garage ? Vérifiez que le passage est libre."
+              - type: custom:ucaness-panel-card
+                interval: 8
+                slides:
+                  - title: Sécurité
+                    cards:
+                      - type: tile
+                        entity: binary_sensor.ouvrants          # EXEMPLE : groupe des portes et fenêtres
+                        name: Ouvrants
+                      - type: tile
+                        entity: alarm_control_panel.maison      # EXEMPLE
+                        name: Alarme
+                        tap_action:
+                          action: more-info
+                  - title: Caméras · Portier
+                    cards:
+                      - type: picture-entity
+                        entity: camera.portier                  # EXEMPLE
+                        camera_view: auto
+                        show_name: false
+
+  # ------------------------------------------------------------------ Batterie
+  - title: Batterie
+    path: batterie
+    icon: mdi:home-battery
+    theme: UCANESS
+    panel: true
+    cards:
+      - type: custom:ucaness-layout-card
+        header: *entete
+        columns:
+          # ---- à gauche : production et consommation (tableau de bord Énergie configuré)
+          - width: 300px
+            cards:
+              - type: custom:ucaness-panel-card
+                title: Production
+                cards:
+                  - type: energy-date-selection
+                  - type: energy-solar-consumed-gauge
+                  - type: energy-solar-graph
+              - type: custom:ucaness-panel-card
+                title: Consommation
+                cards:
+                  - type: energy-self-sufficiency-gauge
+                  - type: energy-usage-graph
+
+          # ---- au centre : charge, conditions du jour, détails
+          - width: 1fr
+            cards:
+              - type: custom:ucaness-panel-card
+                title: Charge de la batterie
+                cards:
+                  - type: custom:ucaness-soc-card
+                    # capacity: 10      # kWh, si vous n'utilisez pas les packages de pilotage
+                    # floor: 10         # %, idem
+                  - type: grid
+                    columns: 2
+                    square: false
+                    cards:
+                      - type: weather-forecast
+                        entity: weather.maison                 # EXEMPLE : votre intégration météo
+                        show_forecast: false
+                      - type: entities
+                        entities:
+                          - entity: sensor.uhome_mode
+                            name: Mode de charge
+                          - entity: binary_sensor.jarvis_heures_creuses
+                            name: Heures creuses
+                          - entity: sensor.jarvis_prix_du_kwh_reseau
+                            name: Prix du kWh
+                          - entity: sensor.solcast_pv_forecast_prevision_aujourdhui
+                            name: Solaire prévu aujourd'hui
+                          - entity: sensor.solcast_pv_forecast_prevision_demain
+                            name: Solaire prévu demain
+              - type: custom:ucaness-panel-card
+                title: Détails
+                cards:
+                  - type: grid
+                    columns: 2
+                    square: false
+                    cards:
+                      - type: entities
+                        title: Batterie
+                        entities:
+                          - entity: sensor.uhome_tension_batterie
+                            name: Tension
+                          - entity: sensor.uhome_courant_batterie
+                            name: Courant
+                          - entity: sensor.uhome_temperature_batterie
+                            name: Température
+                          - entity: sensor.uhome_sante_batterie
+                            name: Santé (SOH)
+                      - type: entities
+                        title: Onduleur et réseau
+                        entities:
+                          - entity: sensor.uhome_puissance_mppt_1
+                            name: MPPT 1
+                          - entity: sensor.uhome_puissance_mppt_2
+                            name: MPPT 2
+                          - entity: sensor.uhome_tension_reseau
+                            name: Tension réseau
+                          - entity: sensor.uhome_frequence_reseau
+                            name: Fréquence
+                          - entity: sensor.uhome_temperature_onduleur
+                            name: Température onduleur
+
+          # ---- à droite : utilisation, batterie, pilotage
+          - width: 300px
+            cards:
+              - type: custom:ucaness-panel-card
+                title: Utilisation
+                cards:
+                  - type: history-graph
+                    hours_to_show: 24
+                    entities:
+                      - entity: sensor.uhome_puissance_solaire
+                        name: Solaire
+                      - entity: sensor.uhome_puissance_maison
+                        name: Maison
+                      - entity: sensor.uhome_puissance_batterie
+                        name: Batterie
+                      - entity: sensor.uhome_puissance_reseau
+                        name: Réseau
+              - type: custom:ucaness-panel-card
+                interval: 8
+                slides:
+                  - title: Batterie
+                    cards:
+                      - type: statistics-graph
+                        chart_type: bar
+                        period: day
+                        days_to_show: 7
+                        stat_types: [change]
+                        entities:
+                          - entity: sensor.uhome_charge_batterie_totale
+                            name: Charge
+                          - entity: sensor.uhome_decharge_batterie_totale
+                            name: Décharge
+                  - title: Santé et défauts
+                    cards:
+                      - type: entities
+                        entities:
+                          - entity: binary_sensor.uhome_connexion_cloud
+                            name: Liaison au cloud
+                          - entity: binary_sensor.uhome_defaut_batterie
+                            name: Défaut ou alarme batterie
+                          - entity: binary_sensor.uhome_temperature_hors_plage
+                            name: Température hors plage de charge
+                          - entity: sensor.uhome_code_defaut_batterie
+                            name: Code défaut
+              - type: custom:ucaness-panel-card
+                title: Pilotage de nuit
+                cards:
+                  - type: entities
+                    entities:
+                      - entity: sensor.jarvis_recharge_reseau_prevue
+                        name: Recharge prévue
+                      - type: attribute
+                        entity: sensor.jarvis_recharge_reseau_prevue
+                        attribute: justification
+                        name: Pourquoi
+                      - entity: input_boolean.jarvis_batterie_plan_actif
+                        name: Recharge en cours
+                  # Changer de mode touche à l'onduleur : confirmation obligatoire, pas d'interrupteur direct.
+                  - type: tile
+                    entity: input_boolean.jarvis_mode_simulation
+                    name: Mode simulation
+                    tap_action:
+                      action: toggle
+                      confirmation:
+                        text: "Changer le mode de pilotage ? En mode réel, le mode et les plages de charge décidés chaque soir sont envoyés à l'onduleur."
