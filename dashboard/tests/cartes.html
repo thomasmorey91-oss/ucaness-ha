@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Essai des cartes UCANESS : texte repliable et panneau à onglets (hors Home Assistant)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin: 0; background: #030B20; }
+  .stub { box-sizing: border-box; min-height: 44px; padding: 8px 10px; background: rgba(22,40,72,0.78); color: #FFFFFF; font: 14px 'Times New Roman', Tinos, serif; }
+</style>
+<script>
+  // Données inventées : aucune mesure réelle.
+  window.fakeHass = { locale: { language: 'fr' }, language: 'fr', states: {} };
+  // Comme une carte markdown de Home Assistant : élément « en ligne », texte dans son propre shadow DOM.
+  customElements.define('faux-markdown', class extends HTMLElement {
+    constructor() { super(); this.attachShadow({ mode: 'open' }); }
+    setConfig(conf) {
+      this.shadowRoot.innerHTML = `<style>.md{box-sizing:border-box;padding:16px;background:rgba(22,40,72,0.78);color:#fff;font:14px/1.5 'Times New Roman',Tinos,serif}.md h4{margin:0 0 8px;font-size:16px}.md p,.md li{margin:0 0 6px}a{color:#00FFFF}</style><div class="md">${conf.content}</div>`;
+    }
+    set hass(h) {}
+  });
+  window.loadCardHelpers = async () => ({
+    createCardElement(conf) {
+      if (String(conf.type).startsWith('custom:')) {
+        const card = document.createElement(conf.type.slice(7));
+        card.setConfig(conf);
+        return card;
+      }
+      if (conf.type === 'markdown') {
+        const md = document.createElement('faux-markdown');
+        md.setConfig(conf);
+        return md;
+      }
+      const el = document.createElement('div');
+      el.className = 'stub';
+      el.textContent = conf.name || conf.type;
+      return el;
+    },
+  });
+</script>
+<script type="module">
+  import '../www/ucaness/ucaness-cards.js';
+  const long = '<h4>Une journée de la batterie</h4><ol>' + [
+    '<b>Nuit, heures creuses</b> : la batterie alimente la maison avec ce qui lui reste. Si demain en a besoin, elle est rechargée sur le réseau en fin de nuit, au tarif bas.',
+    '<b>Matin</b> : la batterie alimente la maison jusqu’au relais du soleil, pour ne rien acheter en heures pleines.',
+    '<b>Journée</b> : le soleil alimente la maison, le surplus recharge la batterie. Batterie pleine : le surplus part sur le réseau.',
+    '<b>Soir</b> : la batterie alimente la maison jusqu’à son plancher, puis le réseau prend le relais.',
+  ].map((t) => `<li>${t}</li>`).join('') + '</ol>';
+  const note = (id, extra) => Object.assign({ type: 'custom:ucaness-note-card', id }, extra);
+  const layout = document.createElement('ucaness-layout-card');
+  layout.setConfig({
+    columns: [
+      { width: '300px', cards: [
+        { type: 'custom:ucaness-panel-card', title: 'Court', cards: [note('court', { content: '<p><b>Pas encore relié.</b> Prévu : une prise mesurée.</p>' })] },
+        { type: 'custom:ucaness-panel-card', title: 'Lien', cards: [note('lien', { lines: 2, content: '<p><a href="#lien-suivi">Ouvrir la notice</a></p>' + long })] },
+      ] },
+      { width: '1fr', cards: [
+        { type: 'custom:ucaness-panel-card', title: 'Principe', cards: [note('long', { lines: 4, mobile_lines: 2, content: long })] },
+        { type: 'custom:ucaness-panel-card', title: 'Détails', tabs: true, slides: [
+          { tab: 'Principe', icon: 'mdi:school-outline', cards: [{ type: 'tile', name: 'Premier onglet' }] },
+          { tab: 'Cette nuit', icon: 'mdi:weather-night', cards: [{ type: 'tile', name: 'Deuxième onglet' }] },
+          { tab: 'Santé', cards: [{ type: 'tile', name: 'Troisième onglet' }] },
+        ] },
+      ] },
+      { width: '300px', cards: [
+        { type: 'custom:ucaness-panel-card', title: 'Pilotage', cards: [note('reconfig', { lines: 3, content: long })] },
+      ] },
+    ],
+  });
+  document.body.appendChild(layout);
+  layout.hass = window.fakeHass;
+  setTimeout(() => { layout.hass = window.fakeHass; document.body.dataset.ready = '1'; }, 400);
+</script>
+</head>
+<body></body>
+</html>

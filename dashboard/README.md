@@ -36,7 +36,7 @@ Un tableau de bord Home Assistant qui prolonge le portail UCANESS : même police
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.1.0`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.2.3`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -105,7 +105,8 @@ Un tableau de bord Home Assistant qui prolonge le portail UCANESS : même police
 | Option | Rôle |
 |---|---|
 | `title`, `cards` | Titre du cartouche et cartes contenues |
-| `slides`, `interval` | Carrousel : liste de `{title, cards}` qui défilent toutes les `interval` secondes (8 par défaut, 0 pour arrêter) |
+| `slides`, `interval` | Carrousel : liste de `{title, cards}` qui défilent toutes les `interval` secondes (8 par défaut, 0 pour arrêter). Après un choix manuel, le défilement reprend à zéro |
+| `tabs` | `true` : les `slides` deviennent des onglets nommés en haut du panneau (`tab` pour le nom, `icon` facultative, `cards`), le titre `title` reste fixe et rien ne défile seul |
 | `status_entity` | Valeur affichée à droite du cartouche |
 
 ### `custom:ucaness-flow-card`
@@ -123,9 +124,34 @@ Chaque nœud accepte `entity`, `x` et `y` (en % de la carte), `label`, `details`
 
 Conventions de signe de l'intégration : batterie positive en charge, réseau positif en soutirage. Un appui sur une boule ouvre la fiche de l'entité.
 
+### `custom:ucaness-note-card`
+
+Texte replié sur quelques lignes et terminé par « … » : le module garde la taille des autres. Un appui sur le texte ou sur « … » le déplie en entier, « Réduire » le replie. Un texte assez court pour tenir s'affiche normalement, sans « … ». Un lien dans le texte s'ouvre sans le déplier.
+
+Pour l'utiliser, remplacer `type: markdown` par `type: custom:ucaness-note-card` en gardant `content:`.
+
+| Option | Défaut | Rôle |
+|---|---|---|
+| `content` | — | Texte markdown (modèles acceptés, comme dans une carte markdown) |
+| `card` | — | À la place de `content` : n'importe quelle autre carte à replier |
+| `lines` | `4` | Nombre de lignes visibles, texte replié |
+| `mobile_lines` | `lines` | Nombre de lignes visibles sous 900 px de large |
+
+```yaml
+- type: custom:ucaness-note-card
+  lines: 4
+  content: |-
+    #### Une journée de la batterie
+    ...
+```
+
 ### `custom:ucaness-soc-card`
 
 Options : `soc_entity`, `power_entity`, `floor_entity` ou `floor` (%), `capacity_entity` ou `capacity` (kWh). Par défaut, les entrées des packages de pilotage.
+
+### Mode allégé
+
+Sur une tablette peu puissante, ajouter `?leger=1` à l'adresse du tableau de bord (par exemple `/ucaness-maison/maison?leger=1`) : les animations sont coupées. Le choix est mémorisé sur l'appareil ; `?leger=0` le retire. Les cartes ne se redessinent que lorsque leurs propres entités changent.
 
 ## 5. Sécurité
 
@@ -141,7 +167,7 @@ python -m http.server 8765
 # puis ouvrir http://localhost:8765/tests/apercu.html
 ```
 
-L'aperçu utilise des valeurs inventées et remplace les cartes standard par des lignes simples.
+L'aperçu utilise des valeurs inventées et remplace les cartes standard par des lignes simples. `tests/cartes.html` montre de la même façon le texte repliable et le panneau à onglets.
 
 ## 7. Tests
 
@@ -149,7 +175,7 @@ L'aperçu utilise des valeurs inventées et remplace les cartes standard par des
 pytest dashboard/tests -q
 ```
 
-Les tests vérifient le fichier YAML, la cohérence entre le tableau de bord, les cartes et la liste des entités, le générateur de maison, l'absence de données personnelles dans le dossier, et le rendu des cartes dans Chrome (ignoré si Playwright n'est pas installé).
+Les tests vérifient le fichier YAML, la cohérence entre le tableau de bord, les cartes et la liste des entités, le générateur de maison, l'absence de données personnelles dans le dossier, la version annoncée de la ressource, et le rendu des cartes dans Chrome : flux, carrousel, onglets, texte repliable (ordinateur et téléphone), redessin limité, mode allégé (ignoré si Playwright n'est pas installé).
 
 ## 8. Licences et marques
 
