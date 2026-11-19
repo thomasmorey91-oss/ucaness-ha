@@ -1,0 +1,633 @@
+# =============================================================================
+# Pilotage de nuit d'une batterie UCanpower (UHome) par l'intégration UCANESS
+# -----------------------------------------------------------------------------
+# MODE SIMULATION PAR DÉFAUT : la stratégie est calculée et journalisée chaque soir,
+# AUCUNE consigne n'est envoyée à l'onduleur tant que « Batterie : mode simulation » est allumé.
+# L'interrupteur revient à « allumé » à chaque redémarrage de Home Assistant (sécurité).
+#
+# Ce qui est envoyé à l'onduleur (actions ucaness.definir_plages_charge et
+# ucaness.definir_mode, relues après envoi) : le mode (autoconsommation / arbitrage horaire)
+# et les plages de CHARGE. Jamais de plage de décharge, jamais de mode Backup, aucun réglage
+# de fond. L'option « Écriture autorisée » de l'intégration doit être cochée.
+#
+# Déroulement d'une nuit :
+#   - 22h30 : calcul d'aperçu (journal) ;
+#   - début des heures creuses : recalcul avec le SOC du moment ; si une recharge est utile,
+#     plage de charge placée en FIN d'heures creuses (fin 15 min avant leur fin, durée + 10 %),
+#     puis passage en arbitrage horaire ;
+#   - 1 h avant le début de la charge : réévaluation (SOC et prévision du moment), la plage est
+#     raccourcie, allongée ou supprimée ;
+#   - 2 min avant la fin des heures creuses : retour en autoconsommation (secours 15 min après).
+#   Une plage qui passe minuit est coupée en deux : début-23h59 puis 00h00-fin.
+#   Constat sur un UHome 6K (modèle « mr ») : en arbitrage (« Peak Fill Mode »), hors plage,
+#   la batterie continue d'alimenter la maison ; la consommation de la nuit est donc toujours
+#   déduite du stock.
+#
+# Calcul (pour le lendemain le soir, pour le jour même après minuit) :
+#   - consommation heure par heure = consommation MESURÉE de la maison (moyenne horaire des
+#     7 derniers jours, même type de jour si possible, statistiques de Home Assistant) ; pour
+#     une heure sans mesure : « consommation journalière par défaut » × profil type ;
+#   - solaire heure par heure = prévision Solcast (attribut detailedHourly) ;
+#   - de la fin des heures creuses à leur retour, bilan cumulé de la batterie : il baisse quand
+#     la maison consomme plus que le solaire, il remonte avec le surplus ;
+#     besoin = le point le plus bas de ce bilan (énergie à avoir en stock en fin de nuit pour
+#     tenir jusqu'au relais du solaire, ou jusqu'aux heures creuses suivantes), plus le quart
+#     d'heure entre la fin de la plage et la fin des heures creuses, majoré de la marge ;
+#   - place = capacité utile - pic de remplissage atteint AVANT le point le plus bas (un stock
+#     consommé avant le surplus solaire ne prend pas sa place) ;
+#   - cible = min(besoin, place) ; stock restant = stock actuel - consommation de la nuit ;
+#   - recharge réseau = (cible - stock restant) / rendement, si rendement² × prix HP > prix HC.
+#   Pas de recharge si la batterie est sous 0 °C, si le jour préparé n'est pas ouvré (tarifs
+#   « week-end en heures creuses »), ou si une donnée manque (repli sûr : rien n'est envoyé).
+#
+# Réglages (Paramètres > Entrées) : capacité, plancher (SOC sous lequel l'onduleur ne
+# décharge plus), rendement, puissance de charge réseau réellement observée, marge,
+# consommation journalière par défaut. Voir pilotage/README.md.
+#
+# Entités attendues (à renommer à l'installation, voir pilotage/README.md) :
+#   sensor.uhome_soc, sensor.uhome_temperature_batterie, sensor.uhome_mode,
+#   sensor.uhome_puissance_maison, binary_sensor.uhome_temperature_hors_plage (UCANESS)
+#   sensor.solcast_pv_forecast_prevision_demain, sensor.solcast_pv_forecast_prevision_aujourdhui
+#   binary_sensor.workday_sensor (Workday)
+# =============================================================================
+
+input_boolean:
+  jarvis_mode_simulation:
+    name: "Batterie : mode simulation (aucune consigne envoyée)"
+    icon: mdi:test-tube
+    initial: true   # sécurité : revient en simulation à chaque redémarrage
+  jarvis_batterie_plan_actif:
+    name: "Batterie : recharge de nuit programmée (arbitrage horaire en cours)"
+    icon: mdi:battery-charging-medium
+
+input_datetime:
+  jarvis_batterie_fin_plan:
+    name: "Batterie : fin de la recharge programmée"
+    has_date: false
+    has_time: true
+  jarvis_batterie_reevaluation:
+    name: "Batterie : réévaluation de la recharge (1 h avant)"
+    has_date: false
+    has_time: true
+
+input_number:
+  jarvis_batterie_capacite:
+    name: "Batterie : capacité brute"
+    min: 0
+    max: 40
+    step: 0.01
+    unit_of_measurement: kWh
+    mode: box
+  jarvis_batterie_plancher:
+    name: "Batterie : SOC plancher (100 - DOD)"
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: "%"
+    mode: box
+  jarvis_batterie_rendement:
+    name: "Batterie : rendement charge ou décharge"
+    min: 0
+    max: 100
+    step: 0.5
+    unit_of_measurement: "%"
+    mode: box
+  jarvis_batterie_puissance_charge:
+    name: "Batterie : puissance de charge"
+    min: 0.5
+    max: 10
+    step: 0.1
+    unit_of_measurement: kW
+    mode: box
+  jarvis_batterie_marge:
+    name: "Batterie : marge de sécurité sur le besoin"
+    min: 0
+    max: 50
+    step: 1
+    unit_of_measurement: "%"
+    mode: box
+  jarvis_conso_journaliere:
+    name: "Batterie : consommation journalière par défaut (heures sans mesure)"
+    min: 0
+    max: 200
+    step: 0.1
+    unit_of_measurement: kWh
+    mode: box
+
+template:
+  # ---------------------------------------------------------------------------
+  # Calcul de la recharge de nuit (chaque soir à 22h30, ou sur l'événement
+  # « jarvis_recalcul_batterie » pour un recalcul manuel).
+  # ---------------------------------------------------------------------------
+  - triggers:
+      - trigger: time
+        at: "22:30:00"
+      - trigger: event
+        event_type: jarvis_recalcul_batterie
+    actions:
+      # Jour à préparer : demain le soir, aujourd'hui après minuit (réévaluation de nuit).
+      - variables:
+          jour_cible: >
+            {% set f = states('input_datetime.jarvis_hc_fin') %}
+            {% set h_f = f[:2] | int(6) if f | regex_match('^\\d\\d:') else 6 %}
+            {{ (now().date() if now().hour < h_f else (now() + timedelta(days=1)).date()) | string }}
+      - action: workday.check_date
+        target: { entity_id: binary_sensor.workday_sensor }
+        data:
+          check_date: "{{ jour_cible }}"
+        response_variable: jour
+      # Consommation réellement mesurée, moyenne horaire des 7 derniers jours.
+      - action: recorder.get_statistics
+        continue_on_error: true
+        data:
+          start_time: "{{ (now() - timedelta(days=7)).isoformat() }}"
+          statistic_ids: [sensor.uhome_puissance_maison]
+          period: hour
+          types: [mean]
+        response_variable: mesures
+      - variables:
+          demain: "{{ jour_cible }}"
+          demain_ouvre: "{{ jour['binary_sensor.workday_sensor'].workday | default(false) }}"
+          # Profil type (part de la journée par heure, 0 h à 23 h) : sert seulement pour les heures
+          # sans mesure. Profil générique (pointes du matin et du soir), à remplacer au besoin.
+          profils:
+            ouvre: [0.030, 0.027, 0.025, 0.024, 0.024, 0.027, 0.045, 0.060, 0.050, 0.038, 0.033, 0.033, 0.040, 0.036, 0.032, 0.032, 0.038, 0.052, 0.066, 0.072, 0.068, 0.058, 0.048, 0.038]
+            repos: [0.032, 0.028, 0.026, 0.025, 0.024, 0.025, 0.030, 0.038, 0.048, 0.050, 0.048, 0.046, 0.050, 0.044, 0.038, 0.036, 0.040, 0.050, 0.062, 0.068, 0.066, 0.056, 0.046, 0.038]
+          conso_jour: >
+            {% set c = states('input_number.jarvis_conso_journaliere') | float(0) %}
+            {{ c if c > 0 else none }}
+          # Consommation mesurée par heure (kWh), même type de jour en priorité ; none sans mesure.
+          conso_mesuree: >
+            {% set st = mesures.statistics if (mesures is defined and mesures is mapping and 'statistics' in mesures) else {} %}
+            {% set rows = st['sensor.uhome_puissance_maison'] if 'sensor.uhome_puissance_maison' in st else [] %}
+            {% set ns = namespace(v=[]) %}
+            {% for h in range(24) %}
+              {% set a = namespace(s1=0, n1=0, s2=0, n2=0) %}
+              {% for r in rows %}
+                {% if r.mean is number %}
+                  {% set t = r.start | as_datetime | as_local %}
+                  {% if t.hour == h %}
+                    {% set a.s2 = a.s2 + r.mean %}
+                    {% set a.n2 = a.n2 + 1 %}
+                    {% if (t.weekday() < 5) == demain_ouvre %}
+                      {% set a.s1 = a.s1 + r.mean %}
+                      {% set a.n1 = a.n1 + 1 %}
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+              {% set val = (a.s1 / a.n1 / 1000) if a.n1 > 0 else ((a.s2 / a.n2 / 1000) if a.n2 > 0 else none) %}
+              {% set ns.v = ns.v + [(val | round(3)) if val is not none else none] %}
+            {% endfor %}
+            {{ ns.v }}
+          # Production solaire prévue pour demain, heure par heure (kWh), d'après Solcast.
+          pv_h: >
+            {% set capteur = 'sensor.solcast_pv_forecast_prevision_aujourdhui' if jour_cible == now().date() | string else 'sensor.solcast_pv_forecast_prevision_demain' %}
+            {% set dh = state_attr(capteur, 'detailedHourly') or [] %}
+            {% set ns = namespace(v=[]) %}
+            {% for h in range(24) %}
+              {% set n2 = namespace(s=0) %}
+              {% for e in dh %}
+                {% if (e.period_start | as_datetime | as_local).hour == h %}
+                  {% set n2.s = n2.s + (e.pv_estimate | float(0)) %}
+                {% endif %}
+              {% endfor %}
+              {% set ns.v = ns.v + [n2.s | round(3)] %}
+            {% endfor %}
+            {{ ns.v }}
+          calcul: >
+            {% set cap_brute = states('input_number.jarvis_batterie_capacite') | float(0) %}
+            {% set plancher = states('input_number.jarvis_batterie_plancher') | float(10) %}
+            {% set eta = states('input_number.jarvis_batterie_rendement') | float(95) / 100 %}
+            {% set p_ch = states('input_number.jarvis_batterie_puissance_charge') | float(5) %}
+            {% set hp = states('input_number.jarvis_prix_hp') | float(0) %}
+            {% set hc = states('input_number.jarvis_prix_hc') | float(0) %}
+            {% set hc_d = states('input_datetime.jarvis_hc_debut') %}
+            {% set hc_f = states('input_datetime.jarvis_hc_fin') %}
+            {% set hc_d = hc_d if hc_d | regex_match('^\\d\\d:\\d\\d') else '23:00:00' %}
+            {% set hc_f = hc_f if hc_f | regex_match('^\\d\\d:\\d\\d') else '06:00:00' %}
+            {% set deb_min = hc_d[:2] | int * 60 + hc_d[3:5] | int %}
+            {% set fin_hc_min = hc_f[:2] | int * 60 + hc_f[3:5] | int %}
+            {% set h_deb = deb_min // 60 %}
+            {% set h_fin = fin_hc_min // 60 %}
+            {% set duree_hc = (fin_hc_min - deb_min) % 1440 %}
+            {% set cap = cap_brute * (1 - plancher / 100) %}
+            {% set soc = states('sensor.uhome_soc') | float(none) %}
+            {% set t_batt = states('sensor.uhome_temperature_batterie') | float(none) %}
+            {% set marge = states('input_number.jarvis_batterie_marge') | float(10) / 100 %}
+            {% set p = profils['ouvre' if demain_ouvre else 'repos'] %}
+            {% set cm = conso_mesuree if conso_mesuree is list and conso_mesuree | count == 24 else [none] * 24 %}
+            {% set n_mes = cm | select('number') | list | count %}
+            {% set ns = namespace(deficit=0, surplus=0, cum=0, pic=0, pic_avant=0, mini=0, h_min=none, conso=0, nuit=0, l=[]) %}
+            {% for h in range(24) %}
+              {% set ns.l = ns.l + [cm[h] if cm[h] is number else ((conso_jour * p[h]) if conso_jour is number else none)] %}
+            {% endfor %}
+            {% set conso_ok = ns.l | select('number') | list | count == 24 %}
+            {% if conso_ok %}
+              {# Consommation d'ici la fin des heures creuses (en cours de nuit : à partir de maintenant). #}
+              {% set now_min = now().hour * 60 + now().minute %}
+              {% set ecoule = (now_min - deb_min) % 1440 %}
+              {% set ecoule = ecoule if ecoule < duree_hc else 0 %}
+              {% for i in range((duree_hc + 59) // 60) %}
+                {% set h = (h_deb + i) % 24 %}
+                {% set part = [0, [1, (60 * (i + 1) - ecoule) / 60, (duree_hc - 60 * i) / 60] | min] | max %}
+                {% set ns.nuit = ns.nuit + ns.l[h] * part %}
+              {% endfor %}
+              {% for h in range(h_fin, h_deb if h_deb > h_fin else 24) %}
+                {% set l = ns.l[h] %}
+                {% set v = pv_h[h] %}
+                {% set ns.conso = ns.conso + l %}
+                {% set d = [l - v, 0] | max %}
+                {% set s = [v - l, 0] | max %}
+                {% set ns.deficit = ns.deficit + d %}
+                {% set ns.surplus = ns.surplus + s %}
+                {% set ns.cum = ns.cum + eta * s - d / eta %}
+                {% set ns.pic = [ns.pic, ns.cum] | max %}
+                {% if ns.cum < ns.mini %}
+                  {% set ns.mini = ns.cum %}
+                  {% set ns.h_min = h %}
+                  {% set ns.pic_avant = ns.pic %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+            {# De la fin de la plage (15 min avant la fin des HC) à la fin des HC, la batterie alimente la maison. #}
+            {% set talon = (ns.l[(h_fin - 1) % 24] * 0.25 / eta) if conso_ok else 0 %}
+            {% set besoin = ([0, -ns.mini] | max + (talon if ns.mini < 0 else 0)) * (1 + marge) %}
+            {% set relais = (ns.h_min + 1) if ns.h_min is not none else h_fin %}
+            {% set relais_txt = ("jusqu'aux heures creuses de " ~ h_deb ~ 'h') if relais >= h_deb else ("jusqu'au relais du solaire vers " ~ relais ~ 'h') %}
+            {# Le stock du matin n'empêche le solaire de charger que s'il est encore là au moment
+               d'un pic de remplissage : seul compte le pic atteint AVANT le point le plus bas. #}
+            {% set place = [0, cap - ns.pic_avant] | max %}
+            {% set cible = [besoin, place, cap] | min %}
+            {% set stock = [0, ((soc if soc is number else plancher) - plancher) / 100 * cap_brute] | max %}
+            {% set drain = ns.nuit / eta %}
+            {% set stock_restant = [0, stock - drain] | max %}
+            {% set ns2 = namespace(recharge=0, maintien=false, motif='ok') %}
+            {% if not demain_ouvre %}{% set ns2.motif = 'Demain non ouvré : tout est en heures creuses, pas de recharge.' %}
+            {% elif cap_brute <= 0 %}{% set ns2.motif = 'Capacité de la batterie non renseignée : pas de recharge.' %}
+            {% elif not conso_ok %}{% set ns2.motif = 'Consommation inconnue (heures sans mesure et consommation journalière par défaut non renseignée) : pas de recharge (repli sûr).' %}
+            {% elif soc is not number %}{% set ns2.motif = 'SOC batterie indisponible : pas de recharge (repli sûr).' %}
+            {% elif t_batt is number and t_batt < 0 %}{% set ns2.motif = 'Batterie sous 0 °C : charge interdite.' %}
+            {% elif cible <= 0.05 %}{% set ns2.motif = 'Soleil prévu suffisant dès la fin des heures creuses : pas de recharge.' %}
+            {% elif stock_restant >= cible %}
+              {% set ns2.motif = 'Stock actuel suffisant, même après la nuit, pour les ' ~ (besoin | round(1)) ~ ' kWh à couvrir ' ~ relais_txt ~ ' : pas de recharge.' %}
+            {% elif hp * eta * eta <= hc %}
+              {% set ns2.motif = 'Écart HP/HC insuffisant : pas de recharge.' %}
+            {% else %}
+              {% set ns2.recharge = (cible - stock_restant) / eta %}
+              {% set ns2.maintien = ns2.recharge > 0 %}
+            {% endif %}
+            {% set recharge = ns2.recharge %}
+            {# Plage en fin d'heures creuses : fin 15 min avant leur fin, durée majorée de 10 %. #}
+            {% set fin_ch = (fin_hc_min - 15) % 1440 %}
+            {% set dispo = (fin_ch - deb_min) % 1440 %}
+            {% set duree_min = [((recharge / p_ch * 60 * 1.1) | round(0, 'ceil') | int) if (recharge > 0 and p_ch > 0) else 0, dispo] | min %}
+            {% set debut_min = (fin_ch - duree_min) % 1440 %}
+            {% set debut = '%02d%02d' | format(debut_min // 60, debut_min % 60) %}
+            {% set fin_txt = '%02d%02d' | format(fin_ch // 60, fin_ch % 60) %}
+            {% if duree_min == 0 %}{% set plages = [] %}
+            {% elif debut_min > fin_ch %}
+              {% set plages = [{'debut': debut, 'fin': '2359'}, {'debut': '0000', 'fin': fin_txt}] %}
+            {% else %}
+              {% set plages = [{'debut': debut, 'fin': fin_txt}] %}
+            {% endif %}
+            {% set avant = (debut_min - deb_min) % 1440 %}
+            {% set reeval_min = (debut_min - 60) % 1440 %}
+            {% set reeval = ('%02d:%02d' | format(reeval_min // 60, reeval_min % 60)) if (duree_min > 0 and avant >= 65) else none %}
+            {% set limite = (' (limitée à la capacité de la batterie)' if cap <= place else ' (limitée pour laisser de la place au solaire)') if [place, cap] | min < besoin else '' %}
+            {% if ns2.motif == 'ok' and recharge > 0 %}
+              {% set ns2.motif = 'Recharge de ' ~ (recharge | round(1)) ~ ' kWh entre ' ~ debut[:2] ~ 'h' ~ debut[2:] ~ ' et ' ~ fin_txt[:2] ~ 'h' ~ fin_txt[2:] ~ limite ~ ' pour couvrir ' ~ (besoin | round(1)) ~ ' kWh ' ~ relais_txt ~ ' (consommation mesurée sur ' ~ n_mes ~ ' h sur 24, marge ' ~ (marge * 100) | round(0) | int ~ ' %).' %}
+            {% endif %}
+            {{ {
+              'recharge_kwh': recharge | round(2),
+              'cible_kwh': cible | round(2),
+              'stock_kwh': stock | round(2),
+              'besoin_kwh': besoin | round(2),
+              'relais_h': relais,
+              'place_kwh': place | round(2),
+              'conso_nuit_kwh': ns.nuit | round(1),
+              'conso_prevue_hp_kwh': ns.conso | round(1),
+              'solaire_prevu_kwh': (pv_h | sum) | round(1),
+              'deficit_hp_kwh': ns.deficit | round(1),
+              'surplus_solaire_kwh': ns.surplus | round(1),
+              'duree_h': (duree_min / 60) | round(2),
+              'gain_estime_eur': (recharge * (eta * eta * hp - hc)) | round(2),
+              'heures_mesurees': n_mes,
+              'stock_apres_nuit_kwh': stock_restant | round(2),
+              'maintien': ns2.maintien,
+              'plages': plages,
+              'plan_debut': plages[0].debut if plages else none,
+              'plan_fin': plages[-1].fin if plages else none,
+              'reevaluation': reeval,
+              'calcul_valide': ns2.motif[:10] not in ['Consommati', 'SOC batter', 'Capacité d'],
+              'justification': ns2.motif
+            } }}
+    sensor:
+      - name: "Jarvis recharge réseau prévue"
+        unique_id: jarvis_recharge_reseau_prevue
+        unit_of_measurement: kWh
+        device_class: energy
+        icon: mdi:battery-clock
+        state: "{{ calcul.recharge_kwh }}"
+        attributes:
+          pour_le: "{{ demain }}"
+          jour_ouvre: "{{ demain_ouvre }}"
+          conso_prevue_jour_kwh: "{{ conso_jour }}"
+          conso_prevue_hp_kwh: "{{ calcul.conso_prevue_hp_kwh }}"
+          solaire_prevu_kwh: "{{ calcul.solaire_prevu_kwh }}"
+          deficit_hp_kwh: "{{ calcul.deficit_hp_kwh }}"
+          surplus_solaire_kwh: "{{ calcul.surplus_solaire_kwh }}"
+          besoin_kwh: "{{ calcul.besoin_kwh }}"
+          relais_h: "{{ calcul.relais_h }}"
+          conso_nuit_kwh: "{{ calcul.conso_nuit_kwh }}"
+          stock_apres_nuit_kwh: "{{ calcul.stock_apres_nuit_kwh }}"
+          heures_mesurees: "{{ calcul.heures_mesurees }}"
+          cible_stock_6h_kwh: "{{ calcul.cible_kwh }}"
+          stock_actuel_kwh: "{{ calcul.stock_kwh }}"
+          duree_h: "{{ calcul.duree_h }}"
+          gain_estime_eur: "{{ calcul.gain_estime_eur }}"
+          justification: "{{ calcul.justification }}"
+          maintien: "{{ calcul.maintien }}"
+          calcul_valide: "{{ calcul.calcul_valide }}"
+          reevaluation: "{{ calcul.reevaluation }}"
+          plan_debut: "{{ calcul.plan_debut }}"
+          plages: "{{ calcul.plages }}"
+          plan_fin: "{{ calcul.plan_fin }}"
+          mode: "{{ 'simulation' if is_state('input_boolean.jarvis_mode_simulation', 'on') else 'réel' }}"
+
+  - sensor:
+      - name: "Jarvis coût réseau du jour"
+        unique_id: jarvis_cout_reseau_jour
+        unit_of_measurement: "EUR"
+        device_class: monetary
+        state: >
+          {{ (states('sensor.jarvis_soutirage_jour_hp') | float(0) * states('input_number.jarvis_prix_hp') | float(0)
+            + states('sensor.jarvis_soutirage_jour_hc') | float(0) * states('input_number.jarvis_prix_hc') | float(0)) | round(2) }}
+
+automation:
+  - id: jarvis_batterie_valeurs_initiales
+    alias: "Jarvis · Batterie : valeurs initiales"
+    description: >
+      Tant que la capacité de la batterie n'est pas renseignée, place des valeurs prudentes
+      (plancher 20 % = DOD d'usine de 80 %, rendement 95 %, 3 kW, marge 10 %). Renseigner
+      ensuite la capacité et les valeurs réelles dans Paramètres > Entrées.
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: numeric_state
+        entity_id: input_number.jarvis_batterie_capacite
+        below: 0.01
+    actions:
+      - action: input_number.set_value
+        target: { entity_id: input_number.jarvis_batterie_plancher }
+        data: { value: 20 }
+      - action: input_number.set_value
+        target: { entity_id: input_number.jarvis_batterie_marge }
+        data: { value: 10 }
+      - action: input_number.set_value
+        target: { entity_id: input_number.jarvis_batterie_rendement }
+        data: { value: 95 }
+      - action: input_number.set_value
+        target: { entity_id: input_number.jarvis_batterie_puissance_charge }
+        data: { value: 3 }
+
+  - id: jarvis_batterie_decision_du_soir
+    alias: "Jarvis · Batterie : décision du soir (journal)"
+    description: >
+      Au début des heures creuses (23h), recalcule avec le SOC du moment, journalise la décision
+      et sa justification. En simulation, rien d'autre. En mode réel, appelle le script
+      d'application (plages en fin d'heures creuses, puis arbitrage horaire).
+    mode: single
+    triggers:
+      - trigger: time
+        at: input_datetime.jarvis_hc_debut
+    actions:
+      - event: jarvis_recalcul_batterie
+      - delay: "00:00:20"
+      - action: logbook.log
+        data:
+          name: "Jarvis batterie"
+          entity_id: sensor.jarvis_recharge_reseau_prevue
+          message: >
+            [{{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'mode') }}]
+            {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'justification') }}
+            Conso HP prévue {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'conso_prevue_hp_kwh') }} kWh,
+            solaire prévu {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_prevu_kwh') }} kWh,
+            tarif HP {{ states('input_number.jarvis_prix_hp') }} / HC {{ states('input_number.jarvis_prix_hc') }} €/kWh,
+            gain estimé {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'gain_estime_eur') }} €.
+            {% set pl = state_attr('sensor.jarvis_recharge_reseau_prevue', 'plages') or [] %}
+            {% if state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') %}Arbitrage horaire pendant les heures creuses{% if pl %}, plages {% for x in pl %}{{ x.debut }}-{{ x.fin }} {% endfor %}{% endif %}.{% endif %}
+      - if:
+          - condition: state
+            entity_id: input_boolean.jarvis_mode_simulation
+            state: "off"
+        then:
+          - action: script.jarvis_batterie_appliquer
+            continue_on_error: true
+            response_variable: resultat
+          - if:
+              - condition: template
+                value_template: >
+                  {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') == true
+                     and not ((resultat | default({})) or {}).get('ok', false) }}
+            then:
+              - action: script.jarvis_notifier
+                data:
+                  niveau: a_surveiller
+                  titre: "Recharge de nuit non programmée"
+                  message: >
+                    La recharge prévue ({{ states('sensor.jarvis_recharge_reseau_prevue') }} kWh) n'a pas pu être
+                    programmée sur l'onduleur. Il reste en autoconsommation. Voir le journal de Home Assistant.
+
+  - id: jarvis_batterie_reevaluation
+    alias: "Jarvis · Batterie : réévaluation 1 h avant la recharge"
+    description: >
+      Recalcule avec le SOC et la prévision du moment, et ajuste la plage de charge (la fin reste
+      à 5h45). En simulation, journalise seulement. Une prévision ou un SOC indisponible ne
+      modifie rien : la plage programmée à 23h est conservée.
+    mode: single
+    triggers:
+      - trigger: time
+        at: input_datetime.jarvis_batterie_reevaluation
+    conditions:
+      - condition: state
+        entity_id: input_boolean.jarvis_batterie_plan_actif
+        state: "on"
+    actions:
+      - event: jarvis_recalcul_batterie
+      - delay: "00:00:20"
+      - variables:
+          valide: "{{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'calcul_valide') == true }}"
+          plages: "{{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'plages') or [] }}"
+      - action: logbook.log
+        data:
+          name: "Jarvis batterie"
+          entity_id: sensor.jarvis_recharge_reseau_prevue
+          message: >
+            [{{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'mode') }}] Réévaluation :
+            SOC {{ states('sensor.uhome_soc') }} %, {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'justification') }}
+            {% if not valide %}Calcul incomplet : plage programmée conservée.{% endif %}
+      - if:
+          - condition: state
+            entity_id: input_boolean.jarvis_mode_simulation
+            state: "off"
+          - condition: template
+            value_template: "{{ valide }}"
+        then:
+          - action: ucaness.definir_plages_charge
+            continue_on_error: true
+            data:
+              plages: "{{ plages }}"
+            response_variable: ajustement
+          - if:
+              - condition: template
+                value_template: "{{ not ((ajustement | default({})) or {}).get('confirme', false) }}"
+            then:
+              - action: script.jarvis_notifier
+                data:
+                  niveau: a_surveiller
+                  titre: "Réévaluation de la recharge non appliquée"
+                  message: >
+                    La plage de charge n'a pas pu être ajustée ; celle programmée à 23h reste en place.
+                    Voir le journal de Home Assistant.
+
+  - id: jarvis_batterie_retour_autoconsommation
+    alias: "Jarvis · Batterie : retour en autoconsommation après la recharge"
+    description: "2 min avant la fin des heures creuses, et contrôle de secours 15 min après."
+    mode: single
+    triggers:
+      - trigger: time
+        at:
+          entity_id: input_datetime.jarvis_hc_fin
+          offset: "-00:02:00"
+      - trigger: time
+        at:
+          entity_id: input_datetime.jarvis_hc_fin
+          offset: "00:15:00"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.jarvis_batterie_plan_actif
+        state: "on"
+    actions:
+      - action: script.jarvis_batterie_retour_autoconsommation
+        continue_on_error: true
+      - if:
+          - condition: state
+            entity_id: input_boolean.jarvis_batterie_plan_actif
+            state: "on"
+        then:
+          - delay: "00:05:00"
+          - action: script.jarvis_batterie_retour_autoconsommation
+            continue_on_error: true
+      - if:
+          - condition: state
+            entity_id: input_boolean.jarvis_batterie_plan_actif
+            state: "on"
+        then:
+          - action: script.jarvis_notifier
+            data:
+              niveau: a_surveiller
+              titre: "Batterie restée en arbitrage horaire"
+              message: >
+                Le retour en autoconsommation a échoué deux fois. Hors plage, la batterie ne sert pas :
+                remettre le mode Autoconsommation depuis le portail UCANESS.
+
+script:
+  jarvis_batterie_appliquer:
+    alias: "Jarvis · Batterie : programmer la recharge de nuit"
+    description: >
+      Programme les plages de charge calculées (ou les vide si la batterie doit seulement être
+      gardée en réserve), puis passe en arbitrage horaire. S'arrête au premier refus ou si
+      l'onduleur ne confirme pas (le mode n'est alors pas changé). Ne fait rien en simulation
+      ni si le calcul ne demande aucune action.
+    mode: single
+    sequence:
+      - condition: state
+        entity_id: input_boolean.jarvis_mode_simulation
+        state: "off"
+      - variables:
+          maintien: "{{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') == true }}"
+          plages: "{{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'plages') or [] }}"
+          # « HH:MM » : un attribut « 2328 » est relu comme un nombre, d'où la remise en forme.
+          fin: >
+            {% set f = state_attr('sensor.jarvis_recharge_reseau_prevue', 'plan_fin') %}
+            {% set f = ('%04d' | format(f | int)) if f is number else (f if f is string else '') %}
+            {% set f = f if f | length == 4 else states('input_datetime.jarvis_hc_debut')[:5] | replace(':', '') %}
+            {{ f[:2] ~ ':' ~ f[2:] }}
+          retour: "{{ states('input_datetime.jarvis_hc_fin')[:5] }}"
+          reeval: "{{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'reevaluation') }}"
+          mode_avant: "{{ states('sensor.uhome_mode') }}"
+      - condition: template
+        value_template: "{{ maintien and fin | length == 5 }}"
+      - condition: template
+        value_template: "{{ plages | count == 0 or is_state('binary_sensor.uhome_temperature_hors_plage', 'off') }}"
+      - action: ucaness.definir_plages_charge
+        data:
+          plages: "{{ plages }}"
+      - action: input_datetime.set_datetime
+        target: { entity_id: input_datetime.jarvis_batterie_fin_plan }
+        data:
+          time: "{{ fin }}:00"
+      - if:
+          - condition: template
+            value_template: "{{ reeval is string and reeval | length == 5 }}"
+        then:
+          - action: input_datetime.set_datetime
+            target: { entity_id: input_datetime.jarvis_batterie_reevaluation }
+            data:
+              time: "{{ reeval }}:00"
+      - action: input_boolean.turn_on
+        target: { entity_id: input_boolean.jarvis_batterie_plan_actif }
+      - action: ucaness.definir_mode
+        data:
+          mode: arbitrage_horaire
+      - wait_template: "{{ states('sensor.uhome_mode') not in [mode_avant, 'unknown', 'unavailable'] }}"
+        timeout: "00:08:00"
+        continue_on_timeout: true
+      - if:
+          - condition: template
+            value_template: "{{ wait.completed }}"
+        then:
+          - action: input_text.set_value
+            target: { entity_id: input_text.jarvis_mode_attendu }
+            data:
+              value: "{{ states('sensor.uhome_mode') }}"
+      - action: logbook.log
+        data:
+          name: "Jarvis batterie"
+          entity_id: sensor.jarvis_recharge_reseau_prevue
+          message: >
+            [réel] Consigne envoyée et confirmée : {% if plages %}plages {% for x in plages %}{{ x.debut }}-{{ x.fin }} {% endfor %}{% else %}aucune plage (réserve seule){% endif %}
+            puis arbitrage horaire (batterie en réserve) ; {% if reeval is string %}réévaluation à {{ reeval }} ; {% endif %}retour en autoconsommation 2 min avant {{ retour }}.
+            Mode affiché : {{ states('sensor.uhome_mode') }}.
+      - variables:
+          resultat:
+            ok: true
+            plages: "{{ plages }}"
+            fin: "{{ fin }}"
+      - stop: "Recharge de nuit programmée"
+        response_variable: resultat
+
+  jarvis_batterie_retour_autoconsommation:
+    alias: "Jarvis · Batterie : retour en autoconsommation"
+    mode: single
+    sequence:
+      - action: ucaness.definir_mode
+        data:
+          mode: autoconsommation
+      - action: input_boolean.turn_off
+        target: { entity_id: input_boolean.jarvis_batterie_plan_actif }
+      - wait_template: "{{ is_state('sensor.uhome_mode', 'Match Load Mode') }}"
+        timeout: "00:08:00"
+        continue_on_timeout: true
+      - action: input_text.set_value
+        target: { entity_id: input_text.jarvis_mode_attendu }
+        data:
+          value: "Match Load Mode"
+      - action: logbook.log
+        data:
+          name: "Jarvis batterie"
+          entity_id: sensor.jarvis_recharge_reseau_prevue
+          message: "[réel] Retour en autoconsommation confirmé. Mode affiché : {{ states('sensor.uhome_mode') }}."

@@ -1,0 +1,11 @@
+{
+  "domain": "ucaness",
+  "name": "UCANESS (UCanpower UHome) – non officiel",
+  "version": "0.2.4",
+  "config_flow": true,
+  "documentation": "https://oss.ucaness.com/",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": []
+}

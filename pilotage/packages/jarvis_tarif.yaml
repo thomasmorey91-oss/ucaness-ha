@@ -1,0 +1,141 @@
+# =============================================================================
+# Tarif d'électricité paramétrable (pilotage de la batterie)
+# -----------------------------------------------------------------------------
+# Le contrat se règle dans Paramètres > Entrées, sans toucher au code : type de tarif,
+# début et fin des heures creuses, week-end et jours fériés en heures creuses ou non,
+# prix TTC du kWh en heures pleines, en heures creuses et à la revente.
+# Tant que les prix valent 0, le pilotage ne programme aucune recharge.
+# Dépendance : intégration « Workday » (jours ouvrés), entité binary_sensor.workday_sensor.
+# =============================================================================
+
+input_select:
+  jarvis_type_tarif:
+    name: "Tarif : type de contrat"
+    icon: mdi:cash-clock
+    options:
+      - "Heures pleines / heures creuses"
+      - "Base"
+
+input_datetime:
+  jarvis_hc_debut:
+    name: "Tarif : début des heures creuses"
+    has_date: false
+    has_time: true
+  jarvis_hc_fin:
+    name: "Tarif : fin des heures creuses"
+    has_date: false
+    has_time: true
+
+input_boolean:
+  jarvis_hc_jours_non_ouvres:
+    name: "Tarif : week-end et jours fériés en heures creuses"
+    icon: mdi:calendar-weekend
+
+input_number:
+  jarvis_prix_hp:
+    name: "Tarif : prix heures pleines (ou Base)"
+    min: 0
+    max: 1
+    step: 0.00001
+    unit_of_measurement: "EUR/kWh"
+    mode: box
+  jarvis_prix_hc:
+    name: "Tarif : prix heures creuses"
+    min: 0
+    max: 1
+    step: 0.00001
+    unit_of_measurement: "EUR/kWh"
+    mode: box
+  jarvis_prix_injection:
+    name: "Tarif : prix de revente du surplus"
+    min: 0
+    max: 1
+    step: 0.00001
+    unit_of_measurement: "EUR/kWh"
+    mode: box
+
+template:
+  - binary_sensor:
+      - name: "Jarvis heures creuses"
+        unique_id: jarvis_heures_creuses
+        icon: mdi:weather-night
+        # Vrai pendant les heures creuses du contrat. En tarif Base, toujours faux.
+        state: >
+          {% if is_state('input_select.jarvis_type_tarif', 'Base') %}false
+          {% else %}
+            {% set debut = states('input_datetime.jarvis_hc_debut')[:5] %}
+            {% set fin = states('input_datetime.jarvis_hc_fin')[:5] %}
+            {% set h = now().strftime('%H:%M') %}
+            {% set dans_plage = (h >= debut or h < fin) if debut > fin else (debut <= h < fin) %}
+            {% set non_ouvre = is_state('input_boolean.jarvis_hc_jours_non_ouvres', 'on')
+                               and is_state('binary_sensor.workday_sensor', 'off') %}
+            {{ dans_plage or non_ouvre }}
+          {% endif %}
+    sensor:
+      - name: "Jarvis prix du kWh réseau"
+        unique_id: jarvis_prix_actuel
+        unit_of_measurement: "EUR/kWh"
+        icon: mdi:currency-eur
+        state: >
+          {{ states('input_number.jarvis_prix_hc') | float(0)
+             if is_state('binary_sensor.jarvis_heures_creuses', 'on')
+             else states('input_number.jarvis_prix_hp') | float(0) }}
+
+# Compteurs de soutirage par poste tarifaire (base de la mesure des économies).
+# Source : intégration UCANESS (sensor.uhome_soutirage_reseau_total). Un compteur Linky peut la remplacer.
+utility_meter:
+  jarvis_soutirage_jour:
+    name: "Jarvis soutirage du jour"
+    source: sensor.uhome_soutirage_reseau_total
+    cycle: daily
+    tariffs: [hp, hc]
+  jarvis_soutirage_mois:
+    name: "Jarvis soutirage du mois"
+    source: sensor.uhome_soutirage_reseau_total
+    cycle: monthly
+    tariffs: [hp, hc]
+
+automation:
+  - id: jarvis_tarif_valeurs_initiales
+    alias: "Jarvis · Tarif : valeurs initiales (une seule fois)"
+    description: >
+      Au premier démarrage, place des heures creuses type (22h30-6h30) et des prix à 0, à
+      renseigner. Ne fait rien ensuite : les valeurs saisies dans l'interface sont conservées.
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: template
+        value_template: >
+          {{ states('input_datetime.jarvis_hc_debut') in ['00:00:00', 'unknown']
+             and states('input_datetime.jarvis_hc_fin') in ['00:00:00', 'unknown'] }}
+    actions:
+      - action: input_select.select_option
+        target: { entity_id: input_select.jarvis_type_tarif }
+        data: { option: "Heures pleines / heures creuses" }
+      - action: input_datetime.set_datetime
+        target: { entity_id: input_datetime.jarvis_hc_debut }
+        data: { time: "22:30:00" }
+      - action: input_datetime.set_datetime
+        target: { entity_id: input_datetime.jarvis_hc_fin }
+        data: { time: "06:30:00" }
+      - action: input_boolean.turn_off
+        target: { entity_id: input_boolean.jarvis_hc_jours_non_ouvres }
+
+  - id: jarvis_tarif_bascule_compteurs
+    alias: "Jarvis · Tarif : bascule HP/HC des compteurs"
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.jarvis_heures_creuses
+      - trigger: homeassistant
+        event: start
+    actions:
+      - action: select.select_option
+        target:
+          entity_id:
+            - select.jarvis_soutirage_jour
+            - select.jarvis_soutirage_mois
+        data:
+          option: "{{ 'hc' if is_state('binary_sensor.jarvis_heures_creuses', 'on') else 'hp' }}"
