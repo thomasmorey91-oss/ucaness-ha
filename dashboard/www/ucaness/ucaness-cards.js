@@ -5,14 +5,15 @@
  * Cartes fournies :
  *   custom:ucaness-layout-card  en-tête + colonnes (300 px | reste | 300 px), une seule colonne sur téléphone
  *   custom:ucaness-header-card  bandeau titre, onglets, heure, liaison, alertes
- *   custom:ucaness-panel-card   panneau titré (losange, barres orange et cyan), carrousel facultatif
+ *   custom:ucaness-panel-card   panneau titré (losange, barres orange et cyan), carrousel ou onglets facultatifs
  *   custom:ucaness-flow-card    vue en direct de la maison : image, boules, onduleur, flux animés
  *   custom:ucaness-soc-card     anneau de charge de la batterie
+ *   custom:ucaness-note-card    texte replié sur quelques lignes, terminé par « … », déplié d'un appui
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
  */
 
-const UC_VERSION = '0.1.0';
+const UC_VERSION = '0.2.3';
 
 /* Dossier où se trouve ce fichier (en général /local/ucaness/). */
 const UC_BASE = (() => {
@@ -24,6 +25,28 @@ const UC_BASE = (() => {
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const UC_FONT = "'Times New Roman', Tinos, 'Liberation Serif', serif";
+
+/* Mode allégé, pour les tablettes peu puissantes : animations coupées.
+ * « ?leger=1 » dans l'adresse l'active sur cet appareil (mémorisé), « ?leger=0 » le retire. */
+const UC_LIGHT = (() => {
+  try {
+    const q = new URLSearchParams(window.location.search).get('leger');
+    if (q === '1') window.localStorage.setItem('ucaness-leger', '1');
+    if (q === '0') window.localStorage.removeItem('ucaness-leger');
+    return window.localStorage.getItem('ucaness-leger') === '1';
+  } catch (e) { return false; }
+})();
+
+/** Vrai si l'état d'une des entités a changé depuis le dernier appel pour cette carte.
+ *  Home Assistant transmet `hass` à chaque changement d'état de la maison : on ne redessine
+ *  la carte que pour ses propres entités. */
+function ucChanged(card, hass, ids) {
+  const next = ids.map((id) => (hass && hass.states ? hass.states[id] : undefined));
+  const prev = card._ucSeen;
+  card._ucSeen = next;
+  if (!prev || prev.length !== next.length) return true;
+  return next.some((st, i) => st !== prev[i]);
+}
 
 function ucNumber(hass, value, digits) {
   const lang = (hass && hass.locale && hass.locale.language) || (hass && hass.language) || 'fr';
@@ -124,6 +147,7 @@ const UC_BASE_CSS = `
     color: var(--uc-text);
   }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+  ${UC_LIGHT ? '* { animation: none !important; transition: none !important; }' : ''}
 `;
 
 const UC_DIAMOND = `<span class="diamond" aria-hidden="true"><span><i></i></span></span>`;
@@ -147,13 +171,16 @@ const UC_TITLE_CSS = `
 class UcanessHeaderCard extends HTMLElement {
   setConfig(config) {
     this._config = Object.assign({ title: 'UCANESS HOME ASSISTANT', site: 'Maison', tabs: [], alert_entities: [] }, config || {});
+    this._ucSeen = null;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    const c = this._config || {};
+    const ids = [c.connectivity_entity, c.subtitle_entity, ...(c.alert_entities || []), ...(c.tabs || []).map((t) => t.entity)].filter(Boolean);
+    if (ucChanged(this, hass, ids)) this._render();
   }
 
   connectedCallback() {
@@ -308,9 +335,13 @@ class UcanessPanelCard extends HTMLElement {
     this._status();
   }
 
-  connectedCallback() {
+  connectedCallback() { this._startTimer(); }
+
+  /** Défilement automatique du carrousel ; relancé après un choix manuel pour laisser le temps de lire. */
+  _startTimer() {
+    clearInterval(this._timer);
     const c = this._config || {};
-    if (c.slides && c.slides.length > 1 && c.interval !== 0) {
+    if (this.isConnected && c.slides && c.slides.length > 1 && c.interval !== 0 && !c.tabs) {
       this._timer = setInterval(() => this._show((this._slide + 1) % c.slides.length), (c.interval || 8) * 1000);
     }
   }
@@ -322,6 +353,9 @@ class UcanessPanelCard extends HTMLElement {
   async _build() {
     const c = this._config;
     const slides = c.slides || [{ title: c.title, cards: c.cards }];
+    // tabs: true → titre fixe, onglets nommés en haut du panneau, pas de défilement automatique.
+    const tabs = !!(c.tabs && c.slides && c.slides.length > 1);
+    const title = tabs ? (c.title || '') : (slides[0].title || '');
     this.shadowRoot.innerHTML = `
       <style>${UC_BASE_CSS}${UC_TITLE_CSS}
         :host { display: block; }
@@ -334,13 +368,26 @@ class UcanessPanelCard extends HTMLElement {
         .dots button { width: 44px; height: 22px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .dots i { display: block; width: 14px; height: 3px; background: #4E6C93; }
         .dots button.on i { width: 24px; background: #FFFFFF; }
+        .tabs { display: flex; gap: 6px; }
+        .tabs button { flex: 1 1 0; min-width: 0; min-height: 48px; box-sizing: border-box; padding: 4px 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 1px solid #1E4E85; border-radius: 6px; background: rgba(10,30,60,0.6); color: var(--uc-text); font: 400 12px var(--uc-font); cursor: pointer; --mdc-icon-size: 18px; }
+        .tabs button ha-icon { color: #9CC9F5; }
+        .tabs button[aria-selected="true"] { border-color: #22E0F0; background: rgba(18,80,150,0.55); box-shadow: 0 0 10px rgba(34,224,240,0.55); }
       </style>
-      <section aria-label="${esc(slides[0].title || '')}">
-        <div class="titlebar"><div class="tab">${UC_DIAMOND}<h2>${esc(slides[0].title || '')}</h2></div>${c.slides ? '' : UC_BARS}<span class="status"></span><div class="line" aria-hidden="true"></div></div>
-        <div class="body${slides.length > 1 ? ' dots-on' : ''}"></div>
+      <section aria-label="${esc(title)}">
+        <div class="titlebar"><div class="tab">${UC_DIAMOND}<h2>${esc(title)}</h2></div>${c.slides && !tabs ? '' : UC_BARS}<span class="status"></span><div class="line" aria-hidden="true"></div></div>
+        <div class="body${slides.length > 1 && !tabs ? ' dots-on' : ''}"></div>
       </section>`;
     const body = this.shadowRoot.querySelector('.body');
     this._children = [];
+    if (tabs) {
+      const bar = document.createElement('div');
+      bar.className = 'tabs';
+      bar.setAttribute('role', 'tablist');
+      bar.setAttribute('aria-label', title);
+      bar.innerHTML = slides.map((s, i) => `<button type="button" role="tab" aria-selected="${i ? 'false' : 'true'}" data-i="${i}">${s.icon ? `<ha-icon icon="${esc(s.icon)}"></ha-icon>` : ''}<span>${esc(s.tab || s.title || i + 1)}</span></button>`).join('');
+      bar.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => this._show(Number(b.dataset.i))));
+      body.appendChild(bar);
+    }
     for (let i = 0; i < slides.length; i++) {
       const s = document.createElement('div');
       s.className = 'slide';
@@ -350,11 +397,11 @@ class UcanessPanelCard extends HTMLElement {
       cards.forEach((el) => s.appendChild(el));
       this._children.push(cards);
     }
-    if (slides.length > 1) {
+    if (slides.length > 1 && !tabs) {
       const dots = document.createElement('div');
       dots.className = 'dots';
       dots.innerHTML = slides.map((s, i) => `<button type="button" aria-label="Afficher ${esc(s.title || i + 1)}" class="${i ? '' : 'on'}" data-i="${i}"><i></i></button>`).join('');
-      dots.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => this._show(Number(b.dataset.i))));
+      dots.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { this._show(Number(b.dataset.i)); this._startTimer(); }));
       body.appendChild(dots);
     }
     this._status();
@@ -366,6 +413,8 @@ class UcanessPanelCard extends HTMLElement {
     this._slide = i;
     this.shadowRoot.querySelectorAll('.slide').forEach((s, k) => { s.hidden = k !== i; });
     this.shadowRoot.querySelectorAll('.dots button').forEach((b, k) => b.classList.toggle('on', k === i));
+    this.shadowRoot.querySelectorAll('.tabs button').forEach((b, k) => b.setAttribute('aria-selected', String(k === i)));
+    if (this._config.tabs) return;  // onglets : le titre du panneau ne change pas
     this.shadowRoot.querySelector('.titlebar h2').textContent = slides[i].title || '';
     this.shadowRoot.querySelector('section').setAttribute('aria-label', slides[i].title || '');
   }
@@ -406,14 +455,31 @@ class UcanessFlowCard extends HTMLElement {
     }
     c.image_area = Object.assign({}, UC_FLOW_DEFAULTS.image_area, (config || {}).image_area || {});
     this._config = c;
+    this._ucSeen = null;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    if (ucChanged(this, hass, this._ids())) this._render();
   }
+
+  /** Entités affichées par la carte (puissances, charge, détails). */
+  _ids() {
+    const ids = [];
+    for (const n of Object.values(this._config.nodes)) {
+      if (n.entity) ids.push(n.entity);
+      if (n.soc_entity) ids.push(n.soc_entity);
+      (n.details || []).forEach((d) => ids.push(d));
+    }
+    return ids;
+  }
+
+  /* L'âge du relevé (« il y a 20 s ») avance même sans nouvelle mesure. */
+  connectedCallback() { this._timer = setInterval(() => this._render(), 30000); }
+
+  disconnectedCallback() { clearInterval(this._timer); }
 
   getCardSize() { return 8; }
 
@@ -580,11 +646,16 @@ class UcanessSocCard extends HTMLElement {
       floor_entity: 'input_number.jarvis_batterie_plancher',
       capacity_entity: 'input_number.jarvis_batterie_capacite',
     }, config || {});
+    this._ucSeen = null;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this._render();
   }
 
-  set hass(hass) { this._hass = hass; this._render(); }
+  set hass(hass) {
+    this._hass = hass;
+    const c = this._config;
+    if (ucChanged(this, hass, [c.soc_entity, c.power_entity, c.floor_entity, c.capacity_entity].filter(Boolean))) this._render();
+  }
 
   getCardSize() { return 6; }
 
@@ -632,13 +703,121 @@ class UcanessSocCard extends HTMLElement {
   }
 }
 
+/* ------------------------------------------------------------------ texte repliable */
+
+/*
+ * custom:ucaness-note-card : un texte (carte markdown) replié sur quelques lignes, terminé par « … ».
+ * Un appui sur le texte ou sur « … » le déplie en entier ; un nouvel appui le replie.
+ * Remplace directement une carte markdown : changer « type: markdown » en
+ * « type: custom:ucaness-note-card » et garder « content: ». Option « lines » (4 par défaut),
+ * « mobile_lines » sous 900 px de large (par défaut la même valeur), ou « card » pour une autre carte.
+ */
+class UcanessNoteCard extends HTMLElement {
+  setConfig(config) {
+    if (!config || (!config.content && !config.card)) {
+      throw new Error('ucaness-note-card : indiquez « content » (texte markdown) ou « card ».');
+    }
+    this._config = Object.assign({ lines: 4 }, config);
+    this._open = false;
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this._build();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this._child) this._child.hass = hass;
+  }
+
+  getCardSize() { return Math.ceil((this._lines() * 21 + 16) / 50); }
+
+  disconnectedCallback() {
+    if (this._ro) this._ro.disconnect();
+    if (this._onResize) window.removeEventListener('resize', this._onResize);
+  }
+
+  connectedCallback() {
+    const slot = this.shadowRoot && this.shadowRoot.querySelector('.slot');
+    if (this._ro && slot) this._ro.observe(slot);
+    if (this._onResize) window.addEventListener('resize', this._onResize);
+  }
+
+  _lines() {
+    const c = this._config || {};
+    const mobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
+    return Math.max(1, Number(mobile && c.mobile_lines ? c.mobile_lines : c.lines) || 4);
+  }
+
+  async _build() {
+    // Home Assistant peut rappeler setConfig avant la fin de la construction précédente :
+    // seule la dernière construction est gardée, et l'ancienne surveillance de taille est arrêtée.
+    const build = (this._buildId = (this._buildId || 0) + 1);
+    if (this._ro) { this._ro.disconnect(); this._ro = null; }
+    if (this._onResize) { window.removeEventListener('resize', this._onResize); this._onResize = null; }
+    const c = this._config;
+    const childConf = c.card || Object.assign({ type: 'markdown' }, c.content !== undefined ? { content: c.content } : {});
+    this.shadowRoot.innerHTML = `
+      <style>${UC_BASE_CSS}
+        :host { display: block; }
+        .clip { position: relative; overflow: hidden; cursor: pointer; border-radius: 0; }
+        .slot { display: flow-root; }
+        .clip.open { cursor: auto; }
+        .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 2.4em; background: linear-gradient(180deg, rgba(22,40,72,0) 0%, rgba(22,40,72,0.96) 78%); pointer-events: none; }
+        .more { position: absolute; right: 6px; bottom: 2px; min-width: 44px; height: 32px; padding: 0 10px; border: 1px solid var(--uc-tab-border); border-radius: 4px; background: #0A2546; color: var(--uc-tab); font: 700 16px var(--uc-font); letter-spacing: 1px; cursor: pointer; }
+        .less { display: block; margin: 2px 6px 6px auto; min-width: 44px; height: 32px; padding: 0 10px; border: 1px solid var(--uc-tab-border); border-radius: 4px; background: #0A2546; color: var(--uc-tab); font: 400 14px var(--uc-font); cursor: pointer; }
+        .clip:not(.cut) .fade, .clip:not(.cut) .more, .clip.open .fade, .clip.open .more { display: none; }
+        .less[hidden] { display: none; }
+      </style>
+      <div class="clip" part="clip"><div class="slot"></div><div class="fade" aria-hidden="true"></div><button type="button" class="more" aria-expanded="false" aria-label="Lire la suite">…</button></div>
+      <button type="button" class="less" aria-expanded="true" hidden>Réduire</button>`;
+    const clip = this.shadowRoot.querySelector('.clip');
+    const more = this.shadowRoot.querySelector('.more');
+    const less = this.shadowRoot.querySelector('.less');
+    const [child] = await ucCreateCards([childConf], this._hass, this);
+    if (build !== this._buildId) return;
+    this._child = child;
+    child.style.display = 'block';
+    this.shadowRoot.querySelector('.slot').appendChild(child);
+    const toggle = (open) => {
+      this._open = open;
+      clip.classList.toggle('open', open);
+      clip.style.maxHeight = open ? 'none' : `${this._lines() * 21 + 16}px`;
+      more.setAttribute('aria-expanded', String(open));
+      less.hidden = !open || !clip.classList.contains('cut');
+    };
+    const slot = this.shadowRoot.querySelector('.slot');
+    // La hauteur se mesure sur le conteneur : une carte de Home Assistant est un élément « en ligne »
+    // dont la hauteur propre vaut 0.
+    const measure = () => {
+      const limit = this._lines() * 21 + 16;
+      clip.classList.toggle('cut', slot.scrollHeight > limit + 4);
+      toggle(this._open);
+    };
+    clip.addEventListener('click', (ev) => {
+      if (!clip.classList.contains('cut') || this._open) return;
+      // Un lien reste un lien. Il est dans le shadow DOM de la carte markdown : on suit le chemin complet de l'appui.
+      if (ev.composedPath().some((el) => el.tagName === 'A')) return;
+      toggle(true);
+    });
+    more.addEventListener('click', (ev) => { ev.stopPropagation(); toggle(true); });
+    less.addEventListener('click', () => toggle(false));
+    if (typeof ResizeObserver !== 'undefined') {
+      this._ro = new ResizeObserver(measure);
+      this._ro.observe(slot);
+    }
+    this._onResize = measure;
+    window.addEventListener('resize', this._onResize);
+    measure();
+  }
+}
+
 /* ------------------------------------------------------------------ enregistrement */
 
 const UC_CARDS = [
   ['ucaness-layout-card', UcanessLayoutCard, 'UCANESS : mise en page', 'En-tête et colonnes du tableau de bord UCANESS HOME ASSISTANT.'],
   ['ucaness-header-card', UcanessHeaderCard, 'UCANESS : en-tête', 'Bandeau titre, onglets, heure, liaison et alertes.'],
-  ['ucaness-panel-card', UcanessPanelCard, 'UCANESS : panneau', 'Panneau titré dans le style UCANESS, avec carrousel facultatif.'],
+  ['ucaness-panel-card', UcanessPanelCard, 'UCANESS : panneau', 'Panneau titré dans le style UCANESS, avec carrousel ou onglets facultatifs.'],
   ['ucaness-flow-card', UcanessFlowCard, 'UCANESS : maison en direct', 'Flux solaire, réseau, batterie et maison sur l’image de votre maison.'],
+  ['ucaness-note-card', UcanessNoteCard, 'UCANESS : texte repliable', 'Texte replié sur quelques lignes, déplié d’un appui.'],
   ['ucaness-soc-card', UcanessSocCard, 'UCANESS : charge batterie', 'Anneau de charge, énergie stockée et réserve avant le plancher.'],
 ];
 
@@ -652,4 +831,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, ucWatts, ucNum, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, ucWatts, ucNum, ucChanged, UC_LIGHT, UC_VERSION };
