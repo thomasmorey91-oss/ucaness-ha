@@ -24,10 +24,13 @@ async def maison(hass):
     bat = _pkg("jarvis_batterie.yaml")
     alertes = _pkg("jarvis_alertes.yaml")
     calls = []
-    state = {"fail_mode": False}
+    state = {"fail_mode": False, "fail_plages": 0}  # fail_plages : nombre d'échecs à venir (-1 : toujours)
 
     async def plages(call):
         calls.append(("plages", call.data["plages"]))
+        if state["fail_plages"]:
+            state["fail_plages"] -= 1 if state["fail_plages"] > 0 else 0
+            raise HomeAssistantError("Erreur API UCANESS 5019 : Device operation timeout")
         return {"confirme": True}
 
     async def mode(call):
@@ -180,14 +183,26 @@ async def test_retour_2_min_avant_la_fin_des_heures_creuses(hass, maison, freeze
 
 # ----------------------------------------------------------------- version 4
 
-async def _automatisations(hass, ids):
+def _sans_delais(node):
+    """Délais ramenés à 0, y compris dans les boucles : le banc de test ne fait pas avancer le temps des tâches."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "delay":
+                node[key] = "00:00:00"
+            else:
+                _sans_delais(value)
+    elif isinstance(node, list):
+        for item in node:
+            _sans_delais(item)
+
+
+async def _automatisations(hass, ids, notes=None):
     bat = _pkg("jarvis_batterie.yaml")
     autos = [a for a in bat["automation"] if a["id"] in ids]
-    for auto in autos:  # délais ramenés à 0 : le banc de test ne fait pas avancer le temps des tâches
-        for act in auto["actions"]:
-            if "delay" in act:
-                act["delay"] = "00:00:00"
-    hass.services.async_register("script", "jarvis_notifier", lambda call: None)
+    _sans_delais(autos)
+    hass.services.async_register(
+        "script", "jarvis_notifier", lambda call: notes.append(dict(call.data)) if notes is not None else None
+    )
     assert await async_setup_component(hass, "automation", {"automation": autos})
     await hass.async_block_till_done()
 
@@ -219,6 +234,66 @@ async def test_decision_a_23h_programme_la_fin_de_nuit(hass, maison, freezer):
     assert hass.states.get("input_datetime.jarvis_batterie_reevaluation").state == "04:28:00"
     assert hass.states.get("input_datetime.jarvis_batterie_fin_plan").state == "05:45:00"
     assert hass.states.get("input_boolean.jarvis_batterie_plan_actif").state == "on"
+
+
+async def _decision_23h(hass, freezer, notes):
+    import datetime as dt
+    import homeassistant.util.dt as dt_util
+    await hass.config.async_set_time_zone("Europe/Paris")
+    hass.states.async_set("sensor.jarvis_recharge_reseau_prevue", "4.2", {
+        "plages": [{"debut": "0410", "fin": "0545"}], "plan_fin": "0545", "maintien": True,
+        "reevaluation": "03:10", "calcul_valide": True, "mode": "réel", "justification": "test"})
+    await _automatisations(hass, {"jarvis_batterie_decision_du_soir"}, notes)
+    jour = dt_util.now().date()
+    await _a(hass, freezer, jour, dt.time(22, 59, 50))
+    await _a(hass, freezer, jour, dt.time(23, 0, 0))
+
+
+@pytest.mark.parametrize("expected_lingering_timers", [True])
+async def test_decision_reessaie_apres_un_echec(hass, maison, freezer):
+    """Un 5019 au premier essai ne doit plus coûter la recharge de la nuit."""
+    calls, state = maison
+    state["fail_plages"] = 1
+    notes = []
+    await _decision_23h(hass, freezer, notes)
+    actions = [c for c in calls if c[0] != "log"]
+    assert actions == [("plages", [{"debut": "0410", "fin": "0545"}])] * 2 + [("mode", "arbitrage_horaire")]
+    assert any("Essai 1 de programmation non abouti ; nouvel essai à 23h10" in c[1] for c in calls if c[0] == "log")
+    assert notes == []                                                       # pas d'alerte : le 2e essai a réussi
+    assert hass.states.get("input_boolean.jarvis_batterie_plan_actif").state == "on"
+    assert hass.states.get("input_datetime.jarvis_batterie_reevaluation").state == "03:10:00"
+
+
+@pytest.mark.parametrize("expected_lingering_timers", [True])
+async def test_decision_alerte_apres_trois_echecs(hass, maison, freezer):
+    calls, state = maison
+    state["fail_plages"] = -1
+    notes = []
+    await _decision_23h(hass, freezer, notes)
+    assert [c[0] for c in calls if c[0] != "log"] == ["plages"] * 3          # 23h00, 23h10, 23h30
+    assert any("nouvel essai à 23h30" in c[1] for c in calls if c[0] == "log")
+    assert len(notes) == 1 and notes[0]["titre"] == "Recharge de nuit non programmée"
+    assert "après 3 essais" in notes[0]["message"]
+    assert hass.states.get("input_boolean.jarvis_batterie_plan_actif").state == "off"
+    assert hass.states.get("sensor.uhome_mode").state == "Match Load Mode"
+
+
+@pytest.mark.parametrize("expected_lingering_timers", [True])
+async def test_decision_sans_recharge_ne_reessaie_pas(hass, maison, freezer):
+    import datetime as dt
+    import homeassistant.util.dt as dt_util
+    calls, _ = maison
+    notes = []
+    await hass.config.async_set_time_zone("Europe/Paris")
+    hass.states.async_set("sensor.jarvis_recharge_reseau_prevue", "0", {
+        "plages": [], "plan_fin": None, "maintien": False, "calcul_valide": True, "mode": "réel", "justification": "test"})
+    await _automatisations(hass, {"jarvis_batterie_decision_du_soir"}, notes)
+    jour = dt_util.now().date()
+    await _a(hass, freezer, jour, dt.time(22, 59, 50))
+    await _a(hass, freezer, jour, dt.time(23, 0, 0))
+    assert [c for c in calls if c[0] != "log"] == []
+    assert not any("Essai" in c[1] for c in calls if c[0] == "log")
+    assert notes == []
 
 
 @pytest.mark.parametrize("expected_lingering_timers", [True])

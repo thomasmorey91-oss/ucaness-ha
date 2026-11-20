@@ -1,6 +1,6 @@
 # Intégration Home Assistant « UCANESS » (UCanpower UHome)
 
-Version 0.2.4, 19/11/2026. Testée sur un onduleur UHome 6K.
+Version 0.2.5, 20/11/2026. Testée sur un onduleur UHome 6K.
 
 > **Non officielle.** Les mesures sont lues par l'API du portail UCANESS (oss.ucaness.com), qui n'est pas documentée. Le pilotage passe par l'API tierce documentée d'UCanpower (chemins `/api/v1`, clé d'application).
 > **Lecture seule par défaut.** L'onduleur n'est piloté que si l'option « Écriture autorisée » est activée, et seulement sur deux points : le mode (autoconsommation ou arbitrage horaire) et les plages de charge. Tout autre réglage (DOD, hystérésis, courant, protections réseau, type de batterie, retour usine, commandes) est refusé par le client avant d'atteindre le réseau (§ 6 et § 8).
@@ -77,8 +77,8 @@ Chemins d'écriture repérés sur le portail, **volontairement bloqués** : `/de
 ## 7. Tests
 
 ```
-pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py   # client et décodage (7 tests)
-pytest -p no:homeassistant -p no:socket tests/test_pilotage.py           # signature, garde-fous, écriture et relecture (25 tests)
+pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py   # client et décodage (8 tests)
+pytest -p no:homeassistant -p no:socket tests/test_pilotage.py           # signature, garde-fous, écriture et relecture (28 tests)
 pytest tests/test_ha_integration.py                                       # dans Home Assistant 2026.10 (11 tests)
 pytest dashboard/tests -q                                                 # tableau de bord, générateur de maison, rendu dans Chrome (14 tests)
 ```
@@ -109,7 +109,7 @@ Chaque écriture est journalisée, puis relue sur l'onduleur. Si la relecture ne
 | Liste blanche | Réglage 1 (mode, valeurs 0 et 1) et réglages 44 à 55 (plages, 0000 à 2359). Tout le reste est refusé |
 | Chemins | Seuls `/api/v1/device/list`, `/api/v1/device/config`, `/api/v1/device/status` et `/api/v1/device/settings/update` sont appelables par l'API tierce |
 | Fréquence | 2 s au moins entre deux écritures, 20 écritures par heure au plus |
-| Envoi | Comme le portail : seuls les réglages qui changent sont envoyés, deux par deux (une plage). Si l'onduleur répond « 5019 Device operation timeout », le paquet est renvoyé réglage par réglage |
+| Envoi | Comme le portail : seuls les réglages qui changent sont envoyés, deux par deux (une plage). Si l'onduleur répond « 5019 Device operation timeout », la configuration est relue pendant 2 min : un réglage relu comme demandé compte comme envoyé (le 5019 arrive aussi sur des envois appliqués) ; ce qui manque est renvoyé réglage par réglage |
 | Plages de décharge | Toujours vidées : en arbitrage horaire, une plage de décharge renvoie la batterie sur le réseau |
 | Modèle d'onduleur | Écriture permise seulement pour les modèles dont la table du mode et des plages est confirmée : `uhome` (documentation) et `mr` (UHome 6K, confirmé le 18/11/2026 par un enregistrement fait depuis le portail UCANESS et par la table de son formulaire) |
 | Relecture | Un réglage absent de la configuration du cloud vaut 0, comme dans le portail. Si le cloud ne garde pas le mode, il est confirmé par le mode affiché par l'onduleur |

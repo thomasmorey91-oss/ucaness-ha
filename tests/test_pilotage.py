@@ -107,6 +107,15 @@ class FakeUcanessV1:
         self.ignore_writes = False
         self.model = "mr"  # modèle déclaré par l'UHome 6K réel
         self.timeout_over = None  # répond 5019 si un envoi contient plus de N réglages
+        self.timeout_but_applied = 0  # répond 5019 aux N prochains envois, mais les applique
+        self.apply_after_reads = 0    # ... seulement après ce nombre de lectures de la configuration
+        self.pending = []
+        self.config_reads = 0
+
+    def _apply(self, pcs):
+        for item in pcs:
+            key = api.CONFIG_KEYS[item["set_id"]][0]
+            self.settings[key] = item["set_data"]
 
     async def handle(self, request):
         path = request.path
@@ -137,6 +146,14 @@ class FakeUcanessV1:
             )
         if path == "/api/v1/device/config":
             assert body == {"device_id": "MA_testcode01"}
+            self.config_reads += 1
+            if self.pending:
+                remaining, pcs = self.pending[0]
+                if remaining <= 0:
+                    self._apply(pcs)
+                    self.pending.pop(0)
+                else:
+                    self.pending[0] = (remaining - 1, pcs)
             return web.json_response(
                 {"error_code": 2000, "msg": "ok", "data": {"inverter_model": self.model, "pcs": {self.model: dict(self.settings)}}}
             )
@@ -146,10 +163,12 @@ class FakeUcanessV1:
             if self.timeout_over is not None and len(body["pcs"]) > self.timeout_over:
                 return web.json_response({"error_code": 5019, "msg": "Device operation timeout"})
             self.writes.append(body["pcs"])
+            if self.timeout_but_applied:
+                self.timeout_but_applied -= 1
+                self.pending.append((self.apply_after_reads, body["pcs"]))
+                return web.json_response({"error_code": 5019, "msg": "Device operation timeout"})
             if not self.ignore_writes:
-                for item in body["pcs"]:
-                    key = api.CONFIG_KEYS[item["set_id"]][0]
-                    self.settings[key] = item["set_data"]
+                self._apply(body["pcs"])
             return web.json_response({"error_code": 2000, "msg": "ok"})
         return web.json_response({"error_code": 404, "msg": "unknown"})
 
@@ -257,6 +276,7 @@ def test_nothing_sent_when_already_in_place():
 
 def test_device_timeout_falls_back_to_one_setting_per_write(monkeypatch):
     monkeypatch.setattr(api, "MIN_WRITE_INTERVAL_S", 0.01)
+    monkeypatch.setattr(api, "TIMEOUT_CONFIRM_DELAY_S", 0.01)
 
     async def scenario(fake, client):
         fake.timeout_over = 1
@@ -266,6 +286,53 @@ def test_device_timeout_falls_back_to_one_setting_per_write(monkeypatch):
         settings = api.pcs_settings(await client.get_config_v1("testcode01"))
         assert all(api.read_back_value(settings, k) == v for k, v in items.items())
         assert sent
+    asyncio.run(_with_server(scenario))
+
+
+def test_timeout_but_applied_counts_as_success(monkeypatch):
+    """Un 5019 sur un envoi que l'onduleur applique quelques lectures plus tard : succès, sans renvoi."""
+    monkeypatch.setattr(api, "MIN_WRITE_INTERVAL_S", 0.01)
+    monkeypatch.setattr(api, "TIMEOUT_CONFIRM_DELAY_S", 0.01)
+
+    async def scenario(fake, client):
+        fake.timeout_but_applied = 1
+        fake.apply_after_reads = 2
+        sent = await client.update_settings("testcode01", {44: 410})  # début de plage seul
+        assert sent == [{"set_id": 44, "set_data": 410}]
+        assert fake.writes == [[{"set_id": 44, "set_data": 410}]]     # un seul envoi, pas de renvoi
+        settings = api.pcs_settings(await client.get_config_v1("testcode01"))
+        assert api.read_back_value(settings, 44) == 410
+    asyncio.run(_with_server(scenario))
+
+
+def test_timeout_not_applied_still_fails(monkeypatch):
+    """Un 5019 sur un réglage jamais appliqué : l'erreur remonte après 2 min de relecture."""
+    monkeypatch.setattr(api, "MIN_WRITE_INTERVAL_S", 0.01)
+    monkeypatch.setattr(api, "TIMEOUT_CONFIRM_DELAY_S", 0.01)
+
+    async def scenario(fake, client):
+        fake.timeout_over = 0  # 5019 à chaque envoi, rien n'est appliqué
+        reads_before = fake.config_reads
+        with pytest.raises(api.UcanessApiError) as err:
+            await client.update_settings("testcode01", {44: 410})
+        assert str(err.value.code) == "5019"
+        # 1 lecture avant l'envoi + TIMEOUT_CONFIRM_ATTEMPTS relectures
+        assert fake.config_reads - reads_before == 1 + api.TIMEOUT_CONFIRM_ATTEMPTS
+    asyncio.run(_with_server(scenario))
+
+
+def test_timeout_on_first_window_does_not_block_the_next(monkeypatch):
+    """Un 5019 appliqué sur le premier paquet : le paquet suivant est quand même envoyé."""
+    monkeypatch.setattr(api, "MIN_WRITE_INTERVAL_S", 0.01)
+    monkeypatch.setattr(api, "TIMEOUT_CONFIRM_DELAY_S", 0.01)
+
+    async def scenario(fake, client):
+        fake.timeout_but_applied = 1
+        items = api.windows_to_settings([("0410", "0545")])
+        sent = await client.update_settings("testcode01", items)
+        settings = api.pcs_settings(await client.get_config_v1("testcode01"))
+        assert all(api.read_back_value(settings, k) == v for k, v in items.items())
+        assert len(fake.writes) == len(range(0, len(sent), api.MAX_ITEMS_PER_WRITE))  # aucun renvoi
     asyncio.run(_with_server(scenario))
 
 

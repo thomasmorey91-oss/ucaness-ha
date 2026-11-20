@@ -26,7 +26,8 @@ Ce document décrit ce que font les packages de `pilotage/packages/`. Ils s'appu
 | Température | Aucune charge si la batterie est sous 0 °C |
 | Retour sûr | Retour en autoconsommation 2 min avant la fin des heures creuses, contrôle de secours 15 min après, puis alerte |
 | Données manquantes | Prix, capacité, SOC ou consommation inconnus : aucune recharge (repli sûr) |
-| Alertes | Échec de programmation, de réévaluation ou de retour : notification sur le téléphone |
+| Nouveaux essais | Programmation de la nuit : jusqu'à 3 essais (début des heures creuses, +10 min, +30 min). Le script est rejouable : les réglages déjà en place ne sont pas renvoyés |
+| Alertes | Échec de programmation (après le dernier essai), de réévaluation ou de retour : notification sur le téléphone |
 
 ## 3. Déroulement d'une nuit
 
@@ -77,6 +78,7 @@ Pas de recharge si le jour préparé n'est pas ouvré et que les week-ends et jo
 | La table du mode et des plages est la même que celle documentée pour `uhome` (confirmée par une requête du portail UCANESS). Les réglages de fond sont stockés à l'échelle ×10 |
 | Le cloud omet les valeurs nulles dans la configuration (mode 0, plages vides) |
 | Un envoi de 12 réglages d'un coup reçoit « 5019 Device operation timeout » ; un ou deux réglages passent |
+| Un « 5019 » peut aussi répondre à un envoi que l'onduleur a bien appliqué : l'intégration relit la configuration pendant 2 min avant de conclure à un échec |
 | Mode affiché : « Match Load Mode » en autoconsommation, « Peak Fill Mode » en arbitrage horaire |
 | En arbitrage horaire, hors plage, la batterie continue d'alimenter la maison (le manuel indique le contraire) |
 | La puissance de charge réseau est bridée par le réglage « puissance réseau » de l'installateur (par exemple 3,6 kW pour 60 % de 6 kW) |

@@ -398,7 +398,8 @@ automation:
     description: >
       Au début des heures creuses (23h), recalcule avec le SOC du moment, journalise la décision
       et sa justification. En simulation, rien d'autre. En mode réel, appelle le script
-      d'application (plages en fin d'heures creuses, puis arbitrage horaire).
+      d'application (plages en fin d'heures creuses, puis arbitrage horaire), jusqu'à 3 fois
+      (début des heures creuses, +10 min, +30 min) ; alerte seulement après le dernier essai.
     mode: single
     triggers:
       - trigger: time
@@ -424,14 +425,49 @@ automation:
             entity_id: input_boolean.jarvis_mode_simulation
             state: "off"
         then:
-          - action: script.jarvis_batterie_appliquer
-            continue_on_error: true
-            response_variable: resultat
+          # Jusqu'à 3 essais : au début des heures creuses, puis 10 et 30 min après. Un échec
+          # passager (onduleur qui répond hors délai, cloud injoignable) ne coûte plus la nuit.
+          # Le script est rejouable : les réglages déjà en place ne sont pas renvoyés.
+          - variables:
+              programme: false
+              essais: [0, 10, 30]
+          - repeat:
+              sequence:
+                - delay: >
+                    {% set cible = as_local(trigger.now) + timedelta(minutes=essais[repeat.index - 1]) %}
+                    {{ [0, (cible - now()).total_seconds()] | max | int }}
+                - action: script.jarvis_batterie_appliquer
+                  continue_on_error: true
+                  response_variable: resultat
+                - variables:
+                    programme: "{{ ((resultat | default({})) or {}).get('ok', false) == true }}"
+                - if:
+                    - condition: template
+                      value_template: >
+                        {{ not programme and repeat.index < essais | count
+                           and state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') == true
+                           and is_state('input_boolean.jarvis_mode_simulation', 'off') }}
+                  then:
+                    - action: logbook.log
+                      data:
+                        name: "Jarvis batterie"
+                        entity_id: sensor.jarvis_recharge_reseau_prevue
+                        message: >
+                          [réel] Essai {{ repeat.index }} de programmation non abouti ; nouvel essai à
+                          {{ (as_local(trigger.now) + timedelta(minutes=essais[repeat.index])).strftime('%Hh%M') }}.
+              until:
+                - condition: template
+                  value_template: >
+                    {{ programme
+                       or repeat.index >= essais | count
+                       or state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') != true
+                       or is_state('input_boolean.jarvis_mode_simulation', 'on') }}
           - if:
               - condition: template
                 value_template: >
                   {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') == true
-                     and not ((resultat | default({})) or {}).get('ok', false) }}
+                     and is_state('input_boolean.jarvis_mode_simulation', 'off')
+                     and not programme }}
             then:
               - action: script.jarvis_notifier
                 data:
@@ -439,7 +475,8 @@ automation:
                   titre: "Recharge de nuit non programmée"
                   message: >
                     La recharge prévue ({{ states('sensor.jarvis_recharge_reseau_prevue') }} kWh) n'a pas pu être
-                    programmée sur l'onduleur. Il reste en autoconsommation. Voir le journal de Home Assistant.
+                    programmée sur l'onduleur après {{ essais | count }} essais. Il reste en autoconsommation.
+                    Voir le journal de Home Assistant.
 
   - id: jarvis_batterie_reevaluation
     alias: "Jarvis · Batterie : réévaluation 1 h avant la recharge"

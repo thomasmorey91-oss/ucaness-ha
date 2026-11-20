@@ -100,6 +100,11 @@ MIN_WRITE_INTERVAL_S = 2.0
 MAX_WRITES_PER_HOUR = 20
 MAX_ITEMS_PER_WRITE = 2          # une plage (début, fin) par envoi
 DEVICE_TIMEOUT_CODES = {"5019"}  # « Device operation timeout »
+# Un 5019 n'est pas toujours un échec : une plage envoyée a reçu un 5019 alors que l'onduleur
+# l'avait bien enregistrée (relue quelques minutes plus tard). Après un 5019, la configuration
+# est relue pendant TIMEOUT_CONFIRM_ATTEMPTS × TIMEOUT_CONFIRM_DELAY_S (2 min) avant de conclure.
+TIMEOUT_CONFIRM_ATTEMPTS = 6
+TIMEOUT_CONFIRM_DELAY_S = 20.0
 
 
 class UcanessError(Exception):
@@ -332,8 +337,9 @@ class UcanessClient:
 
         Comme le portail : seuls les réglages qui diffèrent de la configuration actuelle sont
         envoyés, par paquets de MAX_ITEMS_PER_WRITE. L'onduleur répond « 5019 Device operation
-        timeout » à un envoi de 12 réglages d'un coup (essai du 18/11/2026) : en cas de 5019,
-        le paquet est renvoyé réglage par réglage.
+        timeout » à un envoi de 12 réglages d'un coup, et parfois à un envoi pourtant appliqué :
+        en cas de 5019, la configuration est relue avant de conclure, puis les réglages qui ne
+        sont pas en place sont renvoyés un par un.
         """
         pcs = validate_settings(items)
         async with self._write_lock:
@@ -351,15 +357,55 @@ class UcanessClient:
                 return []
             for start in range(0, len(todo), MAX_ITEMS_PER_WRITE):
                 chunk = todo[start:start + MAX_ITEMS_PER_WRITE]
-                try:
-                    await self._post_settings(device_id, model, chunk)
-                except UcanessApiError as err:
-                    if str(err.code) not in DEVICE_TIMEOUT_CODES or len(chunk) == 1:
-                        raise
-                    _LOGGER.warning("UCANESS : délai dépassé pour %s, envoi réglage par réglage", chunk)
-                    for item in chunk:
-                        await self._post_settings(device_id, model, [item])
+                await self._send_chunk(device_code, device_id, model, chunk)
         return todo
+
+    async def _send_chunk(
+        self, device_code: str, device_id: str, model: str, chunk: list[dict[str, int]]
+    ) -> None:
+        """Envoie un paquet. Sur 5019 : relit avant de conclure, puis renvoie un par un ce qui manque."""
+        try:
+            await self._post_settings(device_id, model, chunk)
+            return
+        except UcanessApiError as err:
+            if str(err.code) not in DEVICE_TIMEOUT_CODES:
+                raise
+            pending = await self._pending_after_timeout(device_code, model, chunk)
+            if not pending:
+                return
+            if len(chunk) == 1:
+                raise
+        _LOGGER.warning("UCANESS : %s non appliqué après le délai dépassé, envoi réglage par réglage", pending)
+        for item in pending:
+            try:
+                await self._post_settings(device_id, model, [item])
+            except UcanessApiError as err:
+                if str(err.code) not in DEVICE_TIMEOUT_CODES:
+                    raise
+                if await self._pending_after_timeout(device_code, model, [item]):
+                    raise
+
+    async def _pending_after_timeout(
+        self, device_code: str, model: str, chunk: list[dict[str, int]]
+    ) -> list[dict[str, int]]:
+        """Après un 5019 : relit la configuration jusqu'à TIMEOUT_CONFIRM_ATTEMPTS fois.
+
+        Renvoie les réglages du paquet qui ne sont toujours pas en place (liste vide : appliqués).
+        """
+        _LOGGER.warning("UCANESS : délai dépassé (5019) pour %s, vérification par relecture", chunk)
+        pending = list(chunk)
+        for attempt in range(TIMEOUT_CONFIRM_ATTEMPTS):
+            await asyncio.sleep(TIMEOUT_CONFIRM_DELAY_S)
+            try:
+                current = pcs_settings(await self.get_config_v1(device_code), model)
+            except UcanessError as err:
+                _LOGGER.debug("Relecture après 5019 impossible (essai %s) : %s", attempt + 1, err)
+                continue
+            pending = [i for i in chunk if read_back_value(current, i["set_id"]) != i["set_data"]]
+            if not pending:
+                _LOGGER.warning("UCANESS : malgré le 5019, l'onduleur a bien enregistré %s", chunk)
+                return []
+        return pending
 
     async def _post_settings(self, device_id: str, model: str, chunk: list[dict[str, int]]) -> None:
         await self._wait_write_slot()

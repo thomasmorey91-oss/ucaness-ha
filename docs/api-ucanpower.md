@@ -58,6 +58,7 @@ Les mesures de l'intégration passent par les chemins du portail web (`/device/d
 | Échelle des réglages de fond | ×10 par rapport à la documentation `uhome` (DOD 900 pour 90 %, hystérésis 100 pour 10 %, courant 1000 pour 100 A, puissance réseau 600 pour 60 %) |
 | Configuration du cloud | Omet les valeurs nulles (mode 0, plages vides) ; le portail lit un réglage absent comme 0 |
 | Envoi groupé | 12 réglages d'un coup : « 5019 Device operation timeout ». Un ou deux réglages : accepté, confirmé en 8 à 80 s |
+| 5019 sur un envoi appliqué | Un seul réglage (début de plage) a reçu « 5019 Device operation timeout » alors que l'onduleur l'avait enregistré (relu quelques minutes plus tard). Le client relit la configuration avant de conclure à un échec |
 | Plancher | Avec un DOD de 90 % et une hystérésis de 10 %, l'onduleur ne descend pas sous 13 % et se recharge seul jusqu'à 16 %, y compris en heures pleines |
 | Application du téléphone | Affiche « Arbitrage horaire » par défaut quand le mode n'est pas stocké : ne pas valider ce formulaire sans corriger le mode |
 
