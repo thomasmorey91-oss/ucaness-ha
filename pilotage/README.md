@@ -46,12 +46,14 @@ Trois packages Home Assistant qui utilisent l'intégration `ucaness` de ce dép�
    | UCANESS : défaut ou alarme batterie | `binary_sensor.uhome_defaut_batterie` |
    | UCANESS : température hors plage de charge | `binary_sensor.uhome_temperature_hors_plage` |
    | Solcast : prévision de demain / d'aujourd'hui | `sensor.solcast_pv_forecast_prevision_demain` / `..._aujourdhui` |
+   | Solcast : dernière interrogation de l'API, limite, appels utilisés (journal, mises à jour pilotées) | `sensor.solcast_pv_forecast_derniere_interrogation_de_l_api`, `sensor.solcast_pv_forecast_limite_api`, `sensor.solcast_pv_forecast_api_utilisee` (noms créés par Home Assistant en français) |
 
 3. Vérifier la configuration, puis redémarrer.
-4. Renseigner les entrées (Paramètres → Appareils et services → Entrées) : capacité de la batterie, plancher, puissance de charge, marge, consommation journalière par défaut, tarif (heures creuses, week-end en heures creuses, prix), service de notification. Le détail est dans `REGLES.md`, § 5.
-5. Laisser tourner quelques jours en simulation : chaque soir, le journal de bord indique la recharge qui aurait été programmée et pourquoi (entité `sensor.jarvis_recharge_reseau_prevue`).
-6. Mode réel : cocher « Écriture autorisée » dans les options de l'intégration UCANESS, puis éteindre « Batterie : mode simulation ». À refaire après chaque redémarrage de Home Assistant.
-7. Alertes : renseigner le service de notification, puis allumer « Alertes Jarvis actives ».
+4. Renseigner les entrées (Paramètres → Appareils et services → Entrées) : capacité de la batterie, plancher, puissance de charge, marge, consommation journalière par défaut, tarif (heures creuses, week-end en heures creuses, prix), service de notification. Le détail est dans `REGLES.md`, § 6.
+5. Gain réel : chaque soir, `sensor.jarvis_gain_reel_du_jour` compare le coût réel des 24 dernières heures à l'autoconsommation simple simulée avec les mêmes mesures ; cumuls dans `sensor.jarvis_gain_reel_du_mois` et `sensor.jarvis_gain_reel_de_l_annee`. Les jours sans recharge, il doit rester proche de 0 : l'écart mesure la précision de la simulation.
+6. Laisser tourner quelques jours en simulation : chaque soir, le journal de bord indique la recharge qui aurait été programmée et pourquoi (entité `sensor.jarvis_recharge_reseau_prevue`).
+7. Mode réel : cocher « Écriture autorisée » dans les options de l'intégration UCANESS, puis éteindre « Batterie : mode simulation ». À refaire après chaque redémarrage de Home Assistant.
+8. Alertes : renseigner le service de notification, puis allumer « Alertes Jarvis actives ».
 
 ## Mesurer avant de régler
 
@@ -66,6 +68,8 @@ Trois packages Home Assistant qui utilisent l'intégration `ucaness` de ce dép�
 ```bash
 # Calcul (Home Assistant, freezegun, pyyaml)
 python pilotage/tests/test_calcul.py
+# Ajouts v7 : repli sans prévision solaire, moyenne pondérée, fourchette P10-P90, gain réel
+python pilotage/tests/test_v7.py
 
 # Scripts et automatisations (pytest-homeassistant-custom-component)
 cd pilotage/tests && python -m pytest -q test_scripts_pilotage.py

@@ -23,11 +23,13 @@
 #   la batterie continue d'alimenter la maison ; la consommation de la nuit est donc toujours
 #   déduite du stock.
 #
-# Calcul (pour le lendemain le soir, pour le jour même après minuit) :
+# Calcul v7 (pour le lendemain le soir, pour le jour même après minuit) :
 #   - consommation heure par heure = consommation MESURÉE de la maison (moyenne horaire des
-#     7 derniers jours, même type de jour si possible, statistiques de Home Assistant) ; pour
-#     une heure sans mesure : « consommation journalière par défaut » × profil type ;
-#   - solaire heure par heure = prévision Solcast (attribut detailedHourly) ;
+#     7 derniers jours, même type de jour si possible, statistiques de Home Assistant),
+#     PONDÉRÉE par l'ancienneté (1 pour le jour le plus récent, 1/2 pour le précédent, 1/4…) ;
+#     pour une heure sans mesure : « consommation journalière par défaut » × profil type ;
+#   - solaire heure par heure = prévision Solcast (attribut detailedHourly), valeurs datées du
+#     jour préparé seulement ; sans prévision pour ce jour : aucune recharge (repli sûr) ;
 #   - de la fin des heures creuses à leur retour, bilan cumulé de la batterie : il baisse quand
 #     la maison consomme plus que le solaire, il remonte avec le surplus ;
 #     besoin = le point le plus bas de ce bilan (énergie à avoir en stock en fin de nuit pour
@@ -40,14 +42,24 @@
 #   Pas de recharge si la batterie est sous 0 °C, si le jour préparé n'est pas ouvré (tarifs
 #   « week-end en heures creuses »), ou si une donnée manque (repli sûr : rien n'est envoyé).
 #
+# Journal (v7) : chaque décision indique la fourchette solaire P10-P90, l'heure de la prévision,
+# le nombre d'heures mesurées et si la batterie est remplie quelle que soit la prévision.
+# Gain réel (v7) : chaque soir, coût réel des 24 dernières heures comparé à l'autoconsommation
+# simple simulée avec les mêmes mesures ; cumuls du mois et de l'année.
+# Solcast (v7, optionnel) : mises à jour pilotées par Jarvis, dont une avant la réévaluation.
+#
 # Réglages (Paramètres > Entrées) : capacité, plancher (SOC sous lequel l'onduleur ne
 # décharge plus), rendement, puissance de charge réseau réellement observée, marge,
 # consommation journalière par défaut. Voir pilotage/README.md.
 #
 # Entités attendues (à renommer à l'installation, voir pilotage/README.md) :
 #   sensor.uhome_soc, sensor.uhome_temperature_batterie, sensor.uhome_mode,
-#   sensor.uhome_puissance_maison, binary_sensor.uhome_temperature_hors_plage (UCANESS)
-#   sensor.solcast_pv_forecast_prevision_demain, sensor.solcast_pv_forecast_prevision_aujourdhui
+#   sensor.uhome_puissance_maison, binary_sensor.uhome_temperature_hors_plage,
+#   sensor.uhome_puissance_mppt_1, sensor.uhome_puissance_mppt_2, sensor.uhome_puissance_reseau,
+#   sensor.uhome_soutirage_reseau_total (UCANESS)
+#   sensor.solcast_pv_forecast_prevision_demain, sensor.solcast_pv_forecast_prevision_aujourdhui,
+#   sensor.solcast_pv_forecast_derniere_interrogation_de_l_api, sensor.solcast_pv_forecast_limite_api,
+#   sensor.solcast_pv_forecast_api_utilisee (Solcast, noms français)
 #   binary_sensor.workday_sensor (Workday)
 # =============================================================================
 
@@ -59,6 +71,9 @@ input_boolean:
   jarvis_batterie_plan_actif:
     name: "Batterie : recharge de nuit programmée (arbitrage horaire en cours)"
     icon: mdi:battery-charging-medium
+  jarvis_solcast_pilote:
+    name: "Solcast : mises à jour pilotées par Jarvis"
+    icon: mdi:weather-partly-cloudy
 
 input_datetime:
   jarvis_batterie_fin_plan:
@@ -157,9 +172,22 @@ template:
             {% set c = states('input_number.jarvis_conso_journaliere') | float(0) %}
             {{ c if c > 0 else none }}
           # Consommation mesurée par heure (kWh), même type de jour en priorité ; none sans mesure.
+          # Moyenne PONDÉRÉE (v7) : le jour retenu le plus récent compte 1, le précédent 1/2, puis
+          # 1/4… (rang parmi les jours de même type, ou parmi tous les jours à défaut).
           conso_mesuree: >
             {% set st = mesures.statistics if (mesures is defined and mesures is mapping and 'statistics' in mesures) else {} %}
             {% set rows = st['sensor.uhome_puissance_maison'] if 'sensor.uhome_puissance_maison' in st else [] %}
+            {% set nj = namespace(meme=[], tous=[]) %}
+            {% for r in rows %}
+              {% if r.mean is number %}
+                {% set t = r.start | as_datetime | as_local %}
+                {% set d = t.date() | string %}
+                {% if d not in nj.tous %}{% set nj.tous = nj.tous + [d] %}{% endif %}
+                {% if (t.weekday() < 5) == demain_ouvre and d not in nj.meme %}{% set nj.meme = nj.meme + [d] %}{% endif %}
+              {% endif %}
+            {% endfor %}
+            {% set meme = nj.meme | sort(reverse=true) %}
+            {% set tous = nj.tous | sort(reverse=true) %}
             {% set ns = namespace(v=[]) %}
             {% for h in range(24) %}
               {% set a = namespace(s1=0, n1=0, s2=0, n2=0) %}
@@ -167,11 +195,14 @@ template:
                 {% if r.mean is number %}
                   {% set t = r.start | as_datetime | as_local %}
                   {% if t.hour == h %}
-                    {% set a.s2 = a.s2 + r.mean %}
-                    {% set a.n2 = a.n2 + 1 %}
-                    {% if (t.weekday() < 5) == demain_ouvre %}
-                      {% set a.s1 = a.s1 + r.mean %}
-                      {% set a.n1 = a.n1 + 1 %}
+                    {% set d = t.date() | string %}
+                    {% set w2 = 0.5 ** (tous.index(d)) %}
+                    {% set a.s2 = a.s2 + w2 * r.mean %}
+                    {% set a.n2 = a.n2 + w2 %}
+                    {% if d in meme %}
+                      {% set w1 = 0.5 ** (meme.index(d)) %}
+                      {% set a.s1 = a.s1 + w1 * r.mean %}
+                      {% set a.n1 = a.n1 + w1 %}
                     {% endif %}
                   {% endif %}
                 {% endif %}
@@ -180,21 +211,41 @@ template:
               {% set ns.v = ns.v + [(val | round(3)) if val is not none else none] %}
             {% endfor %}
             {{ ns.v }}
-          # Production solaire prévue pour demain, heure par heure (kWh), d'après Solcast.
+          # Prévision Solcast du jour préparé : seules comptent les valeurs datées de ce jour (v7).
+          capteur_pv: >
+            {{ 'sensor.solcast_pv_forecast_prevision_aujourdhui' if jour_cible == now().date() | string else 'sensor.solcast_pv_forecast_prevision_demain' }}
+          # Production solaire prévue heure par heure (kWh) : médiane (pv_estimate).
           pv_h: >
-            {% set capteur = 'sensor.solcast_pv_forecast_prevision_aujourdhui' if jour_cible == now().date() | string else 'sensor.solcast_pv_forecast_prevision_demain' %}
-            {% set dh = state_attr(capteur, 'detailedHourly') or [] %}
+            {% set dh = state_attr(capteur_pv, 'detailedHourly') or [] %}
             {% set ns = namespace(v=[]) %}
             {% for h in range(24) %}
               {% set n2 = namespace(s=0) %}
               {% for e in dh %}
-                {% if (e.period_start | as_datetime | as_local).hour == h %}
+                {% set t = e.period_start | as_datetime | as_local %}
+                {% if t.date() | string == jour_cible and t.hour == h %}
                   {% set n2.s = n2.s + (e.pv_estimate | float(0)) %}
                 {% endif %}
               {% endfor %}
               {% set ns.v = ns.v + [n2.s | round(3)] %}
             {% endfor %}
             {{ ns.v }}
+          # Contrôle et fourchette de la prévision solaire (journal) : nombre de valeurs datées du
+          # jour préparé, cumuls P10 (cas défavorable) et P90 (cas favorable), heure de mise à jour.
+          pv_info: >
+            {% set dh = state_attr(capteur_pv, 'detailedHourly') or [] %}
+            {% set ns = namespace(n=0, p10=0, p90=0) %}
+            {% for e in dh %}
+              {% if (e.period_start | as_datetime | as_local).date() | string == jour_cible %}
+                {% set ns.n = ns.n + 1 %}
+                {% set ns.p10 = ns.p10 + (e.get('pv_estimate10', 0) | float(0)) %}
+                {% set ns.p90 = ns.p90 + (e.get('pv_estimate90', 0) | float(0)) %}
+              {% endif %}
+            {% endfor %}
+            {% set m = states('sensor.solcast_pv_forecast_derniere_interrogation_de_l_api') %}
+            {% set maj = (m | as_datetime(none)) if m not in ['unknown', 'unavailable', ''] else none %}
+            {{ {'ok': ns.n > 0, 'valeurs': ns.n, 'p10': ns.p10 | round(1), 'p90': ns.p90 | round(1),
+                'maj': (maj | as_local).strftime('%d/%m %Hh%M') if maj else none,
+                'age_h': (((now() - maj).total_seconds() / 3600) | round(1)) if maj else none} }}
           calcul: >
             {% set cap_brute = states('input_number.jarvis_batterie_capacite') | float(0) %}
             {% set plancher = states('input_number.jarvis_batterie_plancher') | float(10) %}
@@ -267,6 +318,7 @@ template:
             {% elif cap_brute <= 0 %}{% set ns2.motif = 'Capacité de la batterie non renseignée : pas de recharge.' %}
             {% elif not conso_ok %}{% set ns2.motif = 'Consommation inconnue (heures sans mesure et consommation journalière par défaut non renseignée) : pas de recharge (repli sûr).' %}
             {% elif soc is not number %}{% set ns2.motif = 'SOC batterie indisponible : pas de recharge (repli sûr).' %}
+            {% elif not pv_info.ok %}{% set ns2.motif = 'Prévision solaire indisponible pour le jour préparé : pas de recharge (repli sûr).' %}
             {% elif t_batt is number and t_batt < 0 %}{% set ns2.motif = 'Batterie sous 0 °C : charge interdite.' %}
             {% elif cible <= 0.05 %}{% set ns2.motif = 'Soleil prévu suffisant dès la fin des heures creuses : pas de recharge.' %}
             {% elif stock_restant >= cible %}
@@ -319,7 +371,8 @@ template:
               'plan_debut': plages[0].debut if plages else none,
               'plan_fin': plages[-1].fin if plages else none,
               'reevaluation': reeval,
-              'calcul_valide': ns2.motif[:10] not in ['Consommati', 'SOC batter', 'Capacité d'],
+              'calcul_valide': ns2.motif[:10] not in ['Consommati', 'SOC batter', 'Capacité d', 'Prévision '],
+              'borne_capacite': besoin >= cap and cap > 0,
               'justification': ns2.motif
             } }}
     sensor:
@@ -354,6 +407,13 @@ template:
           plages: "{{ calcul.plages }}"
           plan_fin: "{{ calcul.plan_fin }}"
           mode: "{{ 'simulation' if is_state('input_boolean.jarvis_mode_simulation', 'on') else 'réel' }}"
+          solaire_p10_kwh: "{{ pv_info.p10 }}"
+          solaire_p90_kwh: "{{ pv_info.p90 }}"
+          prevision_solaire_maj: "{{ pv_info.maj }}"
+          prevision_solaire_age_h: "{{ pv_info.age_h }}"
+          prevision_solaire_ok: "{{ pv_info.ok }}"
+          batterie_pleine_de_toute_facon: "{{ calcul.borne_capacite }}"
+          methode_conso: "Moyenne pondérée des 7 derniers jours (même type de jour en priorité)"
 
   - sensor:
       - name: "Jarvis coût réseau du jour"
@@ -363,6 +423,244 @@ template:
         state: >
           {{ (states('sensor.jarvis_soutirage_jour_hp') | float(0) * states('input_number.jarvis_prix_hp') | float(0)
             + states('sensor.jarvis_soutirage_jour_hc') | float(0) * states('input_number.jarvis_prix_hc') | float(0)) | round(2) }}
+
+  # ---------------------------------------------------------------------------
+  # Gain réel (v7) : 25 min après le début des heures creuses, Jarvis compare le coût réel des
+  # 24 dernières heures (soutirage mesuré × prix de l'heure - injection × prix de revente) au coût
+  # qu'aurait eu la maison en autoconsommation simple, simulée heure par heure avec la consommation
+  # et la production mesurées, en partant du même stock. L'écart de stock en fin de fenêtre est
+  # valorisé au prix des heures creuses × rendement (il sert la nuit suivante).
+  # Les jours sans recharge (week-ends), le gain doit rester proche de 0 : l'écart mesure alors
+  # l'imprécision de la simulation horaire. Recalcul manuel : événement « jarvis_calcul_gain ».
+  # Statistiques utilisées : sensor.uhome_puissance_maison, sensor.uhome_puissance_mppt_1 et _2,
+  # sensor.uhome_puissance_reseau (moyennes horaires), sensor.uhome_soc (stock en début et fin de
+  # fenêtre), sensor.uhome_soutirage_reseau_total (soutirage par heure).
+  # ---------------------------------------------------------------------------
+  - triggers:
+      - trigger: time
+        at:
+          entity_id: input_datetime.jarvis_hc_debut
+          offset: "00:25:00"
+      - trigger: event
+        event_type: jarvis_calcul_gain
+    actions:
+      - variables:
+          # Fenêtre de 24 h finissant à l'heure ronde du début des heures creuses (ex. 23h-23h).
+          fin_fenetre: >
+            {% set d = states('input_datetime.jarvis_hc_debut') %}
+            {% set hd = d[:2] | int(23) if d | regex_match('^\\d\\d:') else 23 %}
+            {% set f = now().replace(hour=hd, minute=0, second=0, microsecond=0) %}
+            {{ (f if now() >= f + timedelta(minutes=20) else f - timedelta(days=1)).isoformat() }}
+          debut_fenetre: "{{ ((fin_fenetre | as_datetime) - timedelta(days=1)).isoformat() }}"
+      - action: workday.check_date
+        target: { entity_id: binary_sensor.workday_sensor }
+        data:
+          check_date: "{{ (debut_fenetre | as_datetime).date() | string }}"
+        response_variable: jour_debut
+      - action: workday.check_date
+        target: { entity_id: binary_sensor.workday_sensor }
+        data:
+          check_date: "{{ (fin_fenetre | as_datetime).date() | string }}"
+        response_variable: jour_fin
+      - action: recorder.get_statistics
+        continue_on_error: true
+        data:
+          start_time: "{{ ((debut_fenetre | as_datetime) - timedelta(hours=1)).isoformat() }}"
+          end_time: "{{ fin_fenetre }}"
+          statistic_ids:
+            - sensor.uhome_puissance_maison
+            - sensor.uhome_puissance_mppt_1
+            - sensor.uhome_puissance_mppt_2
+            - sensor.uhome_puissance_reseau
+            - sensor.uhome_soc
+          period: hour
+          types: [mean]
+        response_variable: moyennes
+      - action: recorder.get_statistics
+        continue_on_error: true
+        data:
+          start_time: "{{ debut_fenetre }}"
+          end_time: "{{ fin_fenetre }}"
+          statistic_ids: [sensor.uhome_soutirage_reseau_total]
+          period: hour
+          types: [change]
+        response_variable: compteurs
+      - variables:
+          gain: >
+            {% set cap_brute = states('input_number.jarvis_batterie_capacite') | float(0) %}
+            {% set plancher = states('input_number.jarvis_batterie_plancher') | float(10) %}
+            {% set eta = states('input_number.jarvis_batterie_rendement') | float(95) / 100 %}
+            {% set hp = states('input_number.jarvis_prix_hp') | float(0) %}
+            {% set hc = states('input_number.jarvis_prix_hc') | float(0) %}
+            {% set inj = states('input_number.jarvis_prix_injection') | float(0) %}
+            {% set base = is_state('input_select.jarvis_type_tarif', 'Base') %}
+            {% set hc_we = is_state('input_boolean.jarvis_hc_jours_non_ouvres', 'on') %}
+            {% set hc_d = states('input_datetime.jarvis_hc_debut') %}
+            {% set hc_f = states('input_datetime.jarvis_hc_fin') %}
+            {% set hc_d = hc_d if hc_d | regex_match('^\\d\\d:\\d\\d') else '23:00:00' %}
+            {% set hc_f = hc_f if hc_f | regex_match('^\\d\\d:\\d\\d') else '06:00:00' %}
+            {% set dm = hc_d[:2] | int * 60 + hc_d[3:5] | int %}
+            {% set fm = hc_f[:2] | int * 60 + hc_f[3:5] | int %}
+            {% set cap = cap_brute * (1 - plancher / 100) %}
+            {% set deb = debut_fenetre | as_datetime %}
+            {% set fin = fin_fenetre | as_datetime %}
+            {% set t0 = as_timestamp(deb) | int %}
+            {% set n = ((as_timestamp(fin) - as_timestamp(deb)) / 3600) | round(0) | int %}
+            {% set ouvre_deb = jour_debut['binary_sensor.workday_sensor'].workday | default(true) %}
+            {% set ouvre_fin = jour_fin['binary_sensor.workday_sensor'].workday | default(true) %}
+            {% set date_fin = fin.date() | string %}
+            {% set st = moyennes.statistics if (moyennes is defined and moyennes is mapping and 'statistics' in moyennes) else {} %}
+            {% set sc = compteurs.statistics if (compteurs is defined and compteurs is mapping and 'statistics' in compteurs) else {} %}
+            {% set rL = st.get('sensor.uhome_puissance_maison', []) %}
+            {% set r1 = st.get('sensor.uhome_puissance_mppt_1', []) %}
+            {% set r2 = st.get('sensor.uhome_puissance_mppt_2', []) %}
+            {% set rR = st.get('sensor.uhome_puissance_reseau', []) %}
+            {% set rS = st.get('sensor.uhome_soc', []) %}
+            {% set rI = sc.get('sensor.uhome_soutirage_reseau_total', []) %}
+            {% set mL = dict(zip(rL | map(attribute='start') | map('as_timestamp') | map('int') | list, rL | map(attribute='mean') | list)) %}
+            {% set m1 = dict(zip(r1 | map(attribute='start') | map('as_timestamp') | map('int') | list, r1 | map(attribute='mean') | list)) %}
+            {% set m2 = dict(zip(r2 | map(attribute='start') | map('as_timestamp') | map('int') | list, r2 | map(attribute='mean') | list)) %}
+            {% set mR = dict(zip(rR | map(attribute='start') | map('as_timestamp') | map('int') | list, rR | map(attribute='mean') | list)) %}
+            {% set mS = dict(zip(rS | map(attribute='start') | map('as_timestamp') | map('int') | list, rS | map(attribute='mean') | list)) %}
+            {% set mI = dict(zip(rI | map(attribute='start') | map('as_timestamp') | map('int') | list, rI | map(attribute='change') | list)) %}
+            {% set soc0 = mS.get(t0 - 3600) %}
+            {% set soc1 = mS.get(t0 + 3600 * (n - 1)) %}
+            {% set s_reel0 = [0, ((soc0 if soc0 is number else plancher) - plancher) / 100 * cap_brute] | max %}
+            {% set s_reel1 = [0, ((soc1 if soc1 is number else plancher) - plancher) / 100 * cap_brute] | max %}
+            {% set ns = namespace(ok=0, s=s_reel0, cout_reel=0, cout_auto=0, achat=0, achat_hp=0, injection=0,
+                                  achat_auto=0, achat_hp_auto=0, injection_auto=0) %}
+            {% for i in range(n) %}
+              {% set ts = t0 + 3600 * i %}
+              {% set loc = ts | timestamp_custom('%Y-%m-%d %H', true) %}
+              {% set m0 = loc[11:13] | int * 60 %}
+              {# Part de l'heure en heures creuses (plage qui peut passer minuit). #}
+              {% if dm > fm %}
+                {% set frac = ([0, [m0 + 60, 1440] | min - [m0, dm] | max] | max + [0, [m0 + 60, fm] | min - m0] | max) / 60 %}
+              {% else %}
+                {% set frac = [0, [m0 + 60, fm] | min - [m0, dm] | max] | max / 60 %}
+              {% endif %}
+              {% set ouvre = ouvre_fin if loc[:10] == date_fin else ouvre_deb %}
+              {% set frac = 1 if (hc_we and not ouvre) else frac %}
+              {% set prix = hp if base else hp * (1 - frac) + hc * frac %}
+              {% set L = mL.get(ts) %}
+              {% set p1 = m1.get(ts) %}
+              {% set p2 = m2.get(ts) %}
+              {% set I = mI.get(ts) %}
+              {% set R = mR.get(ts) %}
+              {# La nuit, l'onduleur n'envoie pas de puissance MPPT : une heure sans valeur compte pour 0. #}
+              {% if L is number and I is number %}
+                {% set ns.ok = ns.ok + 1 %}
+                {% set L = [0, L] | max / 1000 %}
+                {% set P = ([0, p1 if p1 is number else 0] | max + [0, p2 if p2 is number else 0] | max) / 1000 %}
+                {% set I = [0, I] | max %}
+                {% set E = [0, I - R / 1000] | max if R is number else 0 %}
+                {% set ns.cout_reel = ns.cout_reel + I * prix - E * inj %}
+                {% set ns.achat = ns.achat + I %}
+                {% set ns.achat_hp = ns.achat_hp + I * (0 if base else 1 - frac) %}
+                {% set ns.injection = ns.injection + E %}
+                {# Autoconsommation simple simulée : le surplus charge la batterie, le déficit la décharge. #}
+                {% set net = P - L %}
+                {% if net >= 0 %}
+                  {% set c = [net, (cap - ns.s) / eta] | min %}
+                  {% set ns.s = ns.s + c * eta %}
+                  {% set ns.injection_auto = ns.injection_auto + net - c %}
+                  {% set ns.cout_auto = ns.cout_auto - (net - c) * inj %}
+                {% else %}
+                  {% set d = [-net, ns.s * eta] | min %}
+                  {% set ns.s = ns.s - d / eta %}
+                  {% set a = -net - d %}
+                  {% set ns.achat_auto = ns.achat_auto + a %}
+                  {% set ns.achat_hp_auto = ns.achat_hp_auto + a * (0 if base else 1 - frac) %}
+                  {% set ns.cout_auto = ns.cout_auto + a * prix %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {% set v = hc * eta %}
+            {% set valide = cap_brute > 0 and soc0 is number and soc1 is number and ns.ok >= n - 1 and n > 0 %}
+            {% set g = ((ns.cout_auto - v * ns.s) - (ns.cout_reel - v * s_reel1)) if valide else none %}
+            {{ {
+              'gain': g | round(2) if g is number else none,
+              'valide': valide,
+              'fenetre': deb.strftime('%d/%m %Hh') ~ ' - ' ~ fin.strftime('%d/%m %Hh'),
+              'jour': date_fin,
+              'jour_ouvre': ouvre_fin,
+              'heures_mesurees': ns.ok,
+              'heures': n,
+              'cout_reel_eur': ns.cout_reel | round(2),
+              'cout_autoconsommation_eur': ns.cout_auto | round(2),
+              'soutirage_kwh': ns.achat | round(1),
+              'soutirage_hp_kwh': ns.achat_hp | round(1),
+              'injection_kwh': ns.injection | round(1),
+              'soutirage_autoconsommation_kwh': ns.achat_auto | round(1),
+              'soutirage_hp_autoconsommation_kwh': ns.achat_hp_auto | round(1),
+              'injection_autoconsommation_kwh': ns.injection_auto | round(1),
+              'stock_debut_kwh': s_reel0 | round(2),
+              'stock_fin_reel_kwh': s_reel1 | round(2),
+              'stock_fin_autoconsommation_kwh': ns.s | round(2),
+              'valeur_stock_eur_kwh': v | round(4)
+            } }}
+    sensor:
+      - name: "Jarvis gain réel du jour"
+        unique_id: jarvis_gain_reel_jour
+        unit_of_measurement: "EUR"
+        device_class: monetary
+        icon: mdi:piggy-bank-outline
+        state: "{{ gain.gain if gain.valide else none }}"
+        attributes:
+          fenetre: "{{ gain.fenetre }}"
+          jour: "{{ gain.jour }}"
+          jour_ouvre: "{{ gain.jour_ouvre }}"
+          calcul_valide: "{{ gain.valide }}"
+          heures_mesurees: "{{ gain.heures_mesurees }} / {{ gain.heures }}"
+          cout_reel_eur: "{{ gain.cout_reel_eur }}"
+          cout_autoconsommation_simulee_eur: "{{ gain.cout_autoconsommation_eur }}"
+          soutirage_kwh: "{{ gain.soutirage_kwh }}"
+          soutirage_hp_kwh: "{{ gain.soutirage_hp_kwh }}"
+          injection_kwh: "{{ gain.injection_kwh }}"
+          soutirage_autoconsommation_kwh: "{{ gain.soutirage_autoconsommation_kwh }}"
+          soutirage_hp_autoconsommation_kwh: "{{ gain.soutirage_hp_autoconsommation_kwh }}"
+          injection_autoconsommation_kwh: "{{ gain.injection_autoconsommation_kwh }}"
+          stock_debut_kwh: "{{ gain.stock_debut_kwh }}"
+          stock_fin_reel_kwh: "{{ gain.stock_fin_reel_kwh }}"
+          stock_fin_autoconsommation_kwh: "{{ gain.stock_fin_autoconsommation_kwh }}"
+          mode: "{{ 'simulation' if is_state('input_boolean.jarvis_mode_simulation', 'on') else 'réel' }}"
+      # Cumuls : chaque jour n'est ajouté qu'une fois (recalcul manuel sans double compte).
+      - name: "Jarvis gain réel du mois"
+        unique_id: jarvis_gain_reel_mois
+        unit_of_measurement: "EUR"
+        device_class: monetary
+        icon: mdi:piggy-bank
+        state: >
+          {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+          {% set prec = (this.state | float(0)) if a.get('mois') == gain.jour[:7] else 0 %}
+          {% if gain.valide and a.get('dernier_jour') != gain.jour %}{{ (prec + gain.gain) | round(2) }}{% else %}{{ prec | round(2) }}{% endif %}
+        attributes:
+          mois: "{{ gain.jour[:7] }}"
+          dernier_jour: >
+            {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+            {{ gain.jour if gain.valide else a.get('dernier_jour') }}
+          jours_comptes: >
+            {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+            {% set n = (a.get('jours_comptes') | int(0)) if a.get('mois') == gain.jour[:7] else 0 %}
+            {{ n + 1 if (gain.valide and a.get('dernier_jour') != gain.jour) else n }}
+      - name: "Jarvis gain réel de l'année"
+        unique_id: jarvis_gain_reel_annee
+        unit_of_measurement: "EUR"
+        device_class: monetary
+        icon: mdi:piggy-bank
+        state: >
+          {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+          {% set prec = (this.state | float(0)) if a.get('annee') == gain.jour[:4] else 0 %}
+          {% if gain.valide and a.get('dernier_jour') != gain.jour %}{{ (prec + gain.gain) | round(2) }}{% else %}{{ prec | round(2) }}{% endif %}
+        attributes:
+          annee: "{{ gain.jour[:4] }}"
+          dernier_jour: >
+            {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+            {{ gain.jour if gain.valide else a.get('dernier_jour') }}
+          jours_comptes: >
+            {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+            {% set n = (a.get('jours_comptes') | int(0)) if a.get('annee') == gain.jour[:4] else 0 %}
+            {{ n + 1 if (gain.valide and a.get('dernier_jour') != gain.jour) else n }}
 
 automation:
   - id: jarvis_batterie_valeurs_initiales
@@ -398,7 +696,8 @@ automation:
     description: >
       Au début des heures creuses (23h), recalcule avec le SOC du moment, journalise la décision
       et sa justification. En simulation, rien d'autre. En mode réel, appelle le script
-      d'application (plages en fin d'heures creuses, puis arbitrage horaire).
+      d'application (plages en fin d'heures creuses, puis arbitrage horaire), jusqu'à 3 fois
+      (début des heures creuses, +10 min, +30 min) ; alerte seulement après le dernier essai.
     mode: single
     triggers:
       - trigger: time
@@ -417,6 +716,10 @@ automation:
             solaire prévu {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_prevu_kwh') }} kWh,
             tarif HP {{ states('input_number.jarvis_prix_hp') }} / HC {{ states('input_number.jarvis_prix_hc') }} €/kWh,
             gain estimé {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'gain_estime_eur') }} €.
+            Fourchette solaire P10-P90 : {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_p10_kwh') }} à {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_p90_kwh') }} kWh
+            (prévision du {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'prevision_solaire_maj') }}) ;
+            consommation mesurée sur {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'heures_mesurees') }} h sur 24 (moyenne pondérée).
+            {% if state_attr('sensor.jarvis_recharge_reseau_prevue', 'batterie_pleine_de_toute_facon') %}Besoin supérieur à la capacité : batterie remplie quelle que soit la prévision.{% endif %}
             {% set pl = state_attr('sensor.jarvis_recharge_reseau_prevue', 'plages') or [] %}
             {% if state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') %}Arbitrage horaire pendant les heures creuses{% if pl %}, plages {% for x in pl %}{{ x.debut }}-{{ x.fin }} {% endfor %}{% endif %}.{% endif %}
       - if:
@@ -424,14 +727,49 @@ automation:
             entity_id: input_boolean.jarvis_mode_simulation
             state: "off"
         then:
-          - action: script.jarvis_batterie_appliquer
-            continue_on_error: true
-            response_variable: resultat
+          # Jusqu'à 3 essais : au début des heures creuses, puis 10 et 30 min après. Un échec
+          # passager (onduleur qui répond hors délai, cloud injoignable) ne coûte plus la nuit.
+          # Le script est rejouable : les réglages déjà en place ne sont pas renvoyés.
+          - variables:
+              programme: false
+              essais: [0, 10, 30]
+          - repeat:
+              sequence:
+                - delay: >
+                    {% set cible = as_local(trigger.now) + timedelta(minutes=essais[repeat.index - 1]) %}
+                    {{ [0, (cible - now()).total_seconds()] | max | int }}
+                - action: script.jarvis_batterie_appliquer
+                  continue_on_error: true
+                  response_variable: resultat
+                - variables:
+                    programme: "{{ ((resultat | default({})) or {}).get('ok', false) == true }}"
+                - if:
+                    - condition: template
+                      value_template: >
+                        {{ not programme and repeat.index < essais | count
+                           and state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') == true
+                           and is_state('input_boolean.jarvis_mode_simulation', 'off') }}
+                  then:
+                    - action: logbook.log
+                      data:
+                        name: "Jarvis batterie"
+                        entity_id: sensor.jarvis_recharge_reseau_prevue
+                        message: >
+                          [réel] Essai {{ repeat.index }} de programmation non abouti ; nouvel essai à
+                          {{ (as_local(trigger.now) + timedelta(minutes=essais[repeat.index])).strftime('%Hh%M') }}.
+              until:
+                - condition: template
+                  value_template: >
+                    {{ programme
+                       or repeat.index >= essais | count
+                       or state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') != true
+                       or is_state('input_boolean.jarvis_mode_simulation', 'on') }}
           - if:
               - condition: template
                 value_template: >
                   {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') == true
-                     and not ((resultat | default({})) or {}).get('ok', false) }}
+                     and is_state('input_boolean.jarvis_mode_simulation', 'off')
+                     and not programme }}
             then:
               - action: script.jarvis_notifier
                 data:
@@ -439,7 +777,8 @@ automation:
                   titre: "Recharge de nuit non programmée"
                   message: >
                     La recharge prévue ({{ states('sensor.jarvis_recharge_reseau_prevue') }} kWh) n'a pas pu être
-                    programmée sur l'onduleur. Il reste en autoconsommation. Voir le journal de Home Assistant.
+                    programmée sur l'onduleur après {{ essais | count }} essais. Il reste en autoconsommation.
+                    Voir le journal de Home Assistant.
 
   - id: jarvis_batterie_reevaluation
     alias: "Jarvis · Batterie : réévaluation 1 h avant la recharge"
@@ -468,6 +807,8 @@ automation:
           message: >
             [{{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'mode') }}] Réévaluation :
             SOC {{ states('sensor.uhome_soc') }} %, {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'justification') }}
+            Prévision solaire du {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'prevision_solaire_maj') }}
+            (P10-P90 : {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_p10_kwh') }} à {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_p90_kwh') }} kWh).
             {% if not valide %}Calcul incomplet : plage programmée conservée.{% endif %}
       - if:
           - condition: state
@@ -533,6 +874,83 @@ automation:
               message: >
                 Le retour en autoconsommation a échoué deux fois. Hors plage, la batterie ne sert pas :
                 remettre le mode Autoconsommation depuis le portail UCANESS.
+
+  - id: jarvis_batterie_journal_gain_reel
+    alias: "Jarvis · Batterie : journal du gain réel"
+    description: >
+      Inscrit chaque soir au journal le gain réel des 24 dernières heures face à
+      l'autoconsommation simple (calculé 25 min après le début des heures creuses).
+    mode: single
+    triggers:
+      - trigger: time
+        at:
+          entity_id: input_datetime.jarvis_hc_debut
+          offset: "00:27:00"
+    actions:
+      - action: logbook.log
+        data:
+          name: "Jarvis batterie"
+          entity_id: sensor.jarvis_gain_reel_du_jour
+          message: >
+            {% set e = 'sensor.jarvis_gain_reel_du_jour' %}
+            {% if state_attr(e, 'calcul_valide') %}
+            Gain réel ({{ state_attr(e, 'fenetre') }}) : {{ states(e) }} € face à l'autoconsommation simple
+            (coût réel {{ state_attr(e, 'cout_reel_eur') }} €, autoconsommation simulée {{ state_attr(e, 'cout_autoconsommation_simulee_eur') }} € ;
+            achats HP {{ state_attr(e, 'soutirage_hp_kwh') }} kWh contre {{ state_attr(e, 'soutirage_hp_autoconsommation_kwh') }} kWh).
+            Cumul du mois {{ states('sensor.jarvis_gain_reel_du_mois') }} €, de l'année {{ states('sensor.jarvis_gain_reel_de_l_annee') }} €.
+            {% else %}
+            Gain réel ({{ state_attr(e, 'fenetre') }}) non calculé : mesures incomplètes ({{ state_attr(e, 'heures_mesurees') }} h).
+            {% endif %}
+
+  - id: jarvis_solcast_mises_a_jour
+    alias: "Jarvis · Solcast : mises à jour de la prévision"
+    description: >
+      Optionnel : actif seulement si « Solcast : mises à jour pilotées par Jarvis » est allumé,
+      avec la mise à jour automatique de l'intégration Solcast coupée. Quatre mises à jour de jour
+      (lever du soleil + 15 min, 11h, 14h, coucher - 45 min) et une 20 min avant la réévaluation
+      de nuit quand une recharge est programmée. Chaque mise à jour n'est lancée que s'il reste
+      au moins 2 appels dans le quota du jour (2 toitures, 10 appels : 5 mises à jour).
+    mode: queued
+    triggers:
+      - trigger: sun
+        event: sunrise
+        offset: "00:15:00"
+        id: jour
+      - trigger: time
+        at: "11:00:00"
+        id: jour
+      - trigger: time
+        at: "14:00:00"
+        id: jour
+      - trigger: sun
+        event: sunset
+        offset: "-00:45:00"
+        id: jour
+      - trigger: time
+        at:
+          entity_id: input_datetime.jarvis_batterie_reevaluation
+          offset: "-00:20:00"
+        id: nuit
+    conditions:
+      - condition: state
+        entity_id: input_boolean.jarvis_solcast_pilote
+        state: "on"
+      - condition: template
+        value_template: >
+          {{ states('sensor.solcast_pv_forecast_limite_api') | int(0)
+             - states('sensor.solcast_pv_forecast_api_utilisee') | int(99) >= 2 }}
+      - condition: template
+        value_template: "{{ trigger.id == 'jour' or is_state('input_boolean.jarvis_batterie_plan_actif', 'on') }}"
+    actions:
+      - action: solcast_solar.update_forecasts
+        continue_on_error: true
+      - action: logbook.log
+        data:
+          name: "Jarvis batterie"
+          entity_id: sensor.jarvis_recharge_reseau_prevue
+          message: >
+            Prévision Solcast mise à jour ({{ 'avant la réévaluation de nuit' if trigger.id == 'nuit' else 'mise à jour de jour' }}) ;
+            appels utilisés {{ states('sensor.solcast_pv_forecast_api_utilisee') }} / {{ states('sensor.solcast_pv_forecast_limite_api') }}.
 
 script:
   jarvis_batterie_appliquer:
