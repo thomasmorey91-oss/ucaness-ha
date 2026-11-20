@@ -65,7 +65,7 @@ Pas de recharge si le jour préparé n'est pas ouvré et que les week-ends et jo
 | Programmation au début des heures creuses | Jusqu'à 3 essais (au début des heures creuses, puis 10 et 30 min après) ; alerte seulement après le dernier |
 | Gain réel du jour (`sensor.jarvis_gain_reel_du_jour`) | 25 min après le début des heures creuses : coût réel des 24 dernières heures (soutirage mesuré × prix de l'heure − injection × prix de revente) comparé à l'autoconsommation simple simulée heure par heure avec la consommation et la production mesurées, à partir du même stock. L'écart de stock final est valorisé au prix des heures creuses × rendement. Sans recharge (week-end), le gain doit rester proche de 0 |
 | Cumuls | `sensor.jarvis_gain_reel_du_mois` et `sensor.jarvis_gain_reel_de_l_annee` ; un jour n'est compté qu'une fois |
-| Mises à jour Solcast pilotées (optionnel) | Interrupteur « Solcast : mises à jour pilotées par Jarvis », éteint par défaut. À utiliser avec la mise à jour automatique de l'intégration coupée : 4 mises à jour de jour et une 20 min avant la réévaluation de nuit, dans la limite du quota |
+| Mises à jour Solcast pilotées (optionnel) | Interrupteur « Solcast : mises à jour pilotées par Jarvis », éteint par défaut. À utiliser avec la mise à jour automatique de l'intégration coupée : 3 mises à jour de jour (lever + 15 min, 13h, coucher − 45 min) et une 20 min avant la réévaluation de nuit, dans la limite du quota (2 appels par jour restent pour les valeurs réelles estimées de l'amortissement automatique) |
 
 ## 6. Réglages (Paramètres > Entrées)
 
