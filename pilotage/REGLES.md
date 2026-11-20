@@ -46,8 +46,8 @@ La recharge est placée en fin d'heures creuses : elle ne se cumule pas avec les
 
 Pour le jour préparé (le lendemain le soir, le jour même après minuit) :
 
-1. **Consommation heure par heure** : moyenne mesurée des 7 derniers jours (`recorder.get_statistics`, moyenne horaire de `sensor.uhome_puissance_maison`), même type de jour (ouvré ou repos) en priorité. Pour une heure sans mesure : « consommation journalière par défaut » × profil type.
-2. **Solaire heure par heure** : prévision Solcast (attribut `detailedHourly`).
+1. **Consommation heure par heure** : moyenne mesurée des 7 derniers jours (`recorder.get_statistics`, moyenne horaire de `sensor.uhome_puissance_maison`), même type de jour (ouvré ou repos) en priorité, **pondérée par l'ancienneté** : le jour retenu le plus récent compte 1, le précédent 1/2, puis 1/4, etc. Pour une heure sans mesure : « consommation journalière par défaut » × profil type.
+2. **Solaire heure par heure** : prévision Solcast (attribut `detailedHourly`), valeurs datées du jour préparé seulement. Sans prévision pour ce jour : aucune recharge (repli sûr) ; en réévaluation, la plage déjà programmée est conservée.
 3. **Bilan cumulé** de la fin des heures creuses à leur retour : il baisse de déficit ÷ rendement quand la maison consomme plus que le solaire, il monte de surplus × rendement sinon.
 4. **Besoin** : le point le plus bas de ce bilan, c'est-à-dire l'énergie à avoir en stock en fin de nuit pour tenir jusqu'au relais du solaire, ou jusqu'aux heures creuses suivantes si le solaire ne suffit pas. On y ajoute le quart d'heure entre la fin de la plage et la fin des heures creuses, puis la marge de sécurité.
 5. **Place pour le solaire** : capacité utile − pic de remplissage atteint avant le point le plus bas. Un stock consommé avant le surplus solaire ne prend pas sa place.
@@ -58,7 +58,17 @@ Pour le jour préparé (le lendemain le soir, le jour même après minuit) :
 
 Pas de recharge si le jour préparé n'est pas ouvré et que les week-ends et jours fériés sont en heures creuses, si la batterie est sous 0 °C, ou si une donnée manque.
 
-## 5. Réglages (Paramètres > Entrées)
+## 5. Journal et gain réel
+
+| Élément | Contenu |
+|---|---|
+| Journal de chaque décision | Justification, fourchette solaire P10-P90 (cas défavorable et favorable de Solcast), heure de la prévision, heures de consommation mesurées, besoin supérieur à la capacité (batterie remplie quelle que soit la prévision) |
+| Programmation au début des heures creuses | Jusqu'à 3 essais (au début des heures creuses, puis 10 et 30 min après) ; alerte seulement après le dernier |
+| Gain réel du jour (`sensor.jarvis_gain_reel_du_jour`) | 25 min après le début des heures creuses : coût réel des 24 dernières heures (soutirage mesuré × prix de l'heure − injection × prix de revente) comparé à l'autoconsommation simple simulée heure par heure avec la consommation et la production mesurées, à partir du même stock. L'écart de stock final est valorisé au prix des heures creuses × rendement. Sans recharge (week-end), le gain doit rester proche de 0 |
+| Cumuls | `sensor.jarvis_gain_reel_du_mois` et `sensor.jarvis_gain_reel_de_l_annee` ; un jour n'est compté qu'une fois |
+| Mises à jour Solcast pilotées (optionnel) | Interrupteur « Solcast : mises à jour pilotées par Jarvis », éteint par défaut. À utiliser avec la mise à jour automatique de l'intégration coupée : 3 mises à jour de jour (lever + 15 min, 13h, coucher − 45 min) et une 20 min avant la réévaluation de nuit, dans la limite du quota (2 appels par jour restent pour les valeurs réelles estimées de l'amortissement automatique) |
+
+## 6. Réglages (Paramètres > Entrées)
 
 | Entrée | Rôle | Valeur de départ |
 |---|---|---|
@@ -71,7 +81,7 @@ Pas de recharge si le jour préparé n'est pas ouvré et que les week-ends et jo
 | Tarif : type, heures creuses, week-end en heures creuses, prix HP, HC et revente | Contrat de fourniture | Heures creuses 22h30-6h30, prix à 0 : à renseigner |
 | Alertes : service de notification | Par exemple `mobile_app_mon_telephone` | Vide : pas de notification |
 
-## 6. Constats sur un onduleur UHome 6K (modèle `mr`)
+## 7. Constats sur un onduleur UHome 6K (modèle `mr`)
 
 | Constat |
 |---|
@@ -85,7 +95,7 @@ Pas de recharge si le jour préparé n'est pas ouvré et que les week-ends et jo
 | Sous le plancher, l'onduleur se recharge seul de quelques pourcents sur le réseau, y compris en heures pleines |
 | L'application mobile UCANESS affiche « Arbitrage horaire » par défaut quand le mode n'est pas stocké : ne jamais valider ce formulaire sans vérifier le mode |
 
-## 7. Historique
+## 8. Historique
 
 | Version | Changement |
 |---|---|
@@ -94,3 +104,4 @@ Pas de recharge si le jour préparé n'est pas ouvré et que les week-ends et jo
 | v4 | Recharge en fin d'heures creuses, décision au début des heures creuses, réévaluation 1 h avant, jour préparé correct après minuit |
 | v5 | Consommation mesurée, nuit toujours déduite, marge de sécurité |
 | v6 | Réglages propres à chaque installation dans des entrées (aucune valeur d'installation dans le code), service de notification paramétrable, place pour le solaire comptée avant le point le plus bas |
+| v7 | Moyenne de consommation pondérée par l'ancienneté, aucune recharge sans prévision solaire datée du jour préparé, journal enrichi (fourchette P10-P90, heure de la prévision), gain réel du jour face à l'autoconsommation et cumuls, 3 essais de programmation, mises à jour Solcast pilotées (optionnel) |
