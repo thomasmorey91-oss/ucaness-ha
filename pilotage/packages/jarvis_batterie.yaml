@@ -906,10 +906,11 @@ automation:
     alias: "Jarvis · Solcast : mises à jour de la prévision"
     description: >
       Optionnel : actif seulement si « Solcast : mises à jour pilotées par Jarvis » est allumé,
-      avec la mise à jour automatique de l'intégration Solcast coupée. Quatre mises à jour de jour
-      (lever du soleil + 15 min, 11h, 14h, coucher - 45 min) et une 20 min avant la réévaluation
-      de nuit quand une recharge est programmée. Chaque mise à jour n'est lancée que s'il reste
-      au moins 2 appels dans le quota du jour (2 toitures, 10 appels : 5 mises à jour).
+      avec la mise à jour automatique de l'intégration Solcast coupée. Trois mises à jour de jour
+      (lever du soleil + 15 min, 13h, coucher - 45 min) et une 20 min avant la réévaluation de
+      nuit quand une recharge est programmée. Chaque mise à jour n'est lancée que s'il reste au
+      moins 2 appels dans le quota du jour. Exemple : 2 toitures et 10 appels = 3 mises à jour de
+      jour (6) + 1 de nuit (2) + valeurs réelles estimées de minuit pour l'amortissement automatique (2).
     mode: queued
     triggers:
       - trigger: sun
@@ -917,10 +918,7 @@ automation:
         offset: "00:15:00"
         id: jour
       - trigger: time
-        at: "11:00:00"
-        id: jour
-      - trigger: time
-        at: "14:00:00"
+        at: "13:00:00"
         id: jour
       - trigger: sun
         event: sunset
