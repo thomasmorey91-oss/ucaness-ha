@@ -1,6 +1,6 @@
 # Intégration Home Assistant « UCANESS » (UCanpower UHome)
 
-Version 0.2.5, 20/11/2026. Testée sur un onduleur UHome 6K.
+Version 0.3.0, 21/11/2026. Testée sur un onduleur UHome 6K.
 
 > **Non officielle.** Les mesures sont lues par l'API du portail UCANESS (oss.ucaness.com), qui n'est pas documentée. Le pilotage passe par l'API tierce documentée d'UCanpower (chemins `/api/v1`, clé d'application).
 > **Lecture seule par défaut.** L'onduleur n'est piloté que si l'option « Écriture autorisée » est activée, et seulement sur deux points : le mode (autoconsommation ou arbitrage horaire) et les plages de charge. Tout autre réglage (DOD, hystérésis, courant, protections réseau, type de batterie, retour usine, commandes) est refusé par le client avant d'atteindre le réseau (§ 6 et § 8).
@@ -79,11 +79,13 @@ Chemins d'écriture repérés sur le portail, **volontairement bloqués** : `/de
 ```
 pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py   # client et décodage (8 tests)
 pytest -p no:homeassistant -p no:socket tests/test_pilotage.py           # signature, garde-fous, écriture et relecture (28 tests)
-pytest tests/test_ha_integration.py                                       # dans Home Assistant 2026.10 (11 tests)
+pytest tests/test_ha_integration.py                                       # dans Home Assistant (14 tests)
+pytest -p no:homeassistant tests/test_optimiseur.py                      # moteur du tarif dynamique (20 tests)
+pytest tools/dimensionnement/tests -q                                     # analyse et dimensionnement (14 tests)
 pytest dashboard/tests -q                                                 # tableau de bord, générateur de maison, rendu dans Chrome (14 tests)
 ```
 
-## 8. Pilotage (versions 0.2.x)
+## 8. Pilotage (versions 0.2 et 0.3)
 
 ### Options de l'intégration (Paramètres → Appareils et services → UCANESS → Configurer)
 
@@ -99,6 +101,8 @@ pytest dashboard/tests -q                                                 # tabl
 | `ucaness.tester_api` | Lecture seule : identifiant d'appareil de l'API tierce, modèle d'onduleur, mode et plages actuels, réglages enregistrés dans le cloud |
 | `ucaness.definir_plages_charge` | Jusqu'à 3 plages de charge (HHMM) ; les autres plages de charge et **toutes les plages de décharge** sont vidées |
 | `ucaness.definir_mode` | `autoconsommation` ou `arbitrage_horaire`. Le mode Backup est refusé |
+| `ucaness.optimiser_charge` (0.3) | Calcul seul, rien n'est envoyé : à partir des prix par créneau, de la consommation et de la prévision solaire, jusqu'à 3 plages de charge qui minimisent le coût sous un tarif dynamique (`custom_components/ucaness/optimiseur.py`, `pilotage/REGLES.md` § 8) |
+| `ucaness.plages_depuis_plan` (0.3) | Calcul seul : traduit le plan batterie d'EMHASS (ou de tout autre moteur) en 3 plages de charge au plus |
 
 Chaque écriture est journalisée, puis relue sur l'onduleur. Si la relecture ne correspond pas, l'action échoue : un script qui enchaîne plages puis mode s'arrête avant de changer de mode.
 
@@ -128,10 +132,11 @@ Chaque écriture est journalisée, puis relue sur l'onduleur. Si la relecture ne
 |---|---|
 | `custom_components/ucaness/` | L'intégration |
 | `tests/` | Tests de l'intégration |
-| `pilotage/` | Packages Home Assistant de pilotage de nuit de la batterie, règles et calculs (`pilotage/REGLES.md`), guide d'installation (`pilotage/README.md`), tests. Aucune valeur propre à une installation : tout se règle dans les entrées de Home Assistant |
+| `pilotage/` | Packages Home Assistant de pilotage de la batterie (nuit en heures pleines / heures creuses, tarif dynamique, secours), règles et calculs (`pilotage/REGLES.md`), guide d'installation (`pilotage/README.md`), tests. Aucune valeur propre à une installation : tout se règle dans les entrées de Home Assistant |
 | `dashboard/` | Tableau de bord « UCANESS HOME ASSISTANT » dans le style du portail UCANESS : maison en direct au centre, pilotage des appareils autour, onglet Batterie (`dashboard/README.md`). Prérequis pour afficher sa propre maison : `dashboard/MAISON.md` |
 | `docs/api-ucanpower.md` | Synthèse de l'API tierce UCanpower et constats sur le modèle `mr` |
-| `tools/` | Sonde en lecture seule à lancer hors de Home Assistant |
+| `docs/etat-de-l-art.md` | Projets existants (EMHASS, batcontrol, Predbat, PVGIS, pvlib, BREOS), ce que ce dépôt en reprend |
+| `tools/` | Sonde en lecture seule à lancer hors de Home Assistant ; `tools/dimensionnement/` : analyse de l'installation et préconisation de solaire et de batterie, jusqu'à l'autonomie totale |
 
 ## 10. Licence
 

@@ -1,0 +1,467 @@
+# =============================================================================
+# Secours (sortie EPS de l'onduleur UHome) : surveillance, alertes et analyse
+# -----------------------------------------------------------------------------
+# Optionnel, à installer avec jarvis_batterie.yaml et jarvis_alertes.yaml.
+# RIEN N'EST ÉCRIT SUR L'ONDULEUR : quand le réseau tombe, l'onduleur bascule SEUL sur sa sortie
+# de secours (EPS), si elle est activée et raccordée par l'installateur (manuel UHome V1.9,
+# p. 48, modes de fonctionnement : en autoconsommation, réseau coupé, le solaire puis la batterie
+# alimentent la sortie de secours). Ce package :
+#   - détecte la coupure (tension réseau nulle, ou état de l'onduleur « hors réseau ») et alerte,
+#     avec l'autonomie restante à la consommation du moment ;
+#   - suit la coupure (autonomie sous 1 h, batterie presque vide, sortie de secours proche de sa
+#     puissance maximale) ;
+#   - fait le bilan à la fin (durée, énergie fournie, SOC le plus bas, puissance la plus haute) et
+#     tient les cumuls de l'année ;
+#   - prévient d'un RISQUE de coupure (vigilance Météo-France orange ou rouge pour le vent, les
+#     orages, la neige ou les inondations, ou coupure programmée annoncée par Enedis) et, si vous
+#     l'autorisez, demande au pilotage en tarif dynamique de garder une réserve dans la batterie ;
+#   - signale un arrêt de Home Assistant (coupure probable) au redémarrage ;
+#   - signale un passage en mode Backup fait en dehors de Jarvis.
+#
+# IMPORTANT : pour être alerté PENDANT une coupure, Home Assistant, la box Internet et l'onduleur
+# (son module Wi-Fi) doivent rester alimentés : circuits raccordés à la sortie de secours, ou
+# petit onduleur (UPS). Sinon, seul le bilan au redémarrage est possible.
+# Les libellés d'état « hors réseau » de l'onduleur ne sont pas documentés : à confirmer à la
+# première coupure (attribut « source » de binary_sensor.jarvis_coupure_reseau).
+#
+# Entités attendues (en plus du pilotage de nuit) : sensor.uhome_tension_reseau,
+# sensor.uhome_etat (UCANESS : tension réseau, état de fonctionnement).
+# =============================================================================
+
+input_boolean:
+  jarvis_secours_cablee:
+    name: "Secours : sortie de secours (EPS) raccordée à des circuits de la maison"
+    icon: mdi:power-plug-battery
+  jarvis_secours_reserve_auto:
+    name: "Secours : garder une réserve avant un risque de coupure (tarif dynamique)"
+    icon: mdi:shield-home
+  jarvis_secours_coupure_en_cours:
+    name: "Secours : coupure du réseau en cours"
+    icon: mdi:transmission-tower-off
+
+input_number:
+  jarvis_secours_puissance_max:
+    name: "Secours : puissance continue maximale de la sortie de secours"
+    min: 0
+    max: 20
+    step: 0.1
+    unit_of_measurement: kW
+    mode: box
+  jarvis_secours_reserve_soc:
+    name: "Secours : SOC à garder en cas de risque de coupure"
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    mode: box
+  jarvis_secours_seuil_tension:
+    name: "Secours : tension réseau sous laquelle le réseau est considéré coupé"
+    min: 0
+    max: 200
+    step: 1
+    unit_of_measurement: V
+    mode: box
+  # Mémoire de la coupure en cours (renseignée par les automatisations).
+  jarvis_secours_soc_debut:
+    name: "Secours : SOC au début de la coupure"
+    min: 0
+    max: 100
+    step: 0.1
+    unit_of_measurement: "%"
+    mode: box
+  jarvis_secours_soc_min:
+    name: "Secours : SOC le plus bas pendant la coupure"
+    min: 0
+    max: 100
+    step: 0.1
+    unit_of_measurement: "%"
+    mode: box
+  jarvis_secours_charge_max:
+    name: "Secours : puissance la plus haute pendant la coupure"
+    min: 0
+    max: 50
+    step: 0.01
+    unit_of_measurement: kW
+    mode: box
+
+input_text:
+  jarvis_secours_vigilance:
+    name: "Secours : capteur de vigilance Météo-France (ex. sensor.<département>_weather_alert)"
+    max: 100
+
+input_datetime:
+  jarvis_secours_coupure_prevue_debut:
+    name: "Secours : début d'une coupure programmée (Enedis)"
+    has_date: true
+    has_time: true
+  jarvis_secours_coupure_prevue_fin:
+    name: "Secours : fin d'une coupure programmée (Enedis)"
+    has_date: true
+    has_time: true
+  jarvis_secours_debut_coupure:
+    name: "Secours : début de la coupure en cours"
+    has_date: true
+    has_time: true
+  jarvis_secours_battement:
+    name: "Secours : dernier signe de vie de Home Assistant"
+    has_date: true
+    has_time: true
+
+template:
+  - binary_sensor:
+      - name: "Jarvis coupure réseau"
+        unique_id: jarvis_coupure_reseau
+        device_class: problem
+        icon: mdi:transmission-tower-off
+        delay_on: "00:00:20"
+        delay_off: "00:01:00"
+        # Coupure : tension réseau sous le seuil alors que l'onduleur répond, ou état « hors réseau ».
+        state: >
+          {% set v = states('sensor.uhome_tension_reseau') | float(none) %}
+          {% set seuil = states('input_number.jarvis_secours_seuil_tension') | float(100) %}
+          {% set etat = states('sensor.uhome_etat') | lower %}
+          {% set en_ligne = is_state('binary_sensor.uhome_connexion_cloud', 'on') %}
+          {{ en_ligne and ((v is number and v < seuil) or etat is search('off.?grid|eps|island|backup|hors.?r[ée]seau')) }}
+        attributes:
+          source: >
+            {% set v = states('sensor.uhome_tension_reseau') %}
+            tension réseau {{ v }} V, état de l'onduleur « {{ states('sensor.uhome_etat') }} »
+
+      - name: "Jarvis risque de coupure"
+        unique_id: jarvis_risque_coupure
+        device_class: safety
+        icon: mdi:weather-lightning-rainy
+        state: >
+          {% set c = states('input_text.jarvis_secours_vigilance') %}
+          {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Vagues-submersion'] %}
+          {% set ns = namespace(v=false) %}
+          {% if c not in ['', 'unknown'] and states(c) not in ['unknown', 'unavailable'] %}
+            {% for p in phen %}
+              {% if state_attr(c, p) in ['Orange', 'Rouge'] %}{% set ns.v = true %}{% endif %}
+            {% endfor %}
+          {% endif %}
+          {% set d = states('input_datetime.jarvis_secours_coupure_prevue_debut') | as_datetime(none) %}
+          {% set f = states('input_datetime.jarvis_secours_coupure_prevue_fin') | as_datetime(none) %}
+          {% set prevue = d is not none and f is not none and (d | as_local) - timedelta(hours=12) <= now() < (f | as_local) %}
+          {{ ns.v or prevue }}
+        attributes:
+          motif: >
+            {% set c = states('input_text.jarvis_secours_vigilance') %}
+            {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Vagues-submersion'] %}
+            {% set ns = namespace(m=[]) %}
+            {% if c not in ['', 'unknown'] %}
+              {% for p in phen %}
+                {% if state_attr(c, p) in ['Orange', 'Rouge'] %}{% set ns.m = ns.m + [p ~ ' (' ~ state_attr(c, p) | lower ~ ')'] %}{% endif %}
+              {% endfor %}
+            {% endif %}
+            {% set d = states('input_datetime.jarvis_secours_coupure_prevue_debut') | as_datetime(none) %}
+            {% set f = states('input_datetime.jarvis_secours_coupure_prevue_fin') | as_datetime(none) %}
+            {% if d is not none and f is not none and (d | as_local) - timedelta(hours=12) <= now() < (f | as_local) %}
+              {% set ns.m = ns.m + ['coupure programmée du ' ~ (d | as_local).strftime('%d/%m %Hh%M') ~ ' au ' ~ (f | as_local).strftime('%d/%m %Hh%M')] %}
+            {% endif %}
+            {{ ns.m | join(', ') if ns.m else 'aucun' }}
+          fin: >
+            {% set f = states('input_datetime.jarvis_secours_coupure_prevue_fin') | as_datetime(none) %}
+            {{ (f | as_local).isoformat() if (f is not none and (f | as_local) > now()) else (now() + timedelta(hours=12)).replace(minute=0, second=0, microsecond=0).isoformat() }}
+
+    sensor:
+      - name: "Jarvis autonomie de secours"
+        unique_id: jarvis_secours_autonomie
+        unit_of_measurement: h
+        icon: mdi:battery-clock-outline
+        # Énergie utile en batterie ÷ consommation du moment (au moins 0,2 kW), sans compter le solaire.
+        state: >
+          {% set cap = states('input_number.jarvis_batterie_capacite') | float(0) %}
+          {% set pl = states('input_number.jarvis_batterie_plancher') | float(20) %}
+          {% set eta = states('input_number.jarvis_batterie_rendement') | float(95) / 100 %}
+          {% set soc = states('sensor.uhome_soc') | float(none) %}
+          {% set p = [states('sensor.uhome_puissance_maison') | float(0) / 1000, 0.2] | max %}
+          {{ (([0, soc - pl] | max / 100 * cap * eta / p) | round(1)) if (soc is number and cap > 0) else none }}
+        attributes:
+          stock_utile_kwh: >
+            {% set cap = states('input_number.jarvis_batterie_capacite') | float(0) %}
+            {% set pl = states('input_number.jarvis_batterie_plancher') | float(20) %}
+            {{ ([0, states('sensor.uhome_soc') | float(0) - pl] | max / 100 * cap) | round(2) }}
+          consommation_kw: "{{ (states('sensor.uhome_puissance_maison') | float(0) / 1000) | round(2) }}"
+          puissance_max_kw: "{{ states('input_number.jarvis_secours_puissance_max') | float(0) }}"
+          sortie_de_secours_raccordee: "{{ is_state('input_boolean.jarvis_secours_cablee', 'on') }}"
+
+  # Bilan de la dernière coupure et cumuls de l'année (sur l'événement jarvis_fin_coupure).
+  - triggers:
+      - trigger: event
+        event_type: jarvis_fin_coupure
+    sensor:
+      - name: "Jarvis dernière coupure"
+        unique_id: jarvis_secours_derniere_coupure
+        unit_of_measurement: min
+        icon: mdi:history
+        state: "{{ trigger.event.data.duree_min }}"
+        attributes:
+          debut: "{{ trigger.event.data.debut }}"
+          fin: "{{ trigger.event.data.fin }}"
+          energie_fournie_kwh: "{{ trigger.event.data.energie_kwh }}"
+          soc_debut: "{{ trigger.event.data.soc_debut }}"
+          soc_min: "{{ trigger.event.data.soc_min }}"
+          soc_fin: "{{ trigger.event.data.soc_fin }}"
+          puissance_max_kw: "{{ trigger.event.data.charge_max_kw }}"
+          annee: "{{ trigger.event.data.fin[:4] }}"
+          coupures_annee: >
+            {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+            {{ (a.get('coupures_annee') | int(0) if a.get('annee') == trigger.event.data.fin[:4] else 0) + 1 }}
+          duree_annee_min: >
+            {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+            {{ ((a.get('duree_annee_min') | float(0) if a.get('annee') == trigger.event.data.fin[:4] else 0) + trigger.event.data.duree_min | float(0)) | round(0) }}
+
+automation:
+  - id: jarvis_secours_valeurs_initiales
+    alias: "Jarvis · Secours : valeurs initiales (une seule fois)"
+    description: "Seuil de coupure 100 V, réserve 80 %. Puissance de la sortie de secours : fiche technique (manuel, § 3.3)."
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: numeric_state
+        entity_id: input_number.jarvis_secours_seuil_tension
+        below: 1
+    actions:
+      - action: input_number.set_value
+        target: { entity_id: input_number.jarvis_secours_seuil_tension }
+        data: { value: 100 }
+      - action: input_number.set_value
+        target: { entity_id: input_number.jarvis_secours_reserve_soc }
+        data: { value: 80 }
+
+  - id: jarvis_secours_debut_coupure
+    alias: "Jarvis · Secours : début de coupure du réseau"
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.jarvis_coupure_reseau
+        to: "on"
+    actions:
+      - action: input_boolean.turn_on
+        target: { entity_id: input_boolean.jarvis_secours_coupure_en_cours }
+      - action: input_datetime.set_datetime
+        target: { entity_id: input_datetime.jarvis_secours_debut_coupure }
+        data: { timestamp: "{{ now().timestamp() | int }}" }
+      - action: input_number.set_value
+        target: { entity_id: [input_number.jarvis_secours_soc_debut, input_number.jarvis_secours_soc_min] }
+        data: { value: "{{ states('sensor.uhome_soc') | float(0) }}" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.jarvis_secours_charge_max }
+        data: { value: "{{ (states('sensor.uhome_puissance_maison') | float(0) / 1000) | round(2) }}" }
+      - action: logbook.log
+        data:
+          name: "Jarvis secours"
+          entity_id: binary_sensor.jarvis_coupure_reseau
+          message: "Coupure du réseau détectée ({{ state_attr('binary_sensor.jarvis_coupure_reseau', 'source') }})."
+      - action: script.jarvis_notifier
+        data:
+          niveau: intervention
+          titre: "Coupure du réseau"
+          message: >
+            {% set a = 'sensor.jarvis_autonomie_de_secours' %}
+            Coupure détectée à {{ now().strftime('%Hh%M') }}.
+            {% if is_state('input_boolean.jarvis_secours_cablee', 'on') %}
+            La sortie de secours alimente les circuits raccordés : batterie à {{ states('sensor.uhome_soc') }} %
+            ({{ state_attr(a, 'stock_utile_kwh') }} kWh utiles), environ {{ states(a) }} h d'autonomie à la
+            consommation actuelle ({{ state_attr(a, 'consommation_kw') }} kW).
+            {% set pmax = states('input_number.jarvis_secours_puissance_max') | float(0) %}{% if pmax > 0 %}Limite de la sortie de secours : {{ pmax }} kW, évitez les gros appareils.{% endif %}
+            {% else %}
+            Sortie de secours non raccordée : la maison n'est pas alimentée par la batterie
+            ({{ states('sensor.uhome_soc') }} %).
+            {% endif %}
+
+  - id: jarvis_secours_suivi_coupure
+    alias: "Jarvis · Secours : suivi pendant la coupure"
+    mode: queued
+    max: 3
+    triggers:
+      - trigger: time_pattern
+        minutes: "/2"
+        id: mesure
+      - trigger: numeric_state
+        entity_id: sensor.jarvis_autonomie_de_secours
+        below: 1
+        id: autonomie
+      - trigger: template
+        value_template: >
+          {{ states('sensor.uhome_soc') | float(100) <= states('input_number.jarvis_batterie_plancher') | float(20) + 5 }}
+        id: batterie
+      - trigger: template
+        value_template: >
+          {% set pmax = states('input_number.jarvis_secours_puissance_max') | float(0) %}
+          {{ pmax > 0 and states('sensor.uhome_puissance_maison') | float(0) / 1000 > 0.9 * pmax }}
+        for: "00:00:30"
+        id: puissance
+    conditions:
+      - condition: state
+        entity_id: input_boolean.jarvis_secours_coupure_en_cours
+        state: "on"
+    actions:
+      - choose:
+          - conditions: "{{ trigger.id == 'mesure' }}"
+            sequence:
+              - action: input_number.set_value
+                target: { entity_id: input_number.jarvis_secours_soc_min }
+                data:
+                  value: "{{ [states('input_number.jarvis_secours_soc_min') | float(100), states('sensor.uhome_soc') | float(100)] | min }}"
+              - action: input_number.set_value
+                target: { entity_id: input_number.jarvis_secours_charge_max }
+                data:
+                  value: "{{ [states('input_number.jarvis_secours_charge_max') | float(0), (states('sensor.uhome_puissance_maison') | float(0) / 1000) | round(2)] | max }}"
+          - conditions: "{{ trigger.id == 'autonomie' and is_state('input_boolean.jarvis_secours_cablee', 'on') }}"
+            sequence:
+              - action: script.jarvis_notifier
+                data:
+                  niveau: intervention
+                  titre: "Secours : moins d'une heure d'autonomie"
+                  message: >
+                    Batterie à {{ states('sensor.uhome_soc') }} %, consommation {{ state_attr('sensor.jarvis_autonomie_de_secours', 'consommation_kw') }} kW :
+                    environ {{ states('sensor.jarvis_autonomie_de_secours') }} h. Réduisez la consommation pour tenir plus longtemps.
+          - conditions: "{{ trigger.id == 'batterie' }}"
+            sequence:
+              - action: script.jarvis_notifier
+                data:
+                  niveau: intervention
+                  titre: "Secours : batterie presque vide"
+                  message: >
+                    Batterie à {{ states('sensor.uhome_soc') }} % (plancher {{ states('input_number.jarvis_batterie_plancher') | int }} %) :
+                    la sortie de secours va s'arrêter.
+          - conditions: "{{ trigger.id == 'puissance' }}"
+            sequence:
+              - action: script.jarvis_notifier
+                data:
+                  niveau: a_surveiller
+                  titre: "Secours : sortie proche de sa limite"
+                  message: >
+                    {{ (states('sensor.uhome_puissance_maison') | float(0) / 1000) | round(1) }} kW demandés pour
+                    {{ states('input_number.jarvis_secours_puissance_max') }} kW au plus : coupez un gros appareil
+                    pour éviter l'arrêt de la sortie de secours.
+
+  - id: jarvis_secours_fin_coupure
+    alias: "Jarvis · Secours : fin de coupure et bilan"
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.jarvis_coupure_reseau
+        from: "on"
+        to: "off"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.jarvis_secours_coupure_en_cours
+        state: "on"
+    actions:
+      - variables:
+          debut: "{{ (states('input_datetime.jarvis_secours_debut_coupure') | as_datetime | as_local).isoformat() }}"
+          duree_min: "{{ ((now() - (states('input_datetime.jarvis_secours_debut_coupure') | as_datetime | as_local)).total_seconds() / 60) | round(0) }}"
+          soc_debut: "{{ states('input_number.jarvis_secours_soc_debut') | float(0) }}"
+          soc_min: "{{ [states('input_number.jarvis_secours_soc_min') | float(100), states('sensor.uhome_soc') | float(100)] | min }}"
+          soc_fin: "{{ states('sensor.uhome_soc') | float(0) }}"
+          energie: >
+            {{ ([0, soc_debut - soc_min] | max / 100 * states('input_number.jarvis_batterie_capacite') | float(0)) | round(2) }}
+      - event: jarvis_fin_coupure
+        event_data:
+          debut: "{{ debut }}"
+          fin: "{{ now().isoformat() }}"
+          duree_min: "{{ duree_min }}"
+          soc_debut: "{{ soc_debut }}"
+          soc_min: "{{ soc_min }}"
+          soc_fin: "{{ soc_fin }}"
+          energie_kwh: "{{ energie }}"
+          charge_max_kw: "{{ states('input_number.jarvis_secours_charge_max') | float(0) }}"
+      - action: input_boolean.turn_off
+        target: { entity_id: input_boolean.jarvis_secours_coupure_en_cours }
+      - action: script.jarvis_notifier
+        data:
+          niveau: info
+          titre: "Réseau rétabli"
+          message: >
+            Coupure de {{ duree_min | int }} min (depuis {{ (states('input_datetime.jarvis_secours_debut_coupure') | as_datetime | as_local).strftime('%Hh%M') }}).
+            {% if is_state('input_boolean.jarvis_secours_cablee', 'on') %}La batterie a fourni environ {{ energie }} kWh
+            (SOC {{ soc_debut | round(0) | int }} % → {{ soc_min | round(0) | int }} % au plus bas), puissance la plus haute
+            {{ states('input_number.jarvis_secours_charge_max') }} kW.{% endif %}
+            Batterie à {{ soc_fin | round(0) | int }} %.
+
+  - id: jarvis_secours_risque
+    alias: "Jarvis · Secours : risque de coupure"
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.jarvis_risque_de_coupure
+        to: "on"
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: a_surveiller
+          titre: "Risque de coupure du réseau"
+          message: >
+            {% set a = 'sensor.jarvis_autonomie_de_secours' %}
+            Motif : {{ state_attr('binary_sensor.jarvis_risque_de_coupure', 'motif') }}.
+            Batterie à {{ states('sensor.uhome_soc') }} % ({{ state_attr(a, 'stock_utile_kwh') }} kWh utiles).
+            {% if is_state('input_boolean.jarvis_secours_cablee', 'off') %}
+            Sortie de secours non raccordée : la batterie n'alimentera pas la maison pendant une coupure.
+            {% elif is_state('input_boolean.jarvis_secours_reserve_auto', 'on') and is_state('input_select.jarvis_strategie', 'Tarif dynamique (moteur intégré)') %}
+            Jarvis garde la batterie à {{ states('input_number.jarvis_secours_reserve_soc') | int }} % au moins
+            jusqu'au {{ (state_attr('binary_sensor.jarvis_risque_de_coupure', 'fin') | as_datetime | as_local).strftime('%d/%m %Hh%M') }}
+            (plages de charge du tarif dynamique).
+            {% else %}
+            Aucune réserve automatique : le pilotage continue normalement. Pour garder la batterie pleine,
+            choisir le tarif dynamique (moteur intégré) et allumer « Secours : garder une réserve ».
+            {% endif %}
+      - event: jarvis_recalcul_dynamique
+
+  - id: jarvis_secours_battement
+    alias: "Jarvis · Secours : signe de vie de Home Assistant"
+    mode: single
+    triggers:
+      - trigger: time_pattern
+        minutes: "/5"
+    actions:
+      - action: input_datetime.set_datetime
+        target: { entity_id: input_datetime.jarvis_secours_battement }
+        data: { timestamp: "{{ now().timestamp() | int }}" }
+
+  - id: jarvis_secours_redemarrage
+    alias: "Jarvis · Secours : bilan au redémarrage de Home Assistant"
+    description: "Home Assistant arrêté plus de 15 min sans redémarrage demandé : coupure de courant probable."
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+    actions:
+      # Relevé AVANT l'attente : le signe de vie est rafraîchi toutes les 5 min.
+      - variables:
+          dernier: "{{ states('input_datetime.jarvis_secours_battement') | as_datetime(none) }}"
+          arret_min: "{{ (((now() - (dernier | as_datetime | as_local)).total_seconds() / 60) | round(0)) if dernier is not none else 0 }}"
+      # Laisse le temps à l'intégration UCANESS de publier le SOC et le mode.
+      - delay: "00:02:00"
+      - condition: template
+        value_template: "{{ arret_min | float(0) > 15 }}"
+      - action: script.jarvis_notifier
+        data:
+          niveau: a_surveiller
+          titre: "Home Assistant redémarré après un arrêt"
+          message: >
+            Home Assistant ne fonctionnait plus depuis le {{ (dernier | as_datetime | as_local).strftime('%d/%m à %Hh%M') }}
+            (environ {{ arret_min | int }} min) : coupure de courant ou d'Internet probable.
+            Batterie à {{ states('sensor.uhome_soc') }} %, onduleur en « {{ states('sensor.uhome_mode') }} ».
+            Pour être alerté pendant une coupure, Home Assistant et la box doivent rester alimentés (sortie de secours ou UPS).
+
+  - id: jarvis_secours_mode_backup
+    alias: "Jarvis · Secours : mode Backup activé hors de Jarvis"
+    mode: single
+    triggers:
+      - trigger: template
+        value_template: "{{ states('sensor.uhome_mode') | lower is search('backup') }}"
+        for: "00:10:00"
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: info
+          titre: "Mode Backup activé"
+          message: >
+            L'onduleur est en mode Backup (« {{ states('sensor.uhome_mode') }} ») : la batterie est gardée pleine,
+            y compris en se rechargeant sur le réseau, et le pilotage de Jarvis n'a plus d'effet.
+            Jarvis n'écrit jamais ce mode ; revenir en autoconsommation depuis le portail UCANESS si ce n'est pas voulu.

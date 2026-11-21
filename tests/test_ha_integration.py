@@ -237,3 +237,59 @@ async def test_zero_windows_absent_from_cloud_are_confirmed(hass, fake_client, f
     assert resp["confirme"] is True
     client = FakeClient.instances[-1]
     assert client.writes[-1][44] == 0 and client.writes[-1][45] == 0
+
+
+# --- Tarif dynamique : actions de calcul (rien n'est envoyé) -------------------------------------
+def _prix_jour(debut, valeurs):
+    import datetime as dt
+    return [{"debut": (debut + dt.timedelta(hours=h)).isoformat(), "prix": p} for h, p in enumerate(valeurs)]
+
+
+async def test_optimiser_charge_calcule_sans_ecrire(hass, fake_client, fast_readback):
+    import datetime as dt
+    from homeassistant.util import dt as dt_util
+
+    deja = len(FakeClient.instances)
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
+    debut = dt_util.now().replace(minute=0, second=0, microsecond=0)
+    prix = _prix_jour(debut, [0.08] * 4 + [0.30] * 20)
+    solaire = [{"debut": (debut + dt.timedelta(hours=h)).isoformat(), "kwh": 0.0} for h in range(24)]
+    resp = await hass.services.async_call(
+        DOMAIN, "optimiser_charge",
+        {"prix": prix, "conso": [0.8] * 24, "solaire": solaire, "capacite_kwh": 10, "plancher_pct": 10,
+         "soc_pct": 10, "puissance_charge_kw": 3},
+        blocking=True, return_response=True,
+    )
+    assert resp["valide"] is True
+    assert 1 <= resp["nombre_plages"] <= 3
+    assert resp["prochaine_plage"] is not None or resp["charge_en_cours"] is True
+    assert resp["gain_estime_eur"] > 0
+    assert all(c.writes == [] for c in FakeClient.instances[deja:])
+
+
+async def test_optimiser_charge_repli_sur_sans_prevision(hass, fake_client, fast_readback):
+    from homeassistant.util import dt as dt_util
+
+    await _entry_with_options(hass, app_key="k", app_secret="s")
+    resp = await hass.services.async_call(
+        DOMAIN, "optimiser_charge",
+        {"prix": _prix_jour(dt_util.now(), [0.1] * 24), "conso": [0.5] * 24, "solaire": [],
+         "capacite_kwh": 10, "plancher_pct": 10, "soc_pct": 50, "puissance_charge_kw": 3},
+        blocking=True, return_response=True,
+    )
+    assert resp["valide"] is False and resp["plages"] == []
+    assert "repli sûr" in resp["justification"]
+
+
+async def test_plages_depuis_plan_emhass(hass, fake_client):
+    import datetime as dt
+    from homeassistant.util import dt as dt_util
+
+    await _entry_with_options(hass, app_key="k", app_secret="s")
+    t0 = dt_util.now().replace(minute=0, second=0, microsecond=0) + dt.timedelta(hours=1)
+    plan = [{"date": (t0 + dt.timedelta(minutes=30 * i)).isoformat(), "p_batt": -3000 if i < 4 else 800,
+             "p_grid": 3200 if i < 4 else 0} for i in range(20)]
+    resp = await hass.services.async_call(DOMAIN, "plages_depuis_plan", {"plan": plan}, blocking=True, return_response=True)
+    assert resp["valide"] is True
+    assert resp["charge_reseau_kwh"] == 6.0
+    assert len(resp["plages"]) in (1, 2)

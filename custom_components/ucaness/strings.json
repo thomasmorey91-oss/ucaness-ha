@@ -80,6 +80,90 @@
           "description": "Self-consumption or time-of-use."
         }
       }
+    },
+    "optimiser_charge": {
+      "name": "Plan charging (dynamic tariff)",
+      "description": "Computes, without sending anything to the inverter, up to 3 grid charge windows that minimise the cost under a variable price, from prices, expected consumption and solar forecast.",
+      "fields": {
+        "prix": {
+          "name": "Prices",
+          "description": "List of {debut, prix} (or {start, price}) in EUR/kWh incl. taxes, hourly or quarter-hourly."
+        },
+        "conso": {
+          "name": "Consumption",
+          "description": "24 values (kWh per hour of the day) or a list of {debut, kwh}."
+        },
+        "solaire": {
+          "name": "Solar forecast",
+          "description": "Solcast detailedHourly / detailedForecast list, or {debut, kwh}."
+        },
+        "capacite_kwh": {
+          "name": "Battery capacity",
+          "description": "Nominal capacity."
+        },
+        "plancher_pct": {
+          "name": "SOC floor",
+          "description": "SOC below which the inverter stops discharging."
+        },
+        "soc_pct": {
+          "name": "Current SOC",
+          "description": "Battery state of charge now."
+        },
+        "rendement_pct": {
+          "name": "Efficiency",
+          "description": "One-way efficiency (charge or discharge)."
+        },
+        "puissance_charge_kw": {
+          "name": "Grid charge power",
+          "description": "Power actually observed during a grid charge window."
+        },
+        "prix_revente": {
+          "name": "Feed-in price",
+          "description": "EUR/kWh paid for exported energy."
+        },
+        "marge_pct": {
+          "name": "Margin",
+          "description": "Increase applied to the expected consumption."
+        },
+        "charge_interdite": {
+          "name": "Charging forbidden",
+          "description": "True when the battery is below 0 °C."
+        },
+        "reserve": {
+          "name": "Backup reserve",
+          "description": "{debut, fin, soc_pct}: minimum SOC to keep between two times (risk of grid outage)."
+        },
+        "seuil_gain_eur": {
+          "name": "Minimum gain",
+          "description": "Below this estimated gain, no window is planned."
+        },
+        "valeur_stock_eur_kwh": {
+          "name": "Value of stored energy",
+          "description": "EUR per kWh left in the battery at the end of the horizon (default: cheapest price / efficiency)."
+        },
+        "max_plages": {
+          "name": "Maximum windows",
+          "description": "Charge windows available on the inverter (3)."
+        }
+      }
+    },
+    "plages_depuis_plan": {
+      "name": "Windows from an external plan",
+      "description": "Turns a battery plan from another optimiser (EMHASS: P_batt < 0 = charge, P_grid > 0 = import) into up to 3 charge windows. Nothing is sent to the inverter.",
+      "fields": {
+        "plan": {
+          "name": "Plan",
+          "description": "List of {debut, charge_reseau_kw} or EMHASS items {date, p_batt, p_grid} in W."
+        },
+        "seuil_kw": {
+          "name": "Threshold",
+          "description": "Grid charge power below which a slot is ignored."
+        },
+        "max_plages": {
+          "name": "Maximum windows",
+          "description": "Charge windows available on the inverter (3)."
+        }
+      }
     }
   },
   "selector": {

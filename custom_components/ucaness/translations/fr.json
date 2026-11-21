@@ -80,6 +80,90 @@
           "description": "Autoconsommation ou arbitrage horaire."
         }
       }
+    },
+    "optimiser_charge": {
+      "name": "Planifier la charge (tarif dynamique)",
+      "description": "Calcule, sans rien envoyer à l'onduleur, jusqu'à 3 plages de charge réseau qui minimisent le coût sous un prix variable, à partir des prix, de la consommation prévue et de la prévision solaire.",
+      "fields": {
+        "prix": {
+          "name": "Prix",
+          "description": "Liste de {debut, prix} (ou {start, price}) en EUR/kWh TTC, à l'heure ou au quart d'heure."
+        },
+        "conso": {
+          "name": "Consommation",
+          "description": "24 valeurs (kWh par heure de la journée) ou liste de {debut, kwh}."
+        },
+        "solaire": {
+          "name": "Prévision solaire",
+          "description": "Liste detailedHourly ou detailedForecast de Solcast, ou {debut, kwh}."
+        },
+        "capacite_kwh": {
+          "name": "Capacité de la batterie",
+          "description": "Capacité nominale."
+        },
+        "plancher_pct": {
+          "name": "SOC plancher",
+          "description": "SOC sous lequel l'onduleur ne décharge plus."
+        },
+        "soc_pct": {
+          "name": "SOC actuel",
+          "description": "Charge de la batterie maintenant."
+        },
+        "rendement_pct": {
+          "name": "Rendement",
+          "description": "Rendement dans un sens (charge ou décharge)."
+        },
+        "puissance_charge_kw": {
+          "name": "Puissance de charge réseau",
+          "description": "Puissance réellement observée pendant une plage de charge."
+        },
+        "prix_revente": {
+          "name": "Prix de revente",
+          "description": "EUR/kWh payé pour l'énergie injectée."
+        },
+        "marge_pct": {
+          "name": "Marge",
+          "description": "Majoration de la consommation prévue."
+        },
+        "charge_interdite": {
+          "name": "Charge interdite",
+          "description": "Vrai quand la batterie est sous 0 °C."
+        },
+        "reserve": {
+          "name": "Réserve de secours",
+          "description": "{debut, fin, soc_pct} : SOC minimal à garder entre deux instants (risque de coupure)."
+        },
+        "seuil_gain_eur": {
+          "name": "Gain minimal",
+          "description": "Sous ce gain estimé, aucune plage n'est prévue."
+        },
+        "valeur_stock_eur_kwh": {
+          "name": "Valeur du stock",
+          "description": "EUR par kWh restant en batterie en fin d'horizon (par défaut : prix le plus bas / rendement)."
+        },
+        "max_plages": {
+          "name": "Plages au plus",
+          "description": "Plages de charge disponibles sur l'onduleur (3)."
+        }
+      }
+    },
+    "plages_depuis_plan": {
+      "name": "Plages depuis un plan externe",
+      "description": "Traduit le plan batterie d'un autre moteur (EMHASS : P_batt < 0 = charge, P_grid > 0 = soutirage) en 3 plages de charge au plus. Rien n'est envoyé à l'onduleur.",
+      "fields": {
+        "plan": {
+          "name": "Plan",
+          "description": "Liste de {debut, charge_reseau_kw} ou éléments EMHASS {date, p_batt, p_grid} en W."
+        },
+        "seuil_kw": {
+          "name": "Seuil",
+          "description": "Puissance de charge réseau sous laquelle un créneau est ignoré."
+        },
+        "max_plages": {
+          "name": "Plages au plus",
+          "description": "Plages de charge disponibles sur l'onduleur (3)."
+        }
+      }
     }
   },
   "selector": {

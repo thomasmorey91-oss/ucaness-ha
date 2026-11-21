@@ -1,0 +1,672 @@
+# =============================================================================
+# Pilotage d'une batterie UCanpower sous TARIF DYNAMIQUE (prix qui change chaque heure ou
+# chaque quart d'heure, publié la veille), par l'intégration UCANESS.
+# -----------------------------------------------------------------------------
+# Optionnel : à installer EN PLUS de jarvis_tarif.yaml, jarvis_batterie.yaml et jarvis_alertes.yaml
+# (il réutilise leurs entrées : capacité, plancher, rendement, puissance de charge, marge,
+# consommation par défaut, mode simulation, notifications).
+#
+# Trois stratégies, au choix dans « Pilotage : stratégie de recharge » :
+#   - « Heures pleines / heures creuses (calcul v7) » : valeur par défaut, ce package ne fait rien ;
+#   - « Tarif dynamique (moteur intégré) » : toutes les 15 min, l'action ucaness.optimiser_charge
+#     choisit jusqu'à 3 plages de charge sur les 24 h à venir (programmation dynamique sur le
+#     stock, prix + consommation mesurée + prévision Solcast) ;
+#   - « Tarif dynamique (EMHASS) » : EMHASS (module complémentaire, installé et lancé à part)
+#     calcule le plan ; l'action ucaness.plages_depuis_plan le traduit en 3 plages au plus.
+#
+# Ce qui est envoyé à l'onduleur : les plages de CHARGE (écrites à l'avance) et le mode
+# (arbitrage horaire pendant une plage, autoconsommation sinon). Jamais de plage de décharge,
+# jamais de mode Backup, aucun réglage de fond. Même mode simulation que le pilotage de nuit :
+# rien n'est envoyé tant que « Batterie : mode simulation » est allumé.
+#
+# Pendant une plage, le réseau charge la batterie et alimente la maison : une plage sert donc
+# aussi à « mettre la batterie de côté » aux heures bon marché pour la vider aux heures chères.
+#
+# Prix : prix de marché (Nord Pool, zone FR, intégration officielle de Home Assistant, ou tout
+# capteur qui publie une liste de prix), auquel on ajoute les coûts du contrat (frais du
+# fournisseur, acheminement, taxes), puis la TVA :
+#   prix TTC = (prix de marché + coûts ajoutés de l'heure) × (1 + TVA)
+# Les coûts ajoutés peuvent différer en heures pleines et en heures creuses d'Enedis (plages
+# « Tarif : début / fin des heures creuses » de jarvis_tarif.yaml, chaque jour).
+# À VÉRIFIER sur la grille de votre fournisseur : composition exacte du prix, acheminement.
+#
+# Repli sûr : prix, prévision solaire, SOC ou capacité manquants, plan de plus de 40 min, batterie
+# hors plage de température : aucune plage, retour en autoconsommation.
+#
+# Entités attendues en plus de celles du pilotage de nuit : aucune (voir pilotage/DYNAMIQUE.md).
+# =============================================================================
+
+input_select:
+  jarvis_strategie:
+    name: "Pilotage : stratégie de recharge"
+    icon: mdi:strategy
+    options:
+      - "Heures pleines / heures creuses (calcul v7)"
+      - "Tarif dynamique (moteur intégré)"
+      - "Tarif dynamique (EMHASS)"
+  jarvis_dyn_source_prix:
+    name: "Tarif dynamique : source des prix de marché"
+    icon: mdi:chart-line
+    options:
+      - "Nord Pool (intégration officielle)"
+      - "Capteur personnalisé"
+
+input_boolean:
+  jarvis_dyn_plan_actif:
+    name: "Tarif dynamique : arbitrage horaire en cours"
+    icon: mdi:battery-charging-high
+
+input_text:
+  jarvis_dyn_nordpool_entree:
+    name: "Tarif dynamique : identifiant de l'entrée Nord Pool"
+    max: 64
+  jarvis_dyn_nordpool_zone:
+    name: "Tarif dynamique : zone Nord Pool (FR)"
+    max: 10
+  jarvis_dyn_capteur_prix:
+    name: "Tarif dynamique : capteur personnalisé (attribut prix)"
+    max: 100
+  jarvis_dyn_emhass_batterie:
+    name: "EMHASS : capteur de puissance batterie prévue"
+    max: 100
+  jarvis_dyn_emhass_attribut_batterie:
+    name: "EMHASS : attribut de la liste batterie"
+    max: 60
+  jarvis_dyn_emhass_reseau:
+    name: "EMHASS : capteur de puissance réseau prévue (facultatif)"
+    max: 100
+  jarvis_dyn_emhass_attribut_reseau:
+    name: "EMHASS : attribut de la liste réseau"
+    max: 60
+  jarvis_dyn_plages_appliquees:
+    name: "Tarif dynamique : plages programmées sur l'onduleur"
+    max: 255
+
+input_number:
+  jarvis_dyn_cout_ajoute_hp:
+    name: "Tarif dynamique : coûts ajoutés au prix de marché, heures pleines (HT)"
+    min: -1
+    max: 1
+    step: 0.00001
+    unit_of_measurement: "EUR/kWh"
+    mode: box
+  jarvis_dyn_cout_ajoute_hc:
+    name: "Tarif dynamique : coûts ajoutés au prix de marché, heures creuses (HT)"
+    min: -1
+    max: 1
+    step: 0.00001
+    unit_of_measurement: "EUR/kWh"
+    mode: box
+  jarvis_dyn_tva:
+    name: "Tarif dynamique : TVA appliquée au kWh"
+    min: 0
+    max: 30
+    step: 0.1
+    unit_of_measurement: "%"
+    mode: box
+  jarvis_dyn_seuil_gain:
+    name: "Tarif dynamique : gain minimal pour programmer une charge"
+    min: 0
+    max: 5
+    step: 0.01
+    unit_of_measurement: "EUR"
+    mode: box
+
+template:
+  # ---------------------------------------------------------------------------
+  # Prix de marché Nord Pool (aujourd'hui et demain, publié vers 13h), en EUR/MWh.
+  # Actif seulement si l'identifiant de l'entrée Nord Pool est renseigné.
+  # ---------------------------------------------------------------------------
+  - triggers:
+      - trigger: time_pattern
+        minutes: "4"
+      - trigger: time
+        at: ["13:20:00", "13:50:00", "14:30:00"]
+      - trigger: homeassistant
+        event: start
+      - trigger: event
+        event_type: jarvis_recalcul_dynamique
+    conditions:
+      - condition: template
+        value_template: >
+          {{ states('input_text.jarvis_dyn_nordpool_entree') not in ['', 'unknown', 'unavailable']
+             and is_state('input_select.jarvis_dyn_source_prix', 'Nord Pool (intégration officielle)') }}
+    actions:
+      - action: nordpool.get_prices_for_date
+        continue_on_error: true
+        data:
+          config_entry: "{{ states('input_text.jarvis_dyn_nordpool_entree') }}"
+          date: "{{ now().date() | string }}"
+          areas: "{{ states('input_text.jarvis_dyn_nordpool_zone') | default('FR', true) }}"
+          currency: EUR
+        response_variable: np_jour
+      - action: nordpool.get_prices_for_date
+        continue_on_error: true
+        data:
+          config_entry: "{{ states('input_text.jarvis_dyn_nordpool_entree') }}"
+          date: "{{ (now() + timedelta(days=1)).date() | string }}"
+          areas: "{{ states('input_text.jarvis_dyn_nordpool_zone') | default('FR', true) }}"
+          currency: EUR
+        response_variable: np_demain
+      - variables:
+          marche: >
+            {% set zone = states('input_text.jarvis_dyn_nordpool_zone') | default('FR', true) %}
+            {% set ns = namespace(v=[]) %}
+            {% for r in [np_jour if np_jour is defined else {}, np_demain if np_demain is defined else {}] %}
+              {% set lignes = r.get(zone, []) if r is mapping else [] %}
+              {% for x in lignes %}
+                {% if x.price is number %}
+                  {% set ns.v = ns.v + [{'debut': (x.start | as_datetime | as_local).isoformat(),
+                                         'fin': (x.end | as_datetime | as_local).isoformat(),
+                                         'eur_mwh': x.price}] %}
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+            {{ ns.v }}
+    sensor:
+      - name: "Jarvis prix de marché Nord Pool"
+        unique_id: jarvis_prix_marche_nordpool
+        unit_of_measurement: "EUR/MWh"
+        icon: mdi:chart-bell-curve
+        state: >
+          {% set n = now() %}
+          {% set c = marche | selectattr('debut', 'le', n.isoformat()) | list %}
+          {{ (c | last).eur_mwh if c else none }}
+        attributes:
+          prix: "{{ marche }}"
+          demain_disponible: "{{ marche | selectattr('debut', 'ge', (now() + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()) | list | count > 0 }}"
+
+  # ---------------------------------------------------------------------------
+  # Prix TTC payés, créneau par créneau (source choisie + coûts ajoutés + TVA).
+  # ---------------------------------------------------------------------------
+  - sensor:
+      - name: "Jarvis prix dynamiques"
+        unique_id: jarvis_prix_dynamiques
+        unit_of_measurement: "EUR/kWh"
+        icon: mdi:currency-eur
+        state: >
+          {% set l = this.attributes.get('prix', []) if this is defined and this.attributes is defined else [] %}
+          {% set c = l | selectattr('debut', 'le', now().isoformat()) | list %}
+          {{ (c | last).prix if c else none }}
+        attributes:
+          prix: >
+            {% set nordpool = is_state('input_select.jarvis_dyn_source_prix', 'Nord Pool (intégration officielle)') %}
+            {% set src = state_attr('sensor.jarvis_prix_marche_nordpool', 'prix') if nordpool
+                         else state_attr(states('input_text.jarvis_dyn_capteur_prix'), 'prix') or state_attr(states('input_text.jarvis_dyn_capteur_prix'), 'prices') %}
+            {% set tva = states('input_number.jarvis_dyn_tva') | float(0) / 100 %}
+            {% set a_hp = states('input_number.jarvis_dyn_cout_ajoute_hp') | float(0) %}
+            {% set a_hc = states('input_number.jarvis_dyn_cout_ajoute_hc') | float(0) %}
+            {% set hd = states('input_datetime.jarvis_hc_debut')[:5] %}
+            {% set hf = states('input_datetime.jarvis_hc_fin')[:5] %}
+            {% set ns = namespace(v=[]) %}
+            {% for x in (src or []) %}
+              {% set d = x.get('debut', x.get('start', x.get('time'))) %}
+              {% set m = (x.eur_mwh / 1000) if x.get('eur_mwh') is number else x.get('prix', x.get('price')) %}
+              {% if d is not none and m is number %}
+                {% set t = (d | as_datetime | as_local) %}
+                {% set h = t.strftime('%H:%M') %}
+                {% set hc = (h >= hd or h < hf) if hd > hf else (hd <= h < hf) %}
+                {% set p = (m + (a_hc if hc else a_hp)) * (1 + tva) %}
+                {% set f = x.get('fin', x.get('end')) %}
+                {% set ns.v = ns.v + [{'debut': t.isoformat(), 'fin': (f | as_datetime | as_local).isoformat() if f else none, 'prix': p | round(5)}] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.v }}
+
+  # ---------------------------------------------------------------------------
+  # Plan du moteur intégré, toutes les 15 min (ou sur l'événement jarvis_recalcul_dynamique).
+  # ---------------------------------------------------------------------------
+  - triggers:
+      - trigger: time_pattern
+        minutes: "/15"
+      - trigger: event
+        event_type: jarvis_recalcul_dynamique
+      - trigger: state
+        entity_id: input_select.jarvis_strategie
+        to: "Tarif dynamique (moteur intégré)"
+    conditions:
+      - condition: state
+        entity_id: input_select.jarvis_strategie
+        state: "Tarif dynamique (moteur intégré)"
+    actions:
+      - action: workday.check_date
+        target: { entity_id: binary_sensor.workday_sensor }
+        data:
+          check_date: "{{ now().date() | string }}"
+        response_variable: j0
+      - action: workday.check_date
+        target: { entity_id: binary_sensor.workday_sensor }
+        data:
+          check_date: "{{ (now() + timedelta(days=1)).date() | string }}"
+        response_variable: j1
+      - action: recorder.get_statistics
+        continue_on_error: true
+        data:
+          start_time: "{{ (now() - timedelta(days=7)).isoformat() }}"
+          statistic_ids: [sensor.uhome_puissance_maison]
+          period: hour
+          types: [mean]
+        response_variable: mesures
+      - variables:
+          # Profil type (part de la journée par heure) pour les heures sans mesure, comme le pilotage de nuit.
+          profils_types:
+            ouvre: [0.030, 0.027, 0.025, 0.024, 0.024, 0.027, 0.045, 0.060, 0.050, 0.038, 0.033, 0.033, 0.040, 0.036, 0.032, 0.032, 0.038, 0.052, 0.066, 0.072, 0.068, 0.058, 0.048, 0.038]
+            repos: [0.032, 0.028, 0.026, 0.025, 0.024, 0.025, 0.030, 0.038, 0.048, 0.050, 0.048, 0.046, 0.050, 0.044, 0.038, 0.036, 0.040, 0.050, 0.062, 0.068, 0.066, 0.056, 0.046, 0.038]
+          # Consommation mesurée par heure (kWh), jours ouvrés et jours de repos séparés, moyenne
+          # pondérée par l'ancienneté (1, 1/2, 1/4…), comme le pilotage de nuit (v7).
+          profils_mesures: >
+            {% set st = mesures.statistics if (mesures is defined and mesures is mapping and 'statistics' in mesures) else {} %}
+            {% set rows = st.get('sensor.uhome_puissance_maison', []) %}
+            {% set nj = namespace(o=[], r=[], t=[]) %}
+            {% for r in rows %}
+              {% if r.mean is number %}
+                {% set t = r.start | as_datetime | as_local %}
+                {% set d = t.date() | string %}
+                {% if d not in nj.t %}{% set nj.t = nj.t + [d] %}{% endif %}
+                {% if t.weekday() < 5 and d not in nj.o %}{% set nj.o = nj.o + [d] %}{% endif %}
+                {% if t.weekday() >= 5 and d not in nj.r %}{% set nj.r = nj.r + [d] %}{% endif %}
+              {% endif %}
+            {% endfor %}
+            {% set sortie = namespace(o=[], r=[]) %}
+            {% for type in ['o', 'r'] %}
+              {% set meme = (nj.o if type == 'o' else nj.r) | sort(reverse=true) %}
+              {% set tous = nj.t | sort(reverse=true) %}
+              {% set ns = namespace(v=[]) %}
+              {% for h in range(24) %}
+                {% set a = namespace(s1=0, n1=0, s2=0, n2=0) %}
+                {% for r in rows %}
+                  {% if r.mean is number %}
+                    {% set t = r.start | as_datetime | as_local %}
+                    {% if t.hour == h %}
+                      {% set d = t.date() | string %}
+                      {% set w2 = 0.5 ** (tous.index(d)) %}
+                      {% set a.s2 = a.s2 + w2 * r.mean %}
+                      {% set a.n2 = a.n2 + w2 %}
+                      {% if d in meme %}
+                        {% set w1 = 0.5 ** (meme.index(d)) %}
+                        {% set a.s1 = a.s1 + w1 * r.mean %}
+                        {% set a.n1 = a.n1 + w1 %}
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+                {% set val = (a.s1 / a.n1 / 1000) if a.n1 > 0 else ((a.s2 / a.n2 / 1000) if a.n2 > 0 else none) %}
+                {% set ns.v = ns.v + [(val | round(3)) if val is not none else none] %}
+              {% endfor %}
+              {% if type == 'o' %}{% set sortie.o = ns.v %}{% else %}{% set sortie.r = ns.v %}{% endif %}
+            {% endfor %}
+            {{ {'ouvre': sortie.o, 'repos': sortie.r} }}
+          conso: >
+            {% set defaut = states('input_number.jarvis_conso_journaliere') | float(0) %}
+            {% set ouvres = [j0['binary_sensor.workday_sensor'].workday | default(true),
+                             j1['binary_sensor.workday_sensor'].workday | default(true)] %}
+            {% set minuit = now().replace(hour=0, minute=0, second=0, microsecond=0) %}
+            {% set ns = namespace(v=[]) %}
+            {% for j in range(2) %}
+              {% set type = 'ouvre' if ouvres[j] else 'repos' %}
+              {% for h in range(24) %}
+                {% set m = profils_mesures[type][h] %}
+                {% set v = m if m is number else ((defaut * profils_types[type][h]) if defaut > 0 else none) %}
+                {% if v is number %}
+                  {% set ns.v = ns.v + [{'debut': (minuit + timedelta(days=j, hours=h)).isoformat(), 'kwh': v}] %}
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+            {{ ns.v }}
+          solaire: >
+            {% set ns = namespace(v=[]) %}
+            {% for capteur in ['sensor.solcast_pv_forecast_prevision_aujourdhui', 'sensor.solcast_pv_forecast_prevision_demain'] %}
+              {% for e in state_attr(capteur, 'detailedHourly') or [] %}
+                {% set ns.v = ns.v + [{'debut': (e.period_start | as_datetime | as_local).isoformat(), 'pv_estimate': e.pv_estimate | float(0)}] %}
+              {% endfor %}
+            {% endfor %}
+            {{ ns.v }}
+          reserve: >
+            {% if is_state('binary_sensor.jarvis_risque_de_coupure', 'on') and is_state('input_boolean.jarvis_secours_reserve_auto', 'on')
+                  and is_state('input_boolean.jarvis_secours_cablee', 'on') %}
+              {{ {'debut': now().isoformat(),
+                  'fin': state_attr('binary_sensor.jarvis_risque_de_coupure', 'fin') or (now() + timedelta(hours=24)).isoformat(),
+                  'soc_pct': states('input_number.jarvis_secours_reserve_soc') | float(100)} }}
+            {% else %}{{ none }}{% endif %}
+      - action: ucaness.optimiser_charge
+        continue_on_error: true
+        data:
+          prix: "{{ state_attr('sensor.jarvis_prix_dynamiques', 'prix') or [] }}"
+          conso: "{{ conso }}"
+          solaire: "{{ solaire }}"
+          capacite_kwh: "{{ states('input_number.jarvis_batterie_capacite') | float(0) }}"
+          plancher_pct: "{{ states('input_number.jarvis_batterie_plancher') | float(20) }}"
+          soc_pct: "{{ [0, [100, states('sensor.uhome_soc') | float(0)] | min] | max }}"
+          rendement_pct: "{{ states('input_number.jarvis_batterie_rendement') | float(95) }}"
+          puissance_charge_kw: "{{ states('input_number.jarvis_batterie_puissance_charge') | float(3) }}"
+          prix_revente: "{{ states('input_number.jarvis_prix_injection') | float(0) }}"
+          marge_pct: "{{ states('input_number.jarvis_batterie_marge') | float(10) }}"
+          charge_interdite: >
+            {{ is_state('binary_sensor.uhome_temperature_hors_plage', 'on')
+               or (states('sensor.uhome_temperature_batterie') | float(20)) < 0 }}
+          seuil_gain_eur: "{{ states('input_number.jarvis_dyn_seuil_gain') | float(0.05) }}"
+          reserve: "{{ reserve }}"
+        response_variable: plan
+      - variables:
+          resultat: >
+            {% set soc_ok = states('sensor.uhome_soc') | float(-1) >= 0 %}
+            {% if plan is defined and plan is mapping and soc_ok %}{{ plan }}
+            {% else %}{{ {'valide': false, 'plages': [], 'nombre_plages': 0, 'charge_en_cours': false,
+                          'justification': ('SOC indisponible' if not soc_ok else 'Calcul impossible') ~ ' : pas de charge réseau (repli sûr).'} }}{% endif %}
+    sensor:
+      - name: "Jarvis plan tarif dynamique"
+        unique_id: jarvis_plan_dynamique_moteur
+        unit_of_measurement: kWh
+        icon: mdi:calendar-clock
+        state: "{{ resultat.get('recharge_reseau_kwh', 0) }}"
+        attributes:
+          strategie: "moteur intégré"
+          valide: "{{ resultat.get('valide', false) }}"
+          calcule_le: "{{ now().isoformat() }}"
+          plages: "{{ resultat.get('plages', []) }}"
+          fenetres: "{{ resultat.get('fenetres', []) }}"
+          nombre_plages: "{{ resultat.get('nombre_plages', 0) }}"
+          charge_en_cours: "{{ resultat.get('charge_en_cours', false) }}"
+          prochaine_plage: "{{ resultat.get('prochaine_plage') }}"
+          gain_estime_eur: "{{ resultat.get('gain_estime_eur') }}"
+          cout_plan_eur: "{{ resultat.get('cout_plan_eur') }}"
+          cout_autoconsommation_eur: "{{ resultat.get('cout_autoconsommation_eur') }}"
+          prix_min: "{{ resultat.get('prix_min') }}"
+          prix_max: "{{ resultat.get('prix_max') }}"
+          horizon_fin: "{{ resultat.get('horizon_fin') }}"
+          reserve_de_secours: "{{ reserve is not none }}"
+          justification: "{{ resultat.get('justification') }}"
+          mode: "{{ 'simulation' if is_state('input_boolean.jarvis_mode_simulation', 'on') else 'réel' }}"
+
+  # ---------------------------------------------------------------------------
+  # Plan EMHASS traduit en plages, toutes les 5 min. Convention d'EMHASS : P_batt < 0 = charge,
+  # P_grid > 0 = soutirage (puissances en W). Noms des capteurs et des attributs à vérifier sur
+  # votre version d'EMHASS (Paramètres > Entrées « EMHASS : … »).
+  # ---------------------------------------------------------------------------
+  - triggers:
+      - trigger: time_pattern
+        minutes: "/5"
+      - trigger: event
+        event_type: jarvis_recalcul_dynamique
+    conditions:
+      - condition: state
+        entity_id: input_select.jarvis_strategie
+        state: "Tarif dynamique (EMHASS)"
+    actions:
+      - variables:
+          plan_emhass: >
+            {% set cb = states('input_text.jarvis_dyn_emhass_batterie') %}
+            {% set ab = states('input_text.jarvis_dyn_emhass_attribut_batterie') %}
+            {% set cg = states('input_text.jarvis_dyn_emhass_reseau') %}
+            {% set ag = states('input_text.jarvis_dyn_emhass_attribut_reseau') %}
+            {% set lb = state_attr(cb, ab) or [] %}
+            {% set lg = (state_attr(cg, ag) or []) if cg not in ['', 'unknown'] else [] %}
+            {% set ns = namespace(g={}, v=[]) %}
+            {% for x in lg %}
+              {% set vals = x.items() | rejectattr('0', 'eq', 'date') | map(attribute='1') | list %}
+              {% if x.date is defined and vals %}{% set ns.g = dict(ns.g, **{(x.date | as_datetime | as_local).isoformat(): vals[0] | float(0)}) %}{% endif %}
+            {% endfor %}
+            {% for x in lb %}
+              {% set vals = x.items() | rejectattr('0', 'eq', 'date') | map(attribute='1') | list %}
+              {% if x.date is defined and vals %}
+                {% set d = (x.date | as_datetime | as_local).isoformat() %}
+                {% set ns.v = ns.v + [{'date': d, 'p_batt': vals[0] | float(0), 'p_grid': ns.g.get(d)}] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.v }}
+      - action: ucaness.plages_depuis_plan
+        continue_on_error: true
+        data:
+          plan: "{{ plan_emhass }}"
+        response_variable: plan
+      - variables:
+          resultat: >
+            {% set temp_ok = not (is_state('binary_sensor.uhome_temperature_hors_plage', 'on')
+                                  or (states('sensor.uhome_temperature_batterie') | float(20)) < 0) %}
+            {% if plan is defined and plan is mapping and plan_emhass | count > 0 and temp_ok %}{{ plan }}
+            {% else %}{{ {'valide': false, 'plages': [], 'charge_en_cours': false,
+                          'justification': ('Plan EMHASS indisponible' if temp_ok else 'Charge interdite (température)') ~ ' : pas de charge réseau (repli sûr).'} }}{% endif %}
+    sensor:
+      - name: "Jarvis plan EMHASS"
+        unique_id: jarvis_plan_dynamique_emhass
+        unit_of_measurement: kWh
+        icon: mdi:calendar-clock
+        state: "{{ resultat.get('charge_reseau_kwh', 0) }}"
+        attributes:
+          strategie: "EMHASS"
+          valide: "{{ resultat.get('valide', false) }}"
+          calcule_le: "{{ now().isoformat() }}"
+          plages: "{{ resultat.get('plages', []) }}"
+          fenetres: "{{ resultat.get('fenetres', []) }}"
+          charge_en_cours: "{{ resultat.get('charge_en_cours', false) }}"
+          prochaine_plage: "{{ resultat.get('prochaine_plage') }}"
+          charge_ecartee_kwh: "{{ resultat.get('charge_ecartee_kwh') }}"
+          justification: >
+            {% if resultat.get('valide') %}EMHASS : {{ resultat.get('fenetres') }} fenêtre(s) de charge réseau,
+            {{ resultat.get('plages') | count }} plage(s) retenue(s), {{ resultat.get('charge_reseau_kwh') }} kWh{% if resultat.get('charge_ecartee_kwh', 0) > 0 %}
+            ({{ resultat.get('charge_ecartee_kwh') }} kWh écartés : 3 plages au plus){% endif %}.{% else %}{{ resultat.get('justification') }}{% endif %}
+          mode: "{{ 'simulation' if is_state('input_boolean.jarvis_mode_simulation', 'on') else 'réel' }}"
+
+automation:
+  - id: jarvis_dyn_valeurs_initiales
+    alias: "Jarvis · Tarif dynamique : valeurs initiales (une seule fois)"
+    description: "Zone FR, TVA 20 %, gain minimal 0,05 €, noms EMHASS par défaut (à vérifier)."
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: template
+        value_template: "{{ states('input_text.jarvis_dyn_nordpool_zone') in ['', 'unknown'] }}"
+    actions:
+      - action: input_text.set_value
+        target: { entity_id: input_text.jarvis_dyn_nordpool_zone }
+        data: { value: "FR" }
+      - action: input_number.set_value
+        target: { entity_id: input_number.jarvis_dyn_tva }
+        data: { value: 20 }
+      - action: input_number.set_value
+        target: { entity_id: input_number.jarvis_dyn_seuil_gain }
+        data: { value: 0.05 }
+      - action: input_text.set_value
+        target: { entity_id: input_text.jarvis_dyn_emhass_batterie }
+        data: { value: "sensor.p_batt_forecast" }
+      - action: input_text.set_value
+        target: { entity_id: input_text.jarvis_dyn_emhass_attribut_batterie }
+        data: { value: "battery_scheduled_power" }
+      - action: input_text.set_value
+        target: { entity_id: input_text.jarvis_dyn_emhass_reseau }
+        data: { value: "sensor.p_grid_forecast" }
+      - action: input_text.set_value
+        target: { entity_id: input_text.jarvis_dyn_emhass_attribut_reseau }
+        data: { value: "forecasts" }
+
+  - id: jarvis_dyn_appliquer
+    alias: "Jarvis · Tarif dynamique : appliquer le plan"
+    description: >
+      Écrit les plages du plan quand elles changent, passe en arbitrage horaire pendant une plage
+      (ou 3 min avant son début) et revient en autoconsommation en dehors. En simulation, ne fait
+      que journaliser. Repli sûr : plan non valide ou de plus de 40 min, stratégie de nuit choisie
+      ou batterie hors plage de température : retour en autoconsommation.
+    mode: single
+    max_exceeded: silent
+    triggers:
+      - trigger: time_pattern
+        minutes: "/1"
+      - trigger: state
+        entity_id: input_select.jarvis_strategie
+      - trigger: state
+        entity_id: input_boolean.jarvis_mode_simulation
+    actions:
+      - variables:
+          strategie: "{{ states('input_select.jarvis_strategie') }}"
+          capteur: >
+            {{ 'sensor.jarvis_plan_tarif_dynamique' if strategie == 'Tarif dynamique (moteur intégré)'
+               else ('sensor.jarvis_plan_emhass' if strategie == 'Tarif dynamique (EMHASS)' else '') }}
+          calcule: "{{ state_attr(capteur, 'calcule_le') if capteur else none }}"
+          frais: >
+            {{ capteur != '' and calcule is not none and state_attr(capteur, 'valide') == true
+               and (now() - (calcule | as_datetime)).total_seconds() < 2400 }}
+          temperature_ok: >
+            {{ is_state('binary_sensor.uhome_temperature_hors_plage', 'off')
+               or states('binary_sensor.uhome_temperature_hors_plage') in ['unknown', 'unavailable'] }}
+          plages: "{{ (state_attr(capteur, 'plages') or []) if frais else [] }}"
+          plages_txt: >
+            {% set ns = namespace(t=[]) %}
+            {% for p in plages %}{% set ns.t = ns.t + ['%04d' | format(p.debut | int) ~ '-' ~ '%04d' | format(p.fin | int)] %}{% endfor %}
+            {{ ns.t | join(' ') }}
+          # En simulation, les plages sont notées « sim … » : elles seront bien écrites au passage en réel.
+          cle_plages: "{{ ('sim ' if is_state('input_boolean.jarvis_mode_simulation', 'on') else '') ~ plages_txt }}"
+          # Dans une fenêtre DATÉE du plan, ou dans les 3 min qui précèdent son début. Les plages HHMM
+          # de l'onduleur se répètent chaque jour : une plage prévue demain à la même heure ne doit pas
+          # faire passer en arbitrage aujourd'hui.
+          dans_plage: >
+            {% set ns = namespace(ok=false) %}
+            {% for w in ((state_attr(capteur, 'fenetres') or []) if frais else []) %}
+              {% set d = w.debut | as_datetime %}
+              {% set f = w.fin | as_datetime %}
+              {% if d is not none and f is not none and d - timedelta(minutes=3) <= now() < f %}{% set ns.ok = true %}{% endif %}
+            {% endfor %}
+            {{ ns.ok }}
+          arbitrage_voulu: "{{ strategie != 'Heures pleines / heures creuses (calcul v7)' and frais and plages | count > 0 and dans_plage and temperature_ok }}"
+          deja_appliquees: "{{ states('input_text.jarvis_dyn_plages_appliquees') }}"
+      # Stratégie de nuit (v7) : ce package rend la main proprement.
+      - if:
+          - condition: template
+            value_template: "{{ strategie == 'Heures pleines / heures creuses (calcul v7)' }}"
+        then:
+          - if:
+              - condition: state
+                entity_id: input_boolean.jarvis_dyn_plan_actif
+                state: "on"
+              - condition: state
+                entity_id: input_boolean.jarvis_mode_simulation
+                state: "off"
+            then:
+              - action: script.jarvis_batterie_retour_autoconsommation
+                continue_on_error: true
+          - action: input_boolean.turn_off
+            target: { entity_id: input_boolean.jarvis_dyn_plan_actif }
+          # Le pilotage de nuit écrit ses propres plages : on oublie celles du tarif dynamique.
+          - if:
+              - condition: template
+                value_template: "{{ deja_appliquees not in ['', 'unknown'] }}"
+            then:
+              - action: input_text.set_value
+                target: { entity_id: input_text.jarvis_dyn_plages_appliquees }
+                data: { value: "" }
+          - stop: "Stratégie heures pleines / heures creuses"
+      # Plan nouveau : journal (et écriture des plages en mode réel).
+      - if:
+          - condition: template
+            value_template: "{{ plages | count > 0 and cle_plages != deja_appliquees }}"
+        then:
+          - action: logbook.log
+            data:
+              name: "Jarvis batterie"
+              entity_id: "{{ capteur }}"
+              message: >
+                [{{ 'simulation' if is_state('input_boolean.jarvis_mode_simulation', 'on') else 'réel' }}]
+                Tarif dynamique : plages {{ plages_txt }}. {{ state_attr(capteur, 'justification') }}
+          - if:
+              - condition: state
+                entity_id: input_boolean.jarvis_mode_simulation
+                state: "off"
+            then:
+              - action: ucaness.definir_plages_charge
+                continue_on_error: true
+                data:
+                  plages: "{{ plages }}"
+                response_variable: ecriture
+              - if:
+                  - condition: template
+                    value_template: "{{ ((ecriture | default({})) or {}).get('confirme', false) }}"
+                then:
+                  - action: input_text.set_value
+                    target: { entity_id: input_text.jarvis_dyn_plages_appliquees }
+                    data: { value: "{{ plages_txt[:255] }}" }
+                else:
+                  - action: script.jarvis_notifier
+                    data:
+                      niveau: a_surveiller
+                      titre: "Plages de charge non programmées"
+                      message: >
+                        Les plages du tarif dynamique ({{ plages_txt }}) n'ont pas été confirmées par
+                        l'onduleur. Nouvel essai à la prochaine minute ; l'onduleur reste en autoconsommation.
+                  - stop: "Plages non confirmées"
+            else:
+              - action: input_text.set_value
+                target: { entity_id: input_text.jarvis_dyn_plages_appliquees }
+                data: { value: "{{ cle_plages[:255] }}" }
+      - condition: state
+        entity_id: input_boolean.jarvis_mode_simulation
+        state: "off"
+      # Entrée en arbitrage horaire (seulement si les plages programmées sont celles du plan).
+      - if:
+          - condition: template
+            value_template: >
+              {{ arbitrage_voulu and states('input_text.jarvis_dyn_plages_appliquees') == plages_txt
+                 and is_state('input_boolean.jarvis_dyn_plan_actif', 'off') }}
+        then:
+          - variables:
+              mode_avant: "{{ states('sensor.uhome_mode') }}"
+          - action: input_boolean.turn_on
+            target: { entity_id: input_boolean.jarvis_dyn_plan_actif }
+          - action: ucaness.definir_mode
+            continue_on_error: true
+            data:
+              mode: arbitrage_horaire
+            response_variable: bascule
+          - if:
+              - condition: template
+                value_template: "{{ ((bascule | default({})) or {}).get('confirme', false) }}"
+            then:
+              - wait_template: "{{ states('sensor.uhome_mode') not in [mode_avant, 'unknown', 'unavailable'] }}"
+                timeout: "00:05:00"
+                continue_on_timeout: true
+              - action: input_text.set_value
+                target: { entity_id: input_text.jarvis_mode_attendu }
+                data: { value: "{{ states('sensor.uhome_mode') }}" }
+              - action: logbook.log
+                data:
+                  name: "Jarvis batterie"
+                  entity_id: "{{ capteur }}"
+                  message: "[réel] Tarif dynamique : arbitrage horaire (plages {{ plages_txt }})."
+            else:
+              - action: input_boolean.turn_off
+                target: { entity_id: input_boolean.jarvis_dyn_plan_actif }
+              - action: script.jarvis_notifier
+                data:
+                  niveau: a_surveiller
+                  titre: "Arbitrage horaire non confirmé"
+                  message: "La bascule en arbitrage horaire n'a pas été confirmée ; l'onduleur reste en autoconsommation."
+      # Sortie : retour en autoconsommation hors plage (ou repli sûr).
+      - if:
+          - condition: template
+            value_template: "{{ not arbitrage_voulu and is_state('input_boolean.jarvis_dyn_plan_actif', 'on') }}"
+        then:
+          - action: script.jarvis_batterie_retour_autoconsommation
+            continue_on_error: true
+          - if:
+              - condition: template
+                value_template: "{{ is_state('sensor.uhome_mode', 'Match Load Mode') }}"
+            then:
+              - action: input_boolean.turn_off
+                target: { entity_id: input_boolean.jarvis_dyn_plan_actif }
+              - action: logbook.log
+                data:
+                  name: "Jarvis batterie"
+                  entity_id: "{{ capteur if capteur else 'input_select.jarvis_strategie' }}"
+                  message: >
+                    [réel] Tarif dynamique : retour en autoconsommation{% if not frais %} (plan absent,
+                    non valide ou trop ancien : repli sûr){% elif not temperature_ok %} (température batterie
+                    hors plage){% endif %}.
+            else:
+              - action: script.jarvis_notifier
+                data:
+                  niveau: intervention
+                  titre: "Batterie restée en arbitrage horaire"
+                  message: >
+                    Le retour en autoconsommation n'a pas été confirmé. Les plages de charge se répètent
+                    chaque jour : remettre le mode Autoconsommation depuis le portail UCANESS si le
+                    problème persiste.
