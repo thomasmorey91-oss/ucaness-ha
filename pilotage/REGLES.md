@@ -1,6 +1,6 @@
-# Pilotage de nuit d'une batterie UCanpower : règles et calculs
+# Pilotage d'une batterie UCanpower : règles et calculs
 
-Ce document décrit ce que font les packages de `pilotage/packages/`. Ils s'appuient sur l'intégration `ucaness` de ce dépôt et conviennent à tout onduleur UCanpower UHome dont la table de réglages est confirmée (`uhome`, `mr`).
+Ce document décrit ce que font les packages de `pilotage/packages/` : pilotage de nuit en heures pleines / heures creuses (§ 1 à 7), tarif dynamique (§ 8), secours (§ 9). Ils s'appuient sur l'intégration `ucaness` de ce dépôt et conviennent à tout onduleur UCanpower UHome dont la table de réglages est confirmée (`uhome`, `mr`).
 
 ## 1. Objectifs
 
@@ -95,7 +95,72 @@ Pas de recharge si le jour préparé n'est pas ouvré et que les week-ends et jo
 | Sous le plancher, l'onduleur se recharge seul de quelques pourcents sur le réseau, y compris en heures pleines |
 | L'application mobile UCANESS affiche « Arbitrage horaire » par défaut quand le mode n'est pas stocké : ne jamais valider ce formulaire sans vérifier le mode |
 
-## 8. Historique
+## 8. Tarif dynamique (`jarvis_dynamique.yaml`, facultatif)
+
+Pour un contrat dont le prix change chaque heure ou chaque quart d'heure et est publié la veille (prix de marché « day-ahead »). L'état de l'art et les choix sont dans `docs/etat-de-l-art.md`.
+
+### 8.1 Stratégies
+
+| « Pilotage : stratégie de recharge » | Effet |
+|---|---|
+| Heures pleines / heures creuses (calcul v7) | Valeur par défaut. Le pilotage de nuit (§ 3 et 4) fonctionne seul ; le tarif dynamique ne fait rien |
+| Tarif dynamique (moteur intégré) | Le pilotage de nuit ne programme plus rien. Toutes les 15 min, l'action `ucaness.optimiser_charge` calcule les plages des 24 h à venir |
+| Tarif dynamique (EMHASS) | Idem, mais le plan vient d'EMHASS, installé et lancé à part ; l'action `ucaness.plages_depuis_plan` le traduit en plages |
+
+### 8.2 Prix payé
+
+prix TTC = (prix de marché + coûts ajoutés de l'heure) × (1 + TVA). Les coûts ajoutés (frais du fournisseur, acheminement, taxes, en EUR/kWh HT) peuvent différer entre les heures pleines et les heures creuses d'Enedis (plages « Tarif : début / fin des heures creuses », chaque jour). Source du prix de marché : Nord Pool (intégration officielle, zone FR) ou tout capteur qui publie un attribut `prix` (ou `prices`) : liste de `{debut, prix}` en EUR/kWh.
+
+### 8.3 Calcul (moteur intégré)
+
+| Étape | Détail |
+|---|---|
+| Horizon | De maintenant au dernier prix connu et à la dernière prévision solaire (48 h au plus) ; le premier créneau est raccourci à l'instant présent |
+| Consommation | Mesurée sur 7 jours, moyenne pondérée par l'ancienneté, profils séparés jours ouvrés / jours de repos (comme le § 4), majorée de la marge |
+| Solaire | Prévision Solcast d'aujourd'hui et de demain (`detailedHourly`, médiane) |
+| Deux actions par créneau | Autoconsommation, ou plage de charge (le réseau, et le solaire s'il y en a, charge la batterie à la puissance de charge ; la maison est alimentée par le réseau, la batterie est donc gardée) |
+| Contraintes | 3 plages au plus dans les 24 h à venir, une plage qui passe minuit en compte deux ; aucune décharge vers le réseau ; capacité utile au-dessus du plancher ; rendement dans chaque sens |
+| Objectif | Coût d'achat − revente, moins la valeur du stock restant en fin d'horizon (prix le plus bas ÷ rendement : on ne charge jamais pour le seul stock) |
+| Méthode | Programmation dynamique sur le stock, exacte pour ce modèle |
+| Seuil | Aucune plage si le gain estimé face à l'autoconsommation simple est sous le « gain minimal » (0,05 € par défaut) |
+| Réserve de secours | Si le package secours l'autorise (§ 9), stock minimal à tenir jusqu'à la fin du risque de coupure |
+
+### 8.4 Application
+
+| Règle | Détail |
+|---|---|
+| Plages | Écrites seulement quand elles changent, à l'avance (en autoconsommation, l'onduleur ne les applique pas) |
+| Mode | Arbitrage horaire pendant une fenêtre datée du plan et 3 min avant son début, autoconsommation en dehors. Les plages de l'onduleur n'ont pas de date et se répètent chaque jour : une plage prévue demain à l'heure qu'il est n'a pas d'effet tant que l'onduleur reste en autoconsommation |
+| Stabilité | Début des plages arrondi au quart d'heure : une plage déjà commencée n'est pas réécrite à chaque calcul |
+| Repli sûr | Plan non valide ou de plus de 40 min, prix, prévision solaire, SOC ou capacité manquants, batterie hors plage de température : aucune plage, retour en autoconsommation |
+| Simulation | Même interrupteur que le pilotage de nuit : en simulation, chaque nouveau plan est journalisé (« [simulation] »), rien n'est envoyé ; au passage en réel, les plages en cours sont écrites aussitôt |
+| Retour à la stratégie de nuit | Retour en autoconsommation et oubli des plages du tarif dynamique |
+| Alertes | Plages ou mode non confirmés : à surveiller ; retour en autoconsommation non confirmé : intervention (les plages se répètent chaque jour) |
+
+## 9. Secours (`jarvis_secours.yaml`, facultatif)
+
+Rien n'est écrit sur l'onduleur : en cas de coupure, il bascule seul sur sa sortie de secours (EPS) si elle est activée et raccordée. En autoconsommation, réseau coupé, le solaire puis la batterie alimentent la sortie de secours (manuel V1.9, p. 48).
+
+| Fonction | Détail |
+|---|---|
+| Détection d'une coupure | Tension réseau sous le seuil (100 V par défaut) pendant 20 s alors que l'onduleur répond, ou état « hors réseau » de l'onduleur (libellé à confirmer à la première coupure) |
+| Alerte de début | Intervention : heure, SOC, énergie utile, autonomie à la consommation du moment, puissance maximale de la sortie de secours |
+| Suivi | Autonomie sous 1 h, batterie à moins de 5 points du plancher, puissance demandée au-delà de 90 % de la sortie de secours pendant 30 s |
+| Bilan de fin | Durée, énergie fournie par la batterie, SOC au début, au plus bas et à la fin, puissance la plus haute ; cumuls de l'année (`sensor.jarvis_derniere_coupure`) |
+| Risque de coupure | Vigilance Météo-France orange ou rouge (vent violent, orages, neige-verglas, pluie-inondation, inondation, vagues-submersion), ou coupure programmée annoncée par Enedis (12 h avant son début). Alerte à surveiller ; avec la stratégie « moteur intégré » et l'interrupteur « garder une réserve », stock minimal (80 % par défaut) jusqu'à la fin du risque |
+| Arrêt de Home Assistant | Au redémarrage, si le dernier signe de vie date de plus de 15 min : coupure de courant ou d'Internet probable |
+| Mode Backup | Signalé s'il est activé hors de Jarvis (Jarvis ne l'écrit jamais) |
+| Autonomie de secours | `sensor.jarvis_autonomie_de_secours` : énergie utile × rendement ÷ consommation du moment (au moins 0,2 kW), sans le solaire |
+
+Pour être alerté pendant une coupure, Home Assistant, la box Internet et le module Wi-Fi de l'onduleur doivent rester alimentés (circuits sur la sortie de secours ou petit onduleur UPS).
+
+Puissance continue de la sortie de secours (manuel V1.9, § 3.3) : 3 000 VA (3K0L), 3 680 VA (3K6L), 4 000 VA (4K0L), 4 600 VA (4K6L), 5 000 VA (5K0L), 6 000 VA (6K0L), 8 000 VA (8K0L) ; au-delà de 6 000 W, deux modules de batterie au moins.
+
+## 10. Analyse de l'installation et dimensionnement
+
+Outil hors de Home Assistant, à lancer une fois depuis un PC : `tools/dimensionnement/README.md`. Il chiffre l'installation existante, la batterie et le solaire nécessaires à l'autonomie totale, et le système le plus petit pour 70 à 95 % d'autonomie.
+
+## 11. Historique
 
 | Version | Changement |
 |---|---|
@@ -105,3 +170,5 @@ Pas de recharge si le jour préparé n'est pas ouvré et que les week-ends et jo
 | v5 | Consommation mesurée, nuit toujours déduite, marge de sécurité |
 | v6 | Réglages propres à chaque installation dans des entrées (aucune valeur d'installation dans le code), service de notification paramétrable, place pour le solaire comptée avant le point le plus bas |
 | v7 | Moyenne de consommation pondérée par l'ancienneté, aucune recharge sans prévision solaire datée du jour préparé, journal enrichi (fourchette P10-P90, heure de la prévision), gain réel du jour face à l'autoconsommation et cumuls, 3 essais de programmation, mises à jour Solcast pilotées (optionnel) |
+| Tarif dynamique 1 | Stratégie au choix (nuit, moteur intégré, EMHASS) ; moteur intégré par programmation dynamique ; adaptateur EMHASS ; le pilotage de nuit ne programme rien quand une stratégie dynamique est choisie |
+| Secours 1 | Détection et suivi des coupures, bilan, risque de coupure (vigilance, coupure programmée), réserve de secours pour le tarif dynamique, bilan au redémarrage ; rien n'est écrit sur l'onduleur |

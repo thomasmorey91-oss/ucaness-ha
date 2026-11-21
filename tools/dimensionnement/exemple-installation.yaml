@@ -1,0 +1,63 @@
+# Exemple de configuration (valeurs INVENTÉES) pour tools/dimensionnement/dimensionnement.py.
+# Copier ce fichier, le remplir avec votre installation, puis :
+#   python tools/dimensionnement/dimensionnement.py mon-installation.yaml -o rapport.md
+# Ce fichier et le rapport contiennent des données de votre maison : ne les publiez pas.
+
+lieu:
+  latitude: 47.0          # une décimale suffit pour PVGIS
+  longitude: 2.0
+  fuseau: Europe/Paris
+
+consommation:
+  fichier: consommation.csv   # chemin relatif à ce fichier
+  unite: W                    # W ou kW (puissance), Wh ou kWh (énergie par pas)
+  # colonne_date: last_changed   # facultatif : sinon détection automatique
+  # colonne_valeur: state
+
+# Facultatif : production mesurée, pour recaler PVGIS sur votre installation (ombrages, salissure).
+# production_mesuree:
+#   fichier: production.csv
+#   unite: W
+
+toitures:                     # azimut convention PVGIS : 0 = sud, -90 = est, 90 = ouest
+  - nom: Pan sud
+    kwc: 3.0                  # puissance installée aujourd'hui (0 pour un projet)
+    inclinaison: 30
+    azimut: 0
+    pertes: 14                # pertes système en % (câbles, onduleur, salissure)
+    kwc_max: 5.0              # puissance que la place permettrait sur ce pan
+  - nom: Pan ouest
+    kwc: 0.0
+    inclinaison: 30
+    azimut: 90
+    pertes: 14
+    kwc_max: 3.0
+
+batterie:
+  capacite_kwh: 5.12          # capacité nominale installée (0 si aucune)
+  plancher_pct: 10            # 100 - profondeur de décharge
+  rendement_pct: 95           # dans chaque sens
+  puissance_kw: 5.0           # charge et décharge maximales (fiche technique)
+  module_kwh: 5.12            # pas d'extension (un module)
+  capacite_max_kwh: 40.96     # maximum admis par le système
+
+onduleur:
+  puissance_ac_kw: 5.0        # puissance de sortie nominale
+  pv_max_kwc: 7.5             # puissance solaire maximale admise
+  secours_kw: 5.0             # sortie de secours (EPS), puissance continue
+
+# Facultatif : chiffrage économique.
+tarif:
+  achat_eur_kwh: 0.25
+  revente_eur_kwh: 0.04
+couts:
+  pv_eur_kwc: 1500
+  batterie_eur_kwh: 500
+
+pvgis:
+  annees: [2014, 2023]        # années réelles rejouées (PVGIS 5.3 : 2005 à 2023)
+  cache: cache-pvgis          # dossier de cache (évite de retélécharger)
+
+recherche:
+  pv_pas_kwc: 0.5
+  batterie_max_kwh: 200

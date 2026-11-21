@@ -4,6 +4,10 @@
 - ucaness.definir_plages_charge : programme jusqu'à 3 plages de charge du mode arbitrage
   horaire ; les autres plages de charge et toutes les plages de décharge sont vidées.
 - ucaness.definir_mode : autoconsommation ou arbitrage horaire (Backup refusé).
+- ucaness.optimiser_charge : calcul seul (rien n'est envoyé) des plages de charge sous tarif
+  dynamique, par le moteur intégré (optimiseur.py).
+- ucaness.plages_depuis_plan : calcul seul ; traduit le plan d'un moteur externe (EMHASS)
+  en 3 plages de charge au plus.
 
 Les deux actions d'écriture exigent l'option « Écriture autorisée » de l'intégration.
 Chaque envoi est journalisé puis relu : si l'onduleur ne reflète pas la consigne, l'action
@@ -21,6 +25,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.util import dt as dt_util
 
 from .api import (
     SET_WORK_MODE,
@@ -41,12 +46,15 @@ from .const import (
     READBACK_DELAY_S,
 )
 from .coordinator import UcanessCoordinator
+from . import optimiseur
 
 _LOGGER = logging.getLogger(__name__)
 
 SERVICE_TEST = "tester_api"
 SERVICE_WINDOWS = "definir_plages_charge"
 SERVICE_MODE = "definir_mode"
+SERVICE_OPTIMISER = "optimiser_charge"
+SERVICE_PLAN = "plages_depuis_plan"
 
 ATTR_ENTRY = "config_entry_id"
 HHMM = vol.All(cv.string, vol.Match(r"^([01]\d|2[0-3]):?[0-5]\d$"))
@@ -57,6 +65,36 @@ WINDOWS_SCHEMA = vol.Schema(
     {
         vol.Optional(ATTR_ENTRY): cv.string,
         vol.Required("plages"): vol.All(cv.ensure_list, [WINDOW], vol.Length(max=3)),
+    }
+)
+POURCENT = vol.All(vol.Coerce(float), vol.Range(min=0, max=100))
+OPTIMISER_SCHEMA = vol.Schema(
+    {
+        vol.Required("prix"): vol.All(cv.ensure_list, [dict]),
+        vol.Required("conso"): list,
+        vol.Required("solaire"): vol.All(cv.ensure_list, [dict]),
+        vol.Required("capacite_kwh"): vol.All(vol.Coerce(float), vol.Range(min=0, max=200)),
+        vol.Required("plancher_pct"): POURCENT,
+        vol.Required("soc_pct"): POURCENT,
+        vol.Optional("rendement_pct", default=95): vol.All(vol.Coerce(float), vol.Range(min=50, max=100)),
+        vol.Required("puissance_charge_kw"): vol.All(vol.Coerce(float), vol.Range(min=0, max=50)),
+        vol.Optional("prix_revente", default=0): vol.Coerce(float),
+        vol.Optional("marge_pct", default=0): POURCENT,
+        vol.Optional("charge_interdite", default=False): cv.boolean,
+        vol.Optional("reserve"): vol.Any(
+            None,
+            vol.Schema({vol.Required("debut"): cv.string, vol.Required("fin"): cv.string, vol.Required("soc_pct"): POURCENT}),
+        ),
+        vol.Optional("seuil_gain_eur", default=0.02): vol.Coerce(float),
+        vol.Optional("valeur_stock_eur_kwh"): vol.Any(None, vol.Coerce(float)),
+        vol.Optional("max_plages", default=3): vol.All(vol.Coerce(int), vol.Range(min=1, max=3)),
+    }
+)
+PLAN_SCHEMA = vol.Schema(
+    {
+        vol.Required("plan"): vol.All(cv.ensure_list, [dict]),
+        vol.Optional("seuil_kw", default=0.2): vol.All(vol.Coerce(float), vol.Range(min=0)),
+        vol.Optional("max_plages", default=3): vol.All(vol.Coerce(int), vol.Range(min=1, max=3)),
     }
 )
 MODE_SCHEMA = vol.Schema(
@@ -204,6 +242,58 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         mode = call.data["mode"]
         return await _write_and_verify(hass, entry, {SET_WORK_MODE: WORK_MODES[mode]}, f"mode {mode}")
 
+    async def optimiser_charge(call: ServiceCall) -> ServiceResponse:
+        """Calcul seul : rien n'est envoyé à l'onduleur. Repli sûr si une donnée manque."""
+        d = call.data
+        fuseau = dt_util.get_default_time_zone()
+        maintenant = dt_util.now()
+        cap_brute = d["capacite_kwh"]
+        plancher = d["plancher_pct"]
+        cap = cap_brute * (1 - plancher / 100)
+        stock = max(0.0, (d["soc_pct"] - plancher) / 100 * cap_brute)
+        reserves = []
+        r = d.get("reserve")
+        try:
+            if r:
+                debut = dt_util.parse_datetime(r["debut"])
+                fin = dt_util.parse_datetime(r["fin"])
+                if debut and fin and fin > maintenant:
+                    niveau = max(0.0, (r["soc_pct"] - plancher) / 100 * cap_brute)
+                    reserves.append(optimiseur.Reserve(debut, fin, min(niveau, cap)))
+            creneaux = optimiseur.construire_creneaux(
+                d["prix"], d["conso"], d["solaire"], maintenant=maintenant, fuseau=fuseau,
+                prix_vente=d["prix_revente"], marge=d["marge_pct"] / 100,
+            )
+            batterie = optimiseur.Batterie(cap, stock, d["rendement_pct"] / 100, d["puissance_charge_kw"])
+            plan = await hass.async_add_executor_job(
+                lambda: optimiseur.optimiser(
+                    creneaux, batterie, fuseau=fuseau, max_plages=d["max_plages"],
+                    charge_interdite=d["charge_interdite"], reserves=reserves,
+                    valeur_stock_eur_kwh=d.get("valeur_stock_eur_kwh"), seuil_gain_eur=d["seuil_gain_eur"],
+                )
+            )
+        except (optimiseur.DonneesManquantes, ValueError, TypeError) as err:
+            return {"valide": False, "plages": [], "nombre_plages": 0, "charge_en_cours": False,
+                    "justification": f"{err} : pas de charge réseau (repli sûr)."}
+        return {"valide": True, "calcule_le": maintenant.isoformat(), **plan.resume(maintenant)}
+
+    async def plages_depuis_plan(call: ServiceCall) -> ServiceResponse:
+        """Calcul seul : plan externe (EMHASS) -> 3 plages de charge au plus."""
+        try:
+            r = optimiseur.plages_depuis_plan(
+                call.data["plan"], maintenant=dt_util.now(), fuseau=dt_util.get_default_time_zone(),
+                seuil_kw=call.data["seuil_kw"], max_plages=call.data["max_plages"],
+            )
+        except (ValueError, TypeError) as err:
+            return {"valide": False, "plages": [], "justification": f"Plan illisible ({err}) : pas de charge réseau."}
+        return {"valide": True, **r}
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_OPTIMISER, optimiser_charge, schema=OPTIMISER_SCHEMA, supports_response=SupportsResponse.ONLY
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_PLAN, plages_depuis_plan, schema=PLAN_SCHEMA, supports_response=SupportsResponse.ONLY
+    )
     hass.services.async_register(
         DOMAIN, SERVICE_TEST, tester_api, schema=TEST_SCHEMA, supports_response=SupportsResponse.ONLY
     )

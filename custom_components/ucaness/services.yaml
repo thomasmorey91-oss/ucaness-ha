@@ -34,3 +34,83 @@ definir_mode:
             - autoconsommation
             - arbitrage_horaire
           translation_key: mode
+
+optimiser_charge:
+  fields:
+    prix:
+      required: true
+      example: '[{"debut": "2030-01-15T00:00:00+01:00", "prix": 0.142}]'
+      selector:
+        object:
+    conso:
+      required: true
+      example: "[0.4, 0.4, 0.3, 0.3, 0.3, 0.4, 0.8, 1.0, 0.7, 0.5, 0.5, 0.5, 0.6, 0.5, 0.5, 0.5, 0.6, 0.9, 1.2, 1.3, 1.2, 1.0, 0.8, 0.6]"
+      selector:
+        object:
+    solaire:
+      required: true
+      example: '[{"period_start": "2030-01-15T12:00:00+01:00", "pv_estimate": 2.1}]'
+      selector:
+        object:
+    capacite_kwh:
+      required: true
+      selector:
+        number: { min: 0, max: 200, step: 0.01, unit_of_measurement: kWh, mode: box }
+    plancher_pct:
+      required: true
+      selector:
+        number: { min: 0, max: 100, unit_of_measurement: "%", mode: box }
+    soc_pct:
+      required: true
+      selector:
+        number: { min: 0, max: 100, unit_of_measurement: "%", mode: box }
+    rendement_pct:
+      default: 95
+      selector:
+        number: { min: 50, max: 100, unit_of_measurement: "%", mode: box }
+    puissance_charge_kw:
+      required: true
+      selector:
+        number: { min: 0, max: 50, step: 0.1, unit_of_measurement: kW, mode: box }
+    prix_revente:
+      default: 0
+      selector:
+        number: { min: -1, max: 1, step: 0.00001, mode: box }
+    marge_pct:
+      default: 0
+      selector:
+        number: { min: 0, max: 100, unit_of_measurement: "%", mode: box }
+    charge_interdite:
+      default: false
+      selector:
+        boolean:
+    reserve:
+      selector:
+        object:
+    seuil_gain_eur:
+      default: 0.02
+      selector:
+        number: { min: 0, max: 10, step: 0.01, mode: box }
+    valeur_stock_eur_kwh:
+      selector:
+        number: { min: 0, max: 2, step: 0.001, mode: box }
+    max_plages:
+      default: 3
+      selector:
+        number: { min: 1, max: 3, mode: box }
+
+plages_depuis_plan:
+  fields:
+    plan:
+      required: true
+      example: '[{"date": "2030-01-15T02:00:00+01:00", "p_batt": -3000, "p_grid": 3400}]'
+      selector:
+        object:
+    seuil_kw:
+      default: 0.2
+      selector:
+        number: { min: 0, max: 20, step: 0.1, unit_of_measurement: kW, mode: box }
+    max_plages:
+      default: 3
+      selector:
+        number: { min: 1, max: 3, mode: box }
