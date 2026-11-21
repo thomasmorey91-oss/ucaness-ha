@@ -293,3 +293,14 @@ async def test_plages_depuis_plan_emhass(hass, fake_client):
     assert resp["valide"] is True
     assert resp["charge_reseau_kwh"] == 6.0
     assert len(resp["plages"]) in (1, 2)
+
+
+def test_services_yaml_selecteurs_valides():
+    """Home Assistant refuse tout services.yaml dont un sélecteur est invalide (descriptions perdues)."""
+    import yaml
+    from homeassistant.helpers import selector
+
+    d = yaml.safe_load((pathlib.Path(__file__).parents[1] / "custom_components" / "ucaness" / "services.yaml").read_text())
+    for service, conf in d.items():
+        for champ, f in (conf.get("fields") or {}).items():
+            selector.validate_selector(f["selector"])
