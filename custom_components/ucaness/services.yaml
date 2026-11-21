@@ -75,7 +75,7 @@ optimiser_charge:
     prix_revente:
       default: 0
       selector:
-        number: { min: -1, max: 1, step: 0.00001, mode: box }
+        number: { min: -1, max: 1, step: any, mode: box }
     marge_pct:
       default: 0
       selector:
