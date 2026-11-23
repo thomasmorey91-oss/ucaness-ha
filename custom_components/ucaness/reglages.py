@@ -51,6 +51,8 @@ REGLAGES: tuple[Reglage, ...] = (
     Reglage("puissance_charge", "Batterie : puissance de charge", NUMBER, "input_number.jarvis_batterie_puissance_charge", "kW", 0.5, 10, 0.1, icone="mdi:flash"),
     Reglage("marge", "Batterie : marge de sécurité", NUMBER, "input_number.jarvis_batterie_marge", "%", 0, 50, 1, icone="mdi:shield-half-full"),
     Reglage("conso_journaliere", "Batterie : consommation journalière par défaut", NUMBER, "input_number.jarvis_conso_journaliere", "kWh", 0, 200, 0.1, icone="mdi:home-lightning-bolt"),
+    # Installation (pas d'entrée dans les packages : réglage propre à l'intégration)
+    Reglage("solaire", "Installation : panneaux solaires raccordés", SWITCH, "", icone="mdi:solar-power"),
     # Contrat (pilotage/packages/jarvis_tarif.yaml)
     Reglage("type_tarif", "Tarif : type de contrat", SELECT, "input_select.jarvis_type_tarif", options=(TARIF_HPHC, TARIF_BASE), icone="mdi:cash-clock"),
     Reglage("prix_hp", "Tarif : prix heures pleines (ou Base)", NUMBER, "input_number.jarvis_prix_hp", "EUR/kWh", 0, 1, 0.00001, icone="mdi:currency-eur"),
@@ -99,7 +101,7 @@ def valeur(hass: HomeAssistant, entry: UcanessConfigEntry, cle: str) -> Any:
 
     None si le réglage n'a jamais été renseigné (une donnée absente reste absente)."""
     reglage = PAR_CLE[cle]
-    etat = hass.states.get(reglage.entree)
+    etat = hass.states.get(reglage.entree) if reglage.entree else None
     if etat is not None and etat.state not in INCONNU:
         try:
             return normaliser(reglage, etat.state)
@@ -119,7 +121,7 @@ async def async_definir(hass: HomeAssistant, entry: UcanessConfigEntry, valeurs:
     )
     for cle, v in propres.items():
         reglage = PAR_CLE[cle]
-        if hass.states.get(reglage.entree) is None:
+        if not reglage.entree or hass.states.get(reglage.entree) is None:
             continue
         cible = {"entity_id": reglage.entree}
         if reglage.type == NUMBER:

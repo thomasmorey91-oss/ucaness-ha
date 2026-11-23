@@ -304,6 +304,23 @@
     "etape_notifications": {
       "title": "UCANESS: choose where to be notified",
       "description": "Optional. To be told about a battery fault or a failed programming.\n\nFill in \"Alertes : service de notification\" in [Settings > Helpers]({lien}), for example `mobile_app_my_phone`."
+    },
+    "etape_solaire": {
+      "title": "UCANESS: do you have solar panels?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Solar panels",
+            "description": "The inverter has not measured any solar production yet. A battery can work with or without panels.\n\nWith panels, the battery first stores your production, and control only charges the remainder at night. Without panels, it buys electricity at the cheapest hours to use it at the expensive ones: everything then depends on your contract, which the assistant reviews in the next step.",
+            "data": {
+              "solaire": "Solar panels are connected to this inverter"
+            }
+          }
+        },
+        "abort": {
+          "entree_absente": "This battery is no longer configured."
+        }
+      }
     }
   }
 }

@@ -49,7 +49,8 @@ class EntiteReglage(CoordinatorEntity[UcanessCoordinator]):
             self.async_write_ha_state()
 
         # L'entrée du package est la référence tant qu'elle existe : on suit ses changements.
-        self.async_on_remove(async_track_state_change_event(self.hass, [self._reglage.entree], _entree_modifiee))
+        if self._reglage.entree:
+            self.async_on_remove(async_track_state_change_event(self.hass, [self._reglage.entree], _entree_modifiee))
 
 
 def entites(coordinator: UcanessCoordinator, entry: UcanessConfigEntry, type_: str, classe: type) -> list:

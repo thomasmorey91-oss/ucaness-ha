@@ -136,7 +136,20 @@ class EtapeContrat(_Etape):
     async_step_bilan_base = async_step_bilan
 
 
-FLUX = {"batterie": EtapeBatterie, "contrat": EtapeContrat}
+class EtapeSolaire(_Etape):
+    """L'onduleur n'a encore mesuré aucune production : la maison a-t-elle des panneaux ?"""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> data_entry_flow.FlowResult:
+        if self._entry is None:
+            return self.async_abort(reason="entree_absente")
+        if user_input is not None:
+            await self._enregistrer({"solaire": bool(user_input["solaire"])})
+            return self.async_create_entry(data={})
+        schema = vol.Schema({vol.Required("solaire", default=False): selector.BooleanSelector()})
+        return self.async_show_form(step_id="init", data_schema=schema)
+
+
+FLUX = {"batterie": EtapeBatterie, "solaire": EtapeSolaire, "contrat": EtapeContrat}
 
 
 async def async_create_fix_flow(hass: HomeAssistant, issue_id: str, data: dict[str, Any] | None) -> RepairsFlow:

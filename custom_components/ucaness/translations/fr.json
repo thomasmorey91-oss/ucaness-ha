@@ -304,6 +304,23 @@
     "etape_notifications": {
       "title": "UCANESS : choisir où être prévenu",
       "description": "Facultatif. Pour être prévenu d'un défaut de la batterie ou d'une programmation qui a échoué.\n\nRenseignez « Alertes : service de notification » dans [Paramètres > Entrées]({lien}), par exemple `mobile_app_mon_telephone`."
+    },
+    "etape_solaire": {
+      "title": "UCANESS : avez-vous des panneaux solaires ?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Panneaux solaires",
+            "description": "L'onduleur n'a encore mesuré aucune production solaire. Une batterie peut fonctionner avec ou sans panneaux.\n\nAvec des panneaux, la batterie stocke d'abord votre production, et le pilotage ne recharge la nuit que le complément. Sans panneaux, elle sert à acheter l'électricité aux heures les moins chères pour la consommer aux heures chères : tout dépend alors de votre contrat, que l'assistant examine à l'étape suivante.",
+            "data": {
+              "solaire": "Des panneaux solaires sont raccordés à cet onduleur"
+            }
+          }
+        },
+        "abort": {
+          "entree_absente": "Cette batterie n'est plus configurée."
+        }
+      }
     }
   }
 }

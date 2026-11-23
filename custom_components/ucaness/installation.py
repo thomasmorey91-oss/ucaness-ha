@@ -94,6 +94,11 @@ ETAPES: tuple[Etape, ...] = (
         lien="/config/helpers",
     ),
     Etape(
+        "solaire", "Panneaux solaires",
+        "Une batterie peut fonctionner avec ou sans panneaux : le pilotage ne se règle pas de la même façon.",
+        lambda c: c.get("solaire") in (True, False),
+    ),
+    Etape(
         "contrat", "Votre contrat d'électricité",
         "Recharger la nuit n'a d'intérêt que si l'écart de prix le justifie.",
         _contrat,
@@ -108,7 +113,8 @@ ETAPES: tuple[Etape, ...] = (
     Etape(
         "prevision_solaire", "Prévision de production solaire",
         "Pour ne recharger que le nécessaire ; sans prévision, aucune recharge n'est programmée.",
-        lambda c: bool(c.get("prevision_solaire")),
+        # Sans panneaux, il n'y a rien à prévoir : l'étape est faite d'office.
+        lambda c: c.get("solaire") is False or bool(c.get("prevision_solaire")),
         lien="/_my_redirect/config_flow_start?domain=solcast_solar",
     ),
     Etape(

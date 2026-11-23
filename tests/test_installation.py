@@ -15,7 +15,7 @@ sys.modules[spec.name] = inst
 spec.loader.exec_module(inst)
 
 COMPLET = {
-    "connexion": True, "packages": True, "entites_manquantes": [], "capacite_kwh": "10.24",
+    "connexion": True, "packages": True, "entites_manquantes": [], "capacite_kwh": "10.24", "solaire": True,
     "type_tarif": "Heures pleines / heures creuses", "prix_hp": "0.25", "prix_hc": "0.18",
     "jours_ouvres": True, "prevision_solaire": True, "notification": True,
     "simulation": True, "ecriture": False,
@@ -37,7 +37,7 @@ def test_installation_vide_commence_par_la_connexion():
 def test_parcours_une_etape_a_la_fois_dans_l_ordre():
     ctx, ordre = {"entites_manquantes": ["sensor.uhome_soc"]}, []
     ajouts = [
-        {"connexion": True}, {"packages": True}, {"entites_manquantes": []}, {"capacite_kwh": 10.24},
+        {"connexion": True}, {"packages": True}, {"entites_manquantes": []}, {"capacite_kwh": 10.24}, {"solaire": True},
         {"type_tarif": "Base", "prix_hp": 0.25}, {"jours_ouvres": True}, {"prevision_solaire": True},
         {"notification": True},
     ]
@@ -93,6 +93,21 @@ def test_capacite_absente_ou_nulle_non_faite(valeur):
 ])
 def test_contrat(ctx, fait):
     assert ("contrat" in inst.evaluer(_ctx(**ctx)).faites) is fait
+
+
+def test_batterie_sans_panneaux_pas_de_prevision_solaire_a_fournir():
+    """Une batterie peut être installée sans panneaux : l'étape « prévision solaire » est alors faite d'office."""
+    b = inst.evaluer(_ctx(solaire=False, prevision_solaire=False))
+    assert b.etat == inst.EN_SIMULATION and b.suivante is None
+    assert "prevision_solaire" in b.faites and "solaire" in b.faites
+    # Avec des panneaux, la prévision reste obligatoire.
+    assert inst.evaluer(_ctx(solaire=True, prevision_solaire=False)).suivante.cle == "prevision_solaire"
+
+
+@pytest.mark.parametrize("valeur", [None, "", "unknown"])
+def test_panneaux_question_posee_tant_qu_on_ne_sait_pas(valeur):
+    b = inst.evaluer(_ctx(solaire=valeur))
+    assert b.suivante.cle == "solaire" and b.etat == inst.A_CONFIGURER
 
 
 def test_entites_manquantes_listees():

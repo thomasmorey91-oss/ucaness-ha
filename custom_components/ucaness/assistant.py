@@ -26,7 +26,7 @@ from .coordinator import UcanessConfigEntry
 # Entrées des packages de pilotage (pilotage/packages/*.yaml).
 E_SIMULATION = "input_boolean.jarvis_mode_simulation"
 # Étapes qui se règlent par un court dialogue dans la réparation elle-même (repairs.py).
-ETAPES_A_QUESTIONS = ("batterie", "contrat")
+ETAPES_A_QUESTIONS = ("batterie", "solaire", "contrat")
 E_NOTIFICATION = "input_text.jarvis_service_notification"
 E_JOURS_OUVRES = "binary_sensor.workday_sensor"
 E_PREVISIONS = (
@@ -48,7 +48,14 @@ def construire_contexte(hass: HomeAssistant, entry: UcanessConfigEntry) -> dict[
     simulation = _etat(hass, E_SIMULATION)
     notification = _etat(hass, E_NOTIFICATION)
     options = entry.options
+    # Panneaux solaires : la réponse de l'utilisateur fait foi ; à défaut, une production déjà
+    # mesurée par l'onduleur suffit à le savoir. Sinon la question est posée.
+    solaire = reglages.valeur(hass, entry, "solaire")
+    if solaire is None:
+        produit = ((coordinator.data or {}).get("values") or {}).get("energy_solar_total")
+        solaire = True if (produit or 0) > 0 else None
     return {
+        "solaire": solaire,
         "connexion": bool(coordinator.last_update_success and coordinator.data),
         "packages": hass.states.get(E_SIMULATION) is not None,
         "entites_manquantes": [e for e in ENTITES_PILOTAGE if hass.states.get(e) is None],

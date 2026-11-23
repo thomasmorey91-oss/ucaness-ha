@@ -190,7 +190,8 @@ async def test_assistant_installation_pas_a_pas(hass, fake_client):
     etat = hass.states.get("sensor.ucaness_installation")
     assert etat.state == "a_configurer"
     assert etat.attributes["etape_suivante"]["cle"] == "packages"
-    assert etat.attributes["etapes_faites"] == ["connexion", "entites"]
+    # « solaire » : l'onduleur a déjà mesuré une production, la question n'est pas posée.
+    assert etat.attributes["etapes_faites"] == ["connexion", "entites", "solaire"]
     assert _issues(hass) == ["etape_packages"]
 
     # Packages installés, capacité à 0 : étape « batterie ».
@@ -736,3 +737,52 @@ async def test_evaluer_offres_calcul_seul(hass, cloud):
     assert resp["offres_ecartees"][0]["nom"] == "Couleurs"
     assert resp["puissance"]["conseil"] == "baisser" and resp["puissance"]["sur"] is False
     assert cloud.updates == []          # rien n'est parti vers l'onduleur
+
+
+# ------------------------------------------------------------------ batterie sans panneaux
+async def _detail_sans_solaire(self, code, tz=3600):
+    """Réponse du portail d'un onduleur qui n'a jamais rien produit (batterie sans panneaux)."""
+    detail = fx("detail_load")
+    for cle in ("solar_power", "usage_solar_today", "usage_solar_month", "usage_solar_total"):
+        detail["status"][cle] = 0
+    return detail
+
+
+async def test_production_mesuree_la_question_des_panneaux_n_est_pas_posee(hass, fake_client):
+    """L'onduleur a déjà mesuré une production : l'assistant sait qu'il y a des panneaux."""
+    await _entrees_du_pilotage(hass)
+    await _create_entry(hass)
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
+    await _relire(hass)
+    assert "solaire" in hass.states.get("sensor.ucaness_installation").attributes["etapes_faites"]
+    assert _issues(hass) == ["etape_contrat"]
+    assert hass.states.get("switch.ucaness_solaire").state == "unknown"       # constaté, pas déclaré
+
+
+async def test_batterie_sans_panneaux(hass, fake_client):
+    """Aucune production mesurée : la question est posée ; sans panneaux, la prévision solaire
+    n'est plus demandée et l'installation peut passer en simulation."""
+    with patch.object(FakeClient, "get_detail", _detail_sans_solaire):
+        await _entrees_du_pilotage(hass)
+        await _create_entry(hass)
+        await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
+        await _relire(hass)
+        assert _issues(hass) == ["etape_solaire"]
+        flux, entry = await _flux(hass, "solaire")
+        assert (await flux.async_step_init())["type"] is FlowResultType.FORM
+        fin = await flux.async_step_init({"solaire": False})
+        assert fin["type"] is FlowResultType.CREATE_ENTRY
+        await hass.async_block_till_done()
+        assert entry.options["reglages"]["solaire"] is False
+        assert hass.states.get("switch.ucaness_solaire").state == "off"
+        assert _issues(hass) == ["etape_contrat"]
+
+        hass.states.async_set("input_boolean.jarvis_mode_simulation", "on")
+        for entite, valeur in (("number.ucaness_prix_hp", 0.30), ("number.ucaness_prix_hc", 0.18)):
+            await hass.services.async_call("number", "set_value", {"entity_id": entite, "value": valeur}, blocking=True)
+        hass.states.async_set("binary_sensor.workday_sensor", "on")
+        await _relire(hass)
+        etat = hass.states.get("sensor.ucaness_installation")
+        assert etat.state == "en_simulation"
+        assert "prevision_solaire" in etat.attributes["etapes_faites"]
+        assert _issues(hass) == ["etape_notifications"]
