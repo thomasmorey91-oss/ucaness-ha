@@ -67,7 +67,12 @@ input_boolean:
   jarvis_mode_simulation:
     name: "Batterie : mode simulation (aucune consigne envoyée)"
     icon: mdi:test-tube
-    initial: true   # sécurité : revient en simulation à chaque redémarrage
+    # Pas de valeur « initial » : l'état est restauré au redémarrage. Sauf si
+    # « Batterie : garder le mode réel après un redémarrage » est allumé, l'automatisation
+    # « simulation au démarrage » rallume la simulation à chaque démarrage (sécurité par défaut).
+  jarvis_simulation_conserver:
+    name: "Batterie : garder le mode réel après un redémarrage"
+    icon: mdi:restart
   jarvis_batterie_plan_actif:
     name: "Batterie : recharge de nuit programmée (arbitrage horaire en cours)"
     icon: mdi:battery-charging-medium
@@ -625,6 +630,8 @@ template:
           stock_fin_autoconsommation_kwh: "{{ gain.stock_fin_autoconsommation_kwh }}"
           mode: "{{ 'simulation' if is_state('input_boolean.jarvis_mode_simulation', 'on') else 'réel' }}"
       # Cumuls : chaque jour n'est ajouté qu'une fois (recalcul manuel sans double compte).
+      # Home Assistant convertit l'attribut « annee » (« 2026 ») en nombre : on le compare
+      # toujours sous forme de texte, sinon le cumul de l'année repart de zéro chaque jour.
       - name: "Jarvis gain réel du mois"
         unique_id: jarvis_gain_reel_mois
         unit_of_measurement: "EUR"
@@ -632,7 +639,7 @@ template:
         icon: mdi:piggy-bank
         state: >
           {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
-          {% set prec = (this.state | float(0)) if a.get('mois') == gain.jour[:7] else 0 %}
+          {% set prec = (this.state | float(0)) if (a.get('mois') | string) == gain.jour[:7] else 0 %}
           {% if gain.valide and a.get('dernier_jour') != gain.jour %}{{ (prec + gain.gain) | round(2) }}{% else %}{{ prec | round(2) }}{% endif %}
         attributes:
           mois: "{{ gain.jour[:7] }}"
@@ -641,7 +648,7 @@ template:
             {{ gain.jour if gain.valide else a.get('dernier_jour') }}
           jours_comptes: >
             {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
-            {% set n = (a.get('jours_comptes') | int(0)) if a.get('mois') == gain.jour[:7] else 0 %}
+            {% set n = (a.get('jours_comptes') | int(0)) if (a.get('mois') | string) == gain.jour[:7] else 0 %}
             {{ n + 1 if (gain.valide and a.get('dernier_jour') != gain.jour) else n }}
       - name: "Jarvis gain réel de l'année"
         unique_id: jarvis_gain_reel_annee
@@ -650,7 +657,7 @@ template:
         icon: mdi:piggy-bank
         state: >
           {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
-          {% set prec = (this.state | float(0)) if a.get('annee') == gain.jour[:4] else 0 %}
+          {% set prec = (this.state | float(0)) if (a.get('annee') | string) == gain.jour[:4] else 0 %}
           {% if gain.valide and a.get('dernier_jour') != gain.jour %}{{ (prec + gain.gain) | round(2) }}{% else %}{{ prec | round(2) }}{% endif %}
         attributes:
           annee: "{{ gain.jour[:4] }}"
@@ -659,7 +666,7 @@ template:
             {{ gain.jour if gain.valide else a.get('dernier_jour') }}
           jours_comptes: >
             {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
-            {% set n = (a.get('jours_comptes') | int(0)) if a.get('annee') == gain.jour[:4] else 0 %}
+            {% set n = (a.get('jours_comptes') | int(0)) if (a.get('annee') | string) == gain.jour[:4] else 0 %}
             {{ n + 1 if (gain.valide and a.get('dernier_jour') != gain.jour) else n }}
 
 automation:
@@ -690,6 +697,52 @@ automation:
       - action: input_number.set_value
         target: { entity_id: input_number.jarvis_batterie_puissance_charge }
         data: { value: 3 }
+
+  - id: jarvis_batterie_simulation_au_demarrage
+    alias: "Jarvis · Batterie : simulation au démarrage"
+    description: >
+      Par défaut, remet « Batterie : mode simulation » à chaque démarrage de Home Assistant
+      (rien n'est envoyé tant qu'il n'est pas éteint). Ne fait rien si « Batterie : garder le mode
+      réel après un redémarrage » est allumé : le mode d'avant le redémarrage est alors conservé.
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: input_boolean.jarvis_simulation_conserver
+            state: "on"
+    actions:
+      - action: input_boolean.turn_on
+        target: { entity_id: input_boolean.jarvis_mode_simulation }
+
+  - id: jarvis_batterie_apercu_journal
+    alias: "Jarvis · Batterie : aperçu de 22h30 (journal)"
+    description: >
+      Journalise le calcul d'aperçu de 22h30 (aucune commande envoyée). La décision réelle
+      est prise au début des heures creuses avec le SOC du moment.
+    mode: single
+    triggers:
+      - trigger: time
+        at: "22:30:00"
+    conditions:
+      - condition: template
+        value_template: >
+          {{ states('input_select.jarvis_strategie') in ['unknown', 'unavailable', 'Heures pleines / heures creuses (calcul v7)'] }}
+    actions:
+      - delay: "00:00:20"
+      - action: logbook.log
+        data:
+          name: "Jarvis batterie"
+          entity_id: sensor.jarvis_recharge_reseau_prevue
+          message: >
+            [aperçu] SOC {{ states('sensor.uhome_soc') }} %, {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'justification') }}
+            Solaire prévu {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_prevu_kwh') }} kWh
+            (P10-P90 : {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_p10_kwh') }} à {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_p90_kwh') }} kWh,
+            prévision du {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'prevision_solaire_maj') }}).
+            Décision définitive au début des heures creuses.
 
   - id: jarvis_batterie_decision_du_soir
     alias: "Jarvis · Batterie : décision du soir (journal)"
@@ -842,6 +895,13 @@ automation:
                   message: >
                     La plage de charge n'a pas pu être ajustée ; celle programmée à 23h reste en place.
                     Voir le journal de Home Assistant.
+            else:
+              - action: logbook.log
+                data:
+                  name: "Jarvis batterie"
+                  entity_id: sensor.jarvis_recharge_reseau_prevue
+                  message: >
+                    [réel] Réévaluation appliquée et confirmée : {% if plages %}plages {% for x in plages %}{{ x.debut }}-{{ x.fin }} {% endfor %}{% else %}aucune plage (réserve seule){% endif %}.
 
   - id: jarvis_batterie_retour_autoconsommation
     alias: "Jarvis · Batterie : retour en autoconsommation après la recharge"

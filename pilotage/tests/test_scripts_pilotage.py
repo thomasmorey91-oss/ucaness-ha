@@ -312,6 +312,7 @@ async def test_reevaluation_ajuste_la_plage(hass, maison, freezer):
     await _a(hass, freezer, jour, dt.time(4, 28, 0))
     assert ("plages", [{"debut": "0533", "fin": "0545"}]) in calls
     assert not any(c[0] == "mode" for c in calls)
+    assert any("Réévaluation appliquée et confirmée : plages 0533-0545" in c[1] for c in calls if c[0] == "log")
 
 
 @pytest.mark.parametrize("expected_lingering_timers", [True])
@@ -329,6 +330,29 @@ async def test_reevaluation_conserve_la_plage_si_calcul_incomplet(hass, maison, 
     await _a(hass, freezer, jour, dt.time(4, 27, 50))
     await _a(hass, freezer, jour, dt.time(4, 28, 0))
     assert not any(c[0] == "plages" for c in calls)
+    assert not any("appliquée et confirmée" in c[1] for c in calls if c[0] == "log")
+
+
+@pytest.mark.parametrize("expected_lingering_timers", [True])
+async def test_apercu_de_22h30_journalise_sans_commande(hass, maison, freezer):
+    import datetime as dt
+    calls, _ = maison
+    await hass.config.async_set_time_zone("Europe/Paris")
+    hass.states.async_set("sensor.uhome_soc", "40")
+    hass.states.async_set("sensor.jarvis_recharge_reseau_prevue", "6.9", {
+        "plages": [{"debut": "0339", "fin": "0545"}], "maintien": True, "calcul_valide": True,
+        "mode": "réel", "justification": "Recharge de 6.9 kWh.", "solaire_prevu_kwh": 10.6,
+        "solaire_p10_kwh": 6.9, "solaire_p90_kwh": 12.6, "prevision_solaire_maj": "22/11 16h29"})
+    await _automatisations(hass, {"jarvis_batterie_apercu_journal"})
+    import homeassistant.util.dt as dt_util
+    jour = dt_util.now().date() + dt.timedelta(days=2)
+    await _a(hass, freezer, jour, dt.time(22, 29, 50))
+    await _a(hass, freezer, jour, dt.time(22, 30, 0))
+    logs = [c[1] for c in calls if c[0] == "log"]
+    # Le saut de date du test peut déclencher 22h30 deux fois : on vérifie le contenu.
+    assert logs and all(x.startswith("[aperçu] SOC 40 %, Recharge de 6.9 kWh.") for x in logs)
+    assert "P10-P90 : 6.9 à 12.6 kWh" in logs[0]
+    assert [c for c in calls if c[0] != "log"] == []
 
 
 async def test_notification_vers_le_service_renseigne(hass):
@@ -348,3 +372,21 @@ async def test_notification_vers_le_service_renseigne(hass):
     await hass.services.async_call("input_text", "set_value", {"entity_id": "input_text.jarvis_service_notification", "value": "notify.mobile_app_test"}, blocking=True)
     await hass.services.async_call("script", "jarvis_notifier", {"niveau": "intervention", "titre": "Essai", "message": "ok"}, blocking=True)
     assert recu and recu[0]["message"] == "ok"
+
+
+@pytest.mark.parametrize("conserver,attendu", [("off", "on"), ("on", "off")])
+async def test_simulation_au_demarrage(hass, conserver, attendu):
+    """Par défaut, simulation à chaque démarrage ; le mode réel est gardé si l'option est allumée."""
+    from homeassistant.core import CoreState
+    hass.set_state(CoreState.not_running)
+    bat = _pkg("jarvis_batterie.yaml")
+    assert "initial" not in bat["input_boolean"]["jarvis_mode_simulation"]
+    assert await async_setup_component(hass, "input_boolean", {"input_boolean": bat["input_boolean"]})
+    autos = [a for a in bat["automation"] if a["id"] == "jarvis_batterie_simulation_au_demarrage"]
+    assert await async_setup_component(hass, "automation", {"automation": autos})
+    await hass.async_block_till_done()
+    await hass.services.async_call("input_boolean", "turn_off", {"entity_id": "input_boolean.jarvis_mode_simulation"}, blocking=True)
+    await hass.services.async_call("input_boolean", "turn_" + conserver, {"entity_id": "input_boolean.jarvis_simulation_conserver"}, blocking=True)
+    await hass.async_start()
+    await hass.async_block_till_done()
+    assert hass.states.get("input_boolean.jarvis_mode_simulation").state == attendu

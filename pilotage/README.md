@@ -63,7 +63,7 @@ Les règles et les calculs sont décrits dans `REGLES.md`. Pour analyser l'insta
 4. Renseigner les entrées (Paramètres → Appareils et services → Entrées) : capacité de la batterie, plancher, puissance de charge, marge, consommation journalière par défaut, tarif (heures creuses, week-end en heures creuses, prix), service de notification. Le détail est dans `REGLES.md`, § 6.
 5. Gain réel : chaque soir, `sensor.jarvis_gain_reel_du_jour` compare le coût réel des 24 dernières heures à l'autoconsommation simple simulée avec les mêmes mesures ; cumuls dans `sensor.jarvis_gain_reel_du_mois` et `sensor.jarvis_gain_reel_de_l_annee`. Les jours sans recharge, il doit rester proche de 0 : l'écart mesure la précision de la simulation.
 6. Laisser tourner quelques jours en simulation : chaque soir, le journal de bord indique la recharge qui aurait été programmée et pourquoi (entité `sensor.jarvis_recharge_reseau_prevue`).
-7. Mode réel : cocher « Écriture autorisée » dans les options de l'intégration UCANESS, puis éteindre « Batterie : mode simulation ». À refaire après chaque redémarrage de Home Assistant.
+7. Mode réel : cocher « Écriture autorisée » dans les options de l'intégration UCANESS, puis éteindre « Batterie : mode simulation ». Par défaut, la simulation revient à chaque redémarrage de Home Assistant ; pour garder le mode réel, allumer « Batterie : garder le mode réel après un redémarrage ».
 8. Alertes : renseigner le service de notification, puis allumer « Alertes Jarvis actives ».
 
 ## Tarif dynamique (facultatif)

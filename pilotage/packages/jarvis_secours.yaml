@@ -207,10 +207,10 @@ template:
           annee: "{{ trigger.event.data.fin[:4] }}"
           coupures_annee: >
             {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
-            {{ (a.get('coupures_annee') | int(0) if a.get('annee') == trigger.event.data.fin[:4] else 0) + 1 }}
+            {{ (a.get('coupures_annee') | int(0) if (a.get('annee') | string) == trigger.event.data.fin[:4] else 0) + 1 }}
           duree_annee_min: >
             {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
-            {{ ((a.get('duree_annee_min') | float(0) if a.get('annee') == trigger.event.data.fin[:4] else 0) + trigger.event.data.duree_min | float(0)) | round(0) }}
+            {{ ((a.get('duree_annee_min') | float(0) if (a.get('annee') | string) == trigger.event.data.fin[:4] else 0) + trigger.event.data.duree_min | float(0)) | round(0) }}
 
 automation:
   - id: jarvis_secours_valeurs_initiales
