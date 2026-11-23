@@ -6,6 +6,7 @@ import time
 from datetime import timedelta
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -15,6 +16,9 @@ from .api import UcanessApiError, UcanessAuthError, UcanessClient, UcanessError
 from .const import CONFIG_REFRESH_S, EVENTS_REFRESH_S
 
 _LOGGER = logging.getLogger(__name__)
+
+# Entrée de configuration UCANESS : entry.runtime_data porte le coordinateur (et son client).
+type UcanessConfigEntry = ConfigEntry[UcanessCoordinator]
 
 
 class UcanessCoordinator(DataUpdateCoordinator[dict[str, Any]]):

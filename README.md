@@ -76,14 +76,18 @@ Chemins d'écriture repérés sur le portail, **volontairement bloqués** : `/de
 
 ## 7. Tests
 
+Dépendances (Python 3.13) : `pip install -r requirements_test.txt`. Les mêmes commandes tournent dans GitHub Actions à chaque envoi et à chaque demande de fusion (`.github/workflows/tests.yml`) ; le rendu dans Chrome y est facultatif.
+
 ```
 pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py   # client et décodage (8 tests)
 pytest -p no:homeassistant -p no:socket tests/test_pilotage.py           # signature, garde-fous, écriture et relecture (28 tests)
 pytest tests/test_ha_integration.py                                       # dans Home Assistant (14 tests)
 pytest -p no:homeassistant tests/test_optimiseur.py                      # moteur du tarif dynamique (20 tests)
 pytest tools/dimensionnement/tests -q                                     # analyse et dimensionnement (14 tests)
-pytest dashboard/tests -q                                                 # tableau de bord, générateur de maison, rendu dans Chrome (14 tests)
+pytest -p no:homeassistant -p no:socket dashboard/tests -q                # tableau de bord, générateur de maison, rendu dans Chrome (14 tests)
 ```
+
+Tests du pilotage : voir `pilotage/README.md` (§ Tests).
 
 ## 8. Pilotage (versions 0.2 et 0.3)
 

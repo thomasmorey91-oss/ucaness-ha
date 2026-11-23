@@ -14,7 +14,14 @@ from homeassistant.data_entry_flow import FlowResultType
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.ucaness.api import CONFIG_KEYS, UcanessAuthError, UcanessWriteRefused, validate_settings
+from custom_components.ucaness.api import (
+    CONFIG_KEYS,
+    SETTINGS_UPDATE_PATH,
+    UcanessAuthError,
+    UcanessClient,
+    UcanessWriteRefused,
+    validate_settings,
+)
 from custom_components.ucaness.const import CONF_DEVICE_CODE, DOMAIN
 
 FIX = pathlib.Path(__file__).parent / "fixtures"
@@ -22,6 +29,11 @@ FIX = pathlib.Path(__file__).parent / "fixtures"
 
 def fx(name):
     return json.loads((FIX / f"{name}.json").read_text())
+
+
+def _client(hass, entry):
+    """Client de l'API de l'entrée chargée."""
+    return entry.runtime_data.client
 
 
 class FakeClient:
@@ -237,6 +249,94 @@ async def test_zero_windows_absent_from_cloud_are_confirmed(hass, fake_client, f
     assert resp["confirme"] is True
     client = FakeClient.instances[-1]
     assert client.writes[-1][44] == 0 and client.writes[-1][45] == 0
+
+
+# --- Vrai client derrière un faux nuage (au niveau de UcanessClient._request) ---------------------
+class FakeCloud:
+    """Répond aux chemins du portail et de l'API tierce ; applique les réglages reçus.
+
+    Le vrai UcanessClient est utilisé (envoi différentiel, plafond d'écritures, verrous) :
+    seule la requête HTTP est remplacée. Données inventées.
+    """
+
+    def __init__(self):
+        self.settings = {"charge_time1_start": 100, "charge_time1_end": 300}
+        self.updates = []
+
+    async def request(self, client, path, payload, auth, signed=False):
+        ok = {"error_code": 2000, "msg": "ok"}
+        if path == "/user/signin":
+            return {**ok, "token": "jeton-test"}
+        if path == "/device/detail/load":
+            detail = fx("detail_load")
+            detail["status"]["work_mode_str"] = "Peak Fill Mode" if self.settings.get("work_mode") else "Match Load Mode"
+            return {**ok, "data": detail}
+        if path == "/device/config":
+            return {**ok, "data": fx("device_config")}
+        if path == "/oss/event/info":
+            return {**ok, "data": fx("events")}
+        if path == "/api/v1/device/list":
+            return {**ok, "list": [{"device_id": "MA_testcode01", "inverter_model": "mr"}]}
+        if path == "/api/v1/device/config":
+            pcs = {k: v for k, v in self.settings.items() if v != 0}
+            return {**ok, "data": {"inverter_model": "mr", "pcs": {"mr": pcs}}}
+        if path == SETTINGS_UPDATE_PATH:
+            self.updates.append(payload["pcs"])
+            for item in payload["pcs"]:
+                self.settings[CONFIG_KEYS[item["set_id"]][0]] = item["set_data"]
+            return ok
+        raise AssertionError(f"chemin inattendu {path}")
+
+
+@pytest.fixture
+def cloud():
+    fake = FakeCloud()
+
+    async def _request(self, path, payload, auth, signed=False):
+        return await fake.request(self, path, payload, auth, signed)
+
+    with patch.object(UcanessClient, "_request", _request):
+        yield fake
+
+
+async def test_write_budget_survives_reload(hass, cloud, fast_readback):
+    """Le plafond d'écritures par heure n'est pas remis à zéro par un rechargement (changement d'options)."""
+    with patch("custom_components.ucaness.api.MAX_WRITES_PER_HOUR", 2), patch(
+        "custom_components.ucaness.api.MIN_WRITE_INTERVAL_S", 0
+    ):
+        entry = await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
+        client_avant = _client(hass, entry)
+        await hass.services.async_call(DOMAIN, "definir_mode", {"mode": "arbitrage_horaire"}, blocking=True)
+        await hass.services.async_call(DOMAIN, "definir_mode", {"mode": "autoconsommation"}, blocking=True)
+        assert len(cloud.updates) == 2
+
+        # Changement d'options : l'intégration se recharge avec un nouveau client.
+        hass.config_entries.async_update_entry(entry, options={**entry.options, "scan_interval": 120})
+        await hass.async_block_till_done()
+        assert _client(hass, entry) is not client_avant
+
+        with pytest.raises(ServiceValidationError, match="écritures en une heure"):
+            await hass.services.async_call(DOMAIN, "definir_mode", {"mode": "arbitrage_horaire"}, blocking=True)
+        assert len(cloud.updates) == 2   # rien n'est parti vers l'onduleur
+
+
+async def test_diagnostics_masquent_secrets_et_identifiants(hass, cloud):
+    from custom_components.ucaness.api import hash_password
+    from custom_components.ucaness.diagnostics import async_get_config_entry_diagnostics
+
+    entry = await _entry_with_options(hass, app_key="cle-app-test-123", app_secret="secret-app-test-456", write_enabled=True)
+    assert _client(hass, entry).has_token          # le jeton existe bien côté client
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    texte = json.dumps(diag, ensure_ascii=False)
+
+    for secret in ("user@example.org", hash_password("secret"), "cle-app-test-123", "secret-app-test-456", "jeton-test"):
+        assert secret not in texte, secret
+    for identifiant in ("testcode01", "S0000TEST", "REWTEST", "Maison Test"):
+        assert identifiant not in texte, identifiant
+    # Ce qui sert au diagnostic reste lisible.
+    assert diag["donnees"]["valeurs"]["soc"] == pytest.approx(41.0)
+    assert diag["entree"]["options"]["scan_interval"] == 60
+    assert diag["client"] == {"session_ouverte": True, "cle_application_presente": True, "ecriture_autorisee": True}
 
 
 # --- Tarif dynamique : actions de calcul (rien n'est envoyé) -------------------------------------

@@ -21,7 +21,7 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
@@ -45,7 +45,7 @@ from .const import (
     READBACK_ATTEMPTS,
     READBACK_DELAY_S,
 )
-from .coordinator import UcanessCoordinator
+from .coordinator import UcanessConfigEntry, UcanessCoordinator
 from . import optimiseur
 
 _LOGGER = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ MODE_SCHEMA = vol.Schema(
 )
 
 
-def _entry(hass: HomeAssistant, call: ServiceCall) -> ConfigEntry:
+def _entry(hass: HomeAssistant, call: ServiceCall) -> UcanessConfigEntry:
     entry_id = call.data.get(ATTR_ENTRY)
     entries = [
         e
@@ -117,11 +117,11 @@ def _entry(hass: HomeAssistant, call: ServiceCall) -> ConfigEntry:
     return entries[0]
 
 
-def _coordinator(hass: HomeAssistant, entry: ConfigEntry) -> UcanessCoordinator:
-    return hass.data[DOMAIN][entry.entry_id]
+def _coordinator(hass: HomeAssistant, entry: UcanessConfigEntry) -> UcanessCoordinator:
+    return entry.runtime_data
 
 
-def _require_write(entry: ConfigEntry) -> None:
+def _require_write(entry: UcanessConfigEntry) -> None:
     if not entry.options.get(CONF_WRITE_ENABLED, False):
         raise ServiceValidationError(
             "Écriture vers l'onduleur désactivée (option « Écriture autorisée » de l'intégration UCANESS)"
@@ -129,7 +129,7 @@ def _require_write(entry: ConfigEntry) -> None:
 
 
 async def _write_and_verify(
-    hass: HomeAssistant, entry: ConfigEntry, items: dict[int, int], label: str
+    hass: HomeAssistant, entry: UcanessConfigEntry, items: dict[int, int], label: str
 ) -> dict[str, Any]:
     coordinator = _coordinator(hass, entry)
     code = entry.data[CONF_DEVICE_CODE]

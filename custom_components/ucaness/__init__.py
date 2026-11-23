@@ -6,7 +6,8 @@ horaire, plages de charge) par l'API tierce signée d'UCanpower, seulement si l'
 """
 from __future__ import annotations
 
-from homeassistant.config_entries import ConfigEntry
+from collections import deque
+
 from homeassistant.const import CONF_EMAIL, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
@@ -20,10 +21,11 @@ from .const import (
     CONF_DEVICE_CODE,
     CONF_PASSWORD_MD5,
     CONF_SCAN_INTERVAL,
+    DATA_WRITE_LOG,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
-from .coordinator import UcanessCoordinator
+from .coordinator import UcanessConfigEntry, UcanessCoordinator
 from .services import async_setup_services
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
@@ -35,29 +37,29 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: UcanessConfigEntry) -> bool:
+    # Plafond d'écritures par onduleur, conservé d'un rechargement à l'autre de l'entrée.
+    write_log = hass.data.setdefault(DATA_WRITE_LOG, {}).setdefault(entry.data[CONF_DEVICE_CODE], deque())
     client = UcanessClient(
         async_get_clientsession(hass),
         entry.data[CONF_EMAIL],
         entry.data[CONF_PASSWORD_MD5],
         app_key=entry.options.get(CONF_APP_KEY),
         app_secret=entry.options.get(CONF_APP_SECRET),
+        write_log=write_log,
     )
     scan = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = UcanessCoordinator(hass, client, entry.data[CONF_DEVICE_CODE], scan)
     await coordinator.async_config_entry_first_refresh()
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
-    return unloaded
+async def async_unload_entry(hass: HomeAssistant, entry: UcanessConfigEntry) -> bool:
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-async def _async_reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _async_reload(hass: HomeAssistant, entry: UcanessConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)

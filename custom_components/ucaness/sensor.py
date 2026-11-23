@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -14,7 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from . import parser
 from .const import CONF_DEVICE_CODE, DOMAIN
-from .coordinator import UcanessCoordinator
+from .coordinator import UcanessConfigEntry, UcanessCoordinator
 
 DEVICE_CLASSES = {
     "power": SensorDeviceClass.POWER,
@@ -32,7 +31,7 @@ STATE_CLASSES = {
 }
 
 
-def device_info(entry: ConfigEntry, coordinator: UcanessCoordinator) -> DeviceInfo:
+def device_info(entry: UcanessConfigEntry, coordinator: UcanessCoordinator) -> DeviceInfo:
     info = ((coordinator.data or {}).get("raw", {}).get("detail", {}) or {}).get("device_info") or {}
     return DeviceInfo(
         identifiers={(DOMAIN, entry.data[CONF_DEVICE_CODE])},
@@ -44,15 +43,17 @@ def device_info(entry: ConfigEntry, coordinator: UcanessCoordinator) -> DeviceIn
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    coordinator: UcanessCoordinator = hass.data[DOMAIN][entry.entry_id]
+async def async_setup_entry(
+    hass: HomeAssistant, entry: UcanessConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
+    coordinator = entry.runtime_data
     async_add_entities(UcanessSensor(coordinator, entry, m) for m in parser.MEASURES)
 
 
 class UcanessSensor(CoordinatorEntity[UcanessCoordinator], SensorEntity):
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: UcanessCoordinator, entry: ConfigEntry, measure: parser.Measure) -> None:
+    def __init__(self, coordinator: UcanessCoordinator, entry: UcanessConfigEntry, measure: parser.Measure) -> None:
         super().__init__(coordinator)
         self._measure = measure
         self._attr_unique_id = f"{entry.data[CONF_DEVICE_CODE]}_{measure.key}"
