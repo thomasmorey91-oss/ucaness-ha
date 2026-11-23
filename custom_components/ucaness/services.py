@@ -122,6 +122,10 @@ OFFRES_SCHEMA = vol.Schema(
         vol.Optional("jours_non_ouvres", default=list): vol.All(cv.ensure_list, [cv.date]),
         vol.Optional("puissances_max_kva", default=list): vol.All(cv.ensure_list, [vol.Any(None, vol.Coerce(float))]),
         vol.Optional("mesure_fine", default=False): cv.boolean,
+        # Batterie : pour estimer la recharge de nuit avec une offre à heures creuses.
+        vol.Optional("capacite_utile_kwh"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=200))),
+        vol.Optional("rendement_pct", default=95): vol.All(vol.Coerce(float), vol.Range(min=50, max=100)),
+        vol.Optional("recharge_deja_active", default=False): cv.boolean,
     }
 )
 MODE_SCHEMA = vol.Schema(
@@ -350,6 +354,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 [_offre(o) for o in d["offres"]], mesures, d["puissance_kva"],
                 contrat_actuel=_offre(actuel) if actuel else None,
                 jours_non_ouvres=d["jours_non_ouvres"], aujourdhui=dt_util.now().date(),
+                batterie=tarifs.Batterie(d["capacite_utile_kwh"], d["rendement_pct"] / 100) if d.get("capacite_utile_kwh") else None,
+                recharge_deja_active=d["recharge_deja_active"],
             )
         )
         resultat["puissance"] = tarifs.analyser_puissance(

@@ -196,6 +196,18 @@
         "mesure_fine": {
           "name": "Peaks read from the meter",
           "description": "Turn on if the peak powers come from the meter itself and not from an estimate."
+        },
+        "capacite_utile_kwh": {
+          "name": "Usable battery capacity",
+          "description": "Capacity above the floor. When given, night charging is estimated for off-peak offers (upper estimate)."
+        },
+        "rendement_pct": {
+          "name": "Efficiency",
+          "description": "Battery efficiency one way (charge or discharge)."
+        },
+        "recharge_deja_active": {
+          "name": "Night charging already active",
+          "description": "Turn on if the house already charges the battery off-peak: the measured grid import already reflects it."
         }
       }
     }

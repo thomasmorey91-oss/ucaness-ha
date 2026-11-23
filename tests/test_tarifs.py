@@ -141,6 +141,62 @@ def test_classer_maison_qui_consomme_le_jour_prefere_le_prix_unique():
     assert r["classement"][0]["nom"] == "Prix unique" and r["contrat_actuel"] is None
 
 
+# --- recharge de nuit ----------------------------------------------------------------------------
+BATTERIE = t.Batterie(capacite_utile_kwh=10.0, rendement=0.95)
+JOURNEE = lambda d: 1.0 if 7 <= d.hour < 22 else 0.1          # maison qui consomme le jour : 15 kWh en heures pleines
+
+
+def test_recharge_de_nuit_estimee_pour_une_offre_a_heures_creuses():
+    sans = t.evaluer(HPHC, _soutirage(365, JOURNEE), 6, aujourdhui=JOUR)
+    avec = t.evaluer(HPHC, _soutirage(365, JOURNEE), 6, aujourdhui=JOUR, batterie=BATTERIE)
+    assert sans.gain_recharge_nuit_eur_an == 0 and sans.cout_retenu_eur == sans.cout_annuel_eur
+    # Chaque jour : 15,1 kWh en heures pleines (6h30-22h30), la batterie en fournit 10 × 0,95 = 9,5 kWh,
+    # rechargés en heures creuses à 0,20 / 0,95² au lieu de 0,30.
+    gain_jour = 9.5 * (0.30 - 0.20 / 0.95 ** 2)
+    assert avec.gain_recharge_nuit_eur_an == pytest.approx(365 * gain_jour)
+    assert avec.cout_annuel_eur == pytest.approx(sans.cout_annuel_eur)          # le coût mesuré reste donné
+    assert avec.cout_retenu_eur == pytest.approx(sans.cout_annuel_eur - 365 * gain_jour)
+    assert "estimation haute" in " ".join(avec.remarques)
+    r = avec.resume()
+    assert r["cout_annuel_eur"] < r["cout_annuel_tel_que_mesure_eur"] and r["gain_recharge_de_nuit_eur_an"] > 0
+
+
+def test_recharge_de_nuit_limitee_par_le_besoin_du_jour():
+    petite = lambda d: 0.2 if 7 <= d.hour < 22 else 0.1                         # 3,1 kWh en heures pleines (6h30-22h30)
+    e = t.evaluer(HPHC, _soutirage(30, petite), 6, aujourdhui=JOUR, batterie=BATTERIE)
+    assert e.gain_recharge_nuit_eur_an == pytest.approx(365 * 3.10 * (0.30 - 0.20 / 0.95 ** 2))
+
+
+def test_recharge_de_nuit_non_comptee_si_elle_n_est_pas_rentable_ou_deja_active_ou_prix_unique():
+    serree = t.Offre("Écart faible", t.HPHC, {6: 160.0}, {"hp": 0.21, "hc": 0.20}, plages_hc=(("22:30", "06:30"),))
+    e = t.evaluer(serree, _soutirage(60, JOURNEE), 6, batterie=BATTERIE)
+    assert e.gain_recharge_nuit_eur_an == 0 and "trop faible" in " ".join(e.remarques)
+    assert t.evaluer(HPHC, _soutirage(60, JOURNEE), 6, batterie=BATTERIE, recharge_deja_active=True).gain_recharge_nuit_eur_an == 0
+    assert t.evaluer(BASE, _soutirage(60, JOURNEE), 6, batterie=BATTERIE).gain_recharge_nuit_eur_an == 0
+    mal = t.evaluer(HPHC, _soutirage(60, JOURNEE), 6, batterie=t.Batterie(0, 0.95))
+    assert mal.gain_recharge_nuit_eur_an == 0 and "mal décrite" in " ".join(mal.remarques)
+
+
+def test_meilleure_offre_change_avec_la_batterie():
+    """Maison qui consomme le jour : sans batterie le prix unique gagne ; avec la recharge de nuit,
+    l'offre à heures creuses passe devant, et le conseil est de changer de formule."""
+    mesures = _soutirage(365, JOURNEE)
+    sans = t.classer([BASE, HPHC], mesures, 6, contrat_actuel=BASE, aujourdhui=JOUR)
+    assert sans["meilleure_offre"]["nom"] == "Prix unique" and sans["conseil"] == "garder_le_contrat_actuel"
+    avec = t.classer([BASE, HPHC], mesures, 6, contrat_actuel=BASE, aujourdhui=JOUR, batterie=BATTERIE)
+    assert avec["meilleure_offre"]["nom"] == "Nuit" and avec["conseil"] == "changer_de_formule"
+    assert avec["meilleure_offre"]["ecart_avec_contrat_actuel_eur_an"] < 0
+    assert avec["meilleure_offre"] == avec["classement"][0]
+
+
+def test_conseils():
+    mesures = _soutirage(365)
+    assert t.classer([], mesures, 6)["conseil"] == "aucune_offre_evaluee"
+    assert t.classer([BASE], mesures, 6)["conseil"] == "meilleure_offre_evaluee"
+    moins_chere = t.Offre("Moins chère", t.BASE, {6: 140.0}, {"base": 0.24}, "Fournisseur D")
+    assert t.classer([moins_chere], mesures, 6, contrat_actuel=BASE)["conseil"] == "changer_d_offre"
+
+
 # --- puissance souscrite -------------------------------------------------------------------------
 @pytest.mark.parametrize(("pointe", "souscrite", "conseil", "recommandee"), [
     (4.9, 9, "baisser", 6), (5.6, 6, "augmenter", 9), (5.0, 6, "garder", 6), (8.5, 9, "augmenter", 12), (2.0, 6, "baisser", 3),

@@ -18,7 +18,10 @@ from homeassistant.helpers import selector
 from . import assistant, reglages
 from .const import DOMAIN
 
-CAPACITE_MODULE_KWH = 5.12   # module ULB-5120MT ; simple proposition, l'utilisateur confirme ou corrige
+# Gamme résidentielle UHome (monophasée 3 à 8 kW, triphasée UHome-KT 8 à 20 kW) : modules de
+# 5,12 kWh, 2 à 8 modules (fiches techniques du constructeur). Simple proposition : l'utilisateur
+# confirme ou corrige.
+CAPACITE_MODULE_KWH = 5.12
 DEFAUTS = {"plancher": 20.0, "puissance_charge": 3.0, "rendement": 95.0, "marge": 10.0,
            "type_tarif": reglages.TARIF_HPHC, "hc_debut": "22:30:00", "hc_fin": "06:30:00",
            "hc_jours_non_ouvres": False, "prix_injection": 0.0}

@@ -196,6 +196,18 @@
         "mesure_fine": {
           "name": "Maximums lus sur le compteur",
           "description": "À activer si les puissances maximales viennent du compteur (prise TIC) et non d'une estimation."
+        },
+        "capacite_utile_kwh": {
+          "name": "Capacité utile de la batterie",
+          "description": "Capacité au-dessus du plancher. Si elle est donnée, la recharge de nuit est estimée pour les offres à heures creuses (estimation haute)."
+        },
+        "rendement_pct": {
+          "name": "Rendement",
+          "description": "Rendement de la batterie dans un sens (charge ou décharge)."
+        },
+        "recharge_deja_active": {
+          "name": "Recharge de nuit déjà en service",
+          "description": "À activer si la maison recharge déjà la batterie en heures creuses : le soutirage mesuré en tient déjà compte."
         }
       }
     }

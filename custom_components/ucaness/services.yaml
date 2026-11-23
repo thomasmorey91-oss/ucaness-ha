@@ -144,3 +144,14 @@ evaluer_offres:
       default: false
       selector:
         boolean:
+    capacite_utile_kwh:
+      selector:
+        number: { min: 0, max: 200, step: 0.01, unit_of_measurement: kWh, mode: box }
+    rendement_pct:
+      default: 95
+      selector:
+        number: { min: 50, max: 100, step: 0.5, unit_of_measurement: "%", mode: box }
+    recharge_deja_active:
+      default: false
+      selector:
+        boolean:
