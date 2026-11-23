@@ -12,6 +12,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 from .api import UcanessApiError, UcanessAuthError, UcanessClient, UcanessError, hash_password
+from .reglages import CONF_REGLAGES
 from .const import (
     CONF_APP_KEY,
     CONF_APP_SECRET,
@@ -115,6 +116,9 @@ class UcanessOptionsFlow(config_entries.OptionsFlow):
                 CONF_APP_SECRET: (user_input.get(CONF_APP_SECRET) or "").strip() or options.get(CONF_APP_SECRET, ""),
                 CONF_WRITE_ENABLED: bool(user_input.get(CONF_WRITE_ENABLED, False)),
             }
+            # Les réglages du pilotage (reglages.py) vivent aussi dans les options : on les garde.
+            if CONF_REGLAGES in options:
+                data[CONF_REGLAGES] = options[CONF_REGLAGES]
             return self.async_create_entry(title="", data=data)
         schema = vol.Schema(
             {

@@ -58,7 +58,7 @@ Un tableau de bord Home Assistant qui prolonge le portail UCANESS : même police
          filename: dashboards/ucaness-home-assistant.yaml
    ```
    Le nom `ucaness-maison` donne l'adresse des onglets (`/ucaness-maison/maison`, `/ucaness-maison/batterie`). Si vous en choisissez un autre, changez aussi les `path` des onglets dans l'en-tête.
-5. **Entités.** Renommer les entités de l'intégration (Paramètres → Entités, champ « ID de l'entité »). Celles du tableau `pilotage/README.md` (étape 2), plus :
+5. **Entités.** Sur une installation neuve de l'intégration, les entités portent déjà l'identifiant attendu. Sur une installation plus ancienne, les renommer (Paramètres → Entités, champ « ID de l'entité ») : celles du tableau `pilotage/README.md` (étape 2), plus :
 
    | Entité d'origine | ID attendu |
    |---|---|

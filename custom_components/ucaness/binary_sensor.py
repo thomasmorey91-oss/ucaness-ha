@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import BATTERY_CHARGE_TEMP_MAX, BATTERY_CHARGE_TEMP_MIN, CONF_DEVICE_CODE, STALE_AFTER_S
+from .const import BATTERY_CHARGE_TEMP_MAX, BATTERY_CHARGE_TEMP_MIN, CONF_DEVICE_CODE, OBJECT_IDS, STALE_AFTER_S
 from .coordinator import UcanessConfigEntry, UcanessCoordinator
 from .sensor import device_info
 
@@ -77,6 +77,8 @@ class UcanessCheck(CoordinatorEntity[UcanessCoordinator], BinarySensorEntity):
         self._attr_name = check.name
         self._attr_device_class = check.device_class
         self._attr_device_info = device_info(entry, coordinator)
+        if check.key in OBJECT_IDS:
+            self.entity_id = f"binary_sensor.{OBJECT_IDS[check.key]}"
 
     @property
     def is_on(self) -> bool | None:

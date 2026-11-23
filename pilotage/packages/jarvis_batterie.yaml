@@ -63,6 +63,19 @@
 #   binary_sensor.workday_sensor (Workday)
 # =============================================================================
 
+input_select:
+  # Une batterie peut être installée sans panneaux solaires. « Détection automatique » : pas de
+  # solaire si l'onduleur n'a jamais rien produit (production totale à 0) et que MPPT 1 et MPPT 2
+  # sont à 0 ; dans le doute (une de ces mesures absente), la maison est considérée AVEC panneaux,
+  # et la prévision solaire reste exigée (repli sûr).
+  jarvis_solaire:
+    name: "Batterie : panneaux solaires"
+    icon: mdi:solar-power
+    options:
+      - "Détection automatique"
+      - "Avec panneaux"
+      - "Sans panneaux"
+
 input_boolean:
   jarvis_mode_simulation:
     name: "Batterie : mode simulation (aucune consigne envoyée)"
@@ -220,7 +233,10 @@ template:
           capteur_pv: >
             {{ 'sensor.solcast_pv_forecast_prevision_aujourdhui' if jour_cible == now().date() | string else 'sensor.solcast_pv_forecast_prevision_demain' }}
           # Production solaire prévue heure par heure (kWh) : médiane (pv_estimate).
+          # Sans panneaux solaires (binary_sensor.jarvis_sans_solaire) : production nulle, connue.
           pv_h: >
+            {% if is_state('binary_sensor.jarvis_sans_solaire', 'on') %}{{ [0.0] * 24 }}
+            {% else %}
             {% set dh = state_attr(capteur_pv, 'detailedHourly') or [] %}
             {% set ns = namespace(v=[]) %}
             {% for h in range(24) %}
@@ -234,9 +250,14 @@ template:
               {% set ns.v = ns.v + [n2.s | round(3)] %}
             {% endfor %}
             {{ ns.v }}
+            {% endif %}
           # Contrôle et fourchette de la prévision solaire (journal) : nombre de valeurs datées du
           # jour préparé, cumuls P10 (cas défavorable) et P90 (cas favorable), heure de mise à jour.
+          # Sans panneaux, il n'y a pas de prévision à attendre : « ok » sans valeur.
           pv_info: >
+            {% if is_state('binary_sensor.jarvis_sans_solaire', 'on') %}
+            {{ {'ok': true, 'valeurs': 0, 'p10': 0, 'p90': 0, 'maj': none, 'age_h': none, 'sans_solaire': true} }}
+            {% else %}
             {% set dh = state_attr(capteur_pv, 'detailedHourly') or [] %}
             {% set ns = namespace(n=0, p10=0, p90=0) %}
             {% for e in dh %}
@@ -250,7 +271,8 @@ template:
             {% set maj = (m | as_datetime(none)) if m not in ['unknown', 'unavailable', ''] else none %}
             {{ {'ok': ns.n > 0, 'valeurs': ns.n, 'p10': ns.p10 | round(1), 'p90': ns.p90 | round(1),
                 'maj': (maj | as_local).strftime('%d/%m %Hh%M') if maj else none,
-                'age_h': (((now() - maj).total_seconds() / 3600) | round(1)) if maj else none} }}
+                'age_h': (((now() - maj).total_seconds() / 3600) | round(1)) if maj else none, 'sans_solaire': false} }}
+            {% endif %}
           calcul: >
             {% set cap_brute = states('input_number.jarvis_batterie_capacite') | float(0) %}
             {% set plancher = states('input_number.jarvis_batterie_plancher') | float(10) %}
@@ -417,6 +439,7 @@ template:
           prevision_solaire_maj: "{{ pv_info.maj }}"
           prevision_solaire_age_h: "{{ pv_info.age_h }}"
           prevision_solaire_ok: "{{ pv_info.ok }}"
+          sans_solaire: "{{ pv_info.get('sans_solaire', false) }}"
           batterie_pleine_de_toute_facon: "{{ calcul.borne_capacite }}"
           methode_conso: "Moyenne pondérée des 7 derniers jours (même type de jour en priorité)"
 
@@ -668,6 +691,29 @@ template:
             {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
             {% set n = (a.get('jours_comptes') | int(0)) if (a.get('annee') | string) == gain.jour[:4] else 0 %}
             {{ n + 1 if (gain.valide and a.get('dernier_jour') != gain.jour) else n }}
+
+  # ---------------------------------------------------------------------------
+  # Batterie sans panneaux solaires : choix de l'utilisateur, ou détection (voir input_select).
+  # Lu par le calcul de nuit et par le tarif dynamique : production prévue nulle, sans prévision.
+  # ---------------------------------------------------------------------------
+  - binary_sensor:
+      - name: "Jarvis sans solaire"
+        unique_id: jarvis_sans_solaire
+        icon: mdi:solar-power-variant-outline
+        state: >
+          {% set choix = states('input_select.jarvis_solaire') %}
+          {% if choix == 'Sans panneaux' %}true
+          {% elif choix == 'Avec panneaux' %}false
+          {% else %}
+            {% set total = states('sensor.uhome_production_solaire_totale') | float(-1) %}
+            {% set p1 = states('sensor.uhome_puissance_mppt_1') | float(-1) %}
+            {% set p2 = states('sensor.uhome_puissance_mppt_2') | float(-1) %}
+            {{ total == 0 and p1 == 0 and p2 == 0 }}
+          {% endif %}
+        attributes:
+          source: >
+            {% set choix = states('input_select.jarvis_solaire') %}
+            {{ 'choix de l\'utilisateur' if choix in ['Sans panneaux', 'Avec panneaux'] else 'détection (production totale et MPPT 1 et 2)' }}
 
 automation:
   - id: jarvis_batterie_valeurs_initiales

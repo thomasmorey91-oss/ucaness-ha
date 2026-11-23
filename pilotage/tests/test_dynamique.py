@@ -330,6 +330,46 @@ async def test_plan_moteur_recoit_les_donnees(hass, temp_hors_plage, temperature
     assert etat.attributes["valide"] is True
 
 
+async def test_plan_moteur_sans_panneaux_solaires(hass):
+    """Batterie sans panneaux : le moteur reçoit une production nulle sur 48 h, sans Solcast."""
+    await hass.config.async_set_time_zone("Europe/Paris")
+    bat, dyn = _pkg("jarvis_batterie.yaml"), _pkg("jarvis_dynamique.yaml")
+    recu = {}
+
+    async def check_date(call):
+        return {"binary_sensor.workday_sensor": {"workday": True}}
+
+    async def stats(call):
+        return {"statistics": {}}
+
+    async def optimiser(call):
+        recu.update(call.data)
+        return {"valide": True, "plages": [], "nombre_plages": 0, "charge_en_cours": False, "justification": "essai"}
+
+    hass.services.async_register("workday", "check_date", check_date, supports_response=SupportsResponse.ONLY)
+    hass.services.async_register("recorder", "get_statistics", stats, supports_response=SupportsResponse.ONLY)
+    hass.services.async_register("ucaness", "optimiser_charge", optimiser, supports_response=SupportsResponse.ONLY)
+    assert await async_setup_component(hass, "input_select", {"input_select": {
+        **dyn["input_select"], "jarvis_strategie": {**dyn["input_select"]["jarvis_strategie"], "initial": MOTEUR}}})
+    assert await async_setup_component(hass, "input_boolean", {"input_boolean": bat["input_boolean"]})
+    assert await async_setup_component(hass, "input_number", {"input_number": {**bat["input_number"], **dyn["input_number"]}})
+    hass.states.async_set("sensor.uhome_soc", "55")
+    hass.states.async_set("binary_sensor.uhome_temperature_hors_plage", "off")
+    hass.states.async_set("sensor.uhome_temperature_batterie", "21.5")
+    hass.states.async_set("binary_sensor.jarvis_sans_solaire", "on")
+    assert await async_setup_component(hass, "template", {"template": [dyn["template"][2]]})
+    await hass.async_block_till_done()
+    hass.bus.async_fire("jarvis_recalcul_dynamique")
+    await hass.async_block_till_done()
+    assert len(recu["solaire"]) == 48 and all(s["pv_estimate"] == 0 for s in recu["solaire"])
+    # Avec panneaux et sans Solcast, rien n'est inventé : la liste reste vide (repli sûr du moteur).
+    recu.clear()
+    hass.states.async_set("binary_sensor.jarvis_sans_solaire", "off")
+    hass.bus.async_fire("jarvis_recalcul_dynamique")
+    await hass.async_block_till_done()
+    assert recu["solaire"] == []
+
+
 # --- Configuration complète acceptée -------------------------------------------------------------
 async def test_package_dynamique_charge(hass, caplog):
     bat, tarif, alertes, dyn = (_pkg(n) for n in ("jarvis_batterie.yaml", "jarvis_tarif.yaml", "jarvis_alertes.yaml", "jarvis_dynamique.yaml"))

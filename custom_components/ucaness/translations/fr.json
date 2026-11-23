@@ -164,6 +164,52 @@
           "description": "Plages de charge disponibles sur l'onduleur (3)."
         }
       }
+    },
+    "evaluer_offres": {
+      "name": "Évaluer des offres d'électricité",
+      "description": "Calcul seul : coût annuel estimé de chaque offre sur le soutirage mesuré heure par heure (batterie déduite), classement par coût, avis sur la puissance souscrite. Formules « base » et « hphc ». Rien n'est souscrit, rien n'est envoyé à l'onduleur.",
+      "fields": {
+        "offres": {
+          "name": "Offres",
+          "description": "Liste de {nom, fournisseur, formule (base ou hphc), abonnement_eur_an {kVA: € TTC}, prix_kwh {base} ou {hp, hc} en € TTC, plages_hc [{debut, fin}], weekend_hc, source, date_prix}."
+        },
+        "contrat_actuel": {
+          "name": "Contrat actuel",
+          "description": "Même forme qu'une offre : sert de référence pour l'écart annuel."
+        },
+        "soutirage": {
+          "name": "Soutirage",
+          "description": "Liste de {debut, kwh} : énergie prise sur le réseau, une valeur par heure."
+        },
+        "puissance_kva": {
+          "name": "Puissance souscrite",
+          "description": "Puissance de l'abonnement, en kVA."
+        },
+        "jours_non_ouvres": {
+          "name": "Jours fériés",
+          "description": "Dates comptées comme un week-end pour les offres « week-end en heures creuses »."
+        },
+        "puissances_max_kva": {
+          "name": "Puissances maximales",
+          "description": "Une puissance maximale par jour, en kVA, pour l'avis sur la puissance souscrite."
+        },
+        "mesure_fine": {
+          "name": "Maximums lus sur le compteur",
+          "description": "À activer si les puissances maximales viennent du compteur (prise TIC) et non d'une estimation."
+        },
+        "capacite_utile_kwh": {
+          "name": "Capacité utile de la batterie",
+          "description": "Capacité au-dessus du plancher. Si elle est donnée, la recharge de nuit est estimée pour les offres à heures creuses (estimation haute)."
+        },
+        "rendement_pct": {
+          "name": "Rendement",
+          "description": "Rendement de la batterie dans un sens (charge ou décharge)."
+        },
+        "recharge_deja_active": {
+          "name": "Recharge de nuit déjà en service",
+          "description": "À activer si la maison recharge déjà la batterie en heures creuses : le soutirage mesuré en tient déjà compte."
+        }
+      }
     }
   },
   "selector": {
@@ -171,6 +217,109 @@
       "options": {
         "autoconsommation": "Autoconsommation",
         "arbitrage_horaire": "Arbitrage horaire"
+      }
+    }
+  },
+  "issues": {
+    "etape_connexion": {
+      "title": "UCANESS : la batterie ne répond pas",
+      "description": "L'intégration ne reçoit plus de mesures de « {appareil} ». Sans elles, rien ne peut être calculé.\n\nVérifiez la connexion de l'onduleur à Internet, puis [ouvrez l'intégration]({lien})."
+    },
+    "etape_packages": {
+      "title": "UCANESS : installer le pilotage",
+      "description": "« {appareil} » est connectée, mais le pilotage n'est pas encore installé : ce sont les packages qui décident chaque soir de la recharge de nuit.\n\n[Guide d'installation du pilotage]({lien}). Le pilotage démarre toujours en simulation : rien n'est envoyé à l'onduleur."
+    },
+    "etape_entites": {
+      "title": "UCANESS : des mesures ne sont pas reconnues par le pilotage",
+      "description": "Le pilotage lit la batterie sous des noms précis. Il ne trouve pas : {entites}.\n\nRenommez les entités correspondantes dans [Paramètres > Entités]({lien}) (champ « ID de l'entité »). Sur une installation neuve, ces noms sont donnés automatiquement."
+    },
+    "etape_batterie": {
+      "title": "UCANESS : indiquer la capacité de votre batterie",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Votre batterie",
+            "description": "L'onduleur annonce {modules} module(s) de batterie. Avec des modules de 5,12 kWh, cela fait {proposition} kWh : confirmez ou corrigez.\n\nLe plancher est le niveau sous lequel la batterie ne se décharge plus (observez le plus bas atteint une nuit sans recharge). La puissance de charge est celle que vous constatez pendant une recharge sur le réseau. Ces deux valeurs pourront être affinées plus tard.",
+            "data": {
+              "capacite": "Capacité de la batterie",
+              "plancher": "Niveau plancher",
+              "puissance_charge": "Puissance de charge sur le réseau"
+            }
+          }
+        },
+        "error": {
+          "capacite_nulle": "Indiquez une capacité supérieure à 0."
+        },
+        "abort": {
+          "entree_absente": "Cette batterie n'est plus configurée."
+        }
+      }
+    },
+    "etape_contrat": {
+      "title": "UCANESS : indiquer votre contrat d'électricité",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Votre contrat d'électricité",
+            "description": "Ces informations figurent sur votre facture. Avec un contrat sans heures creuses, choisissez « Base » et laissez les heures creuses de côté.",
+            "data": {
+              "type_tarif": "Type de contrat",
+              "prix_hp": "Prix du kWh en heures pleines (ou prix unique)",
+              "prix_hc": "Prix du kWh en heures creuses",
+              "hc_debut": "Début des heures creuses",
+              "hc_fin": "Fin des heures creuses",
+              "hc_jours_non_ouvres": "Week-end et jours fériés entièrement en heures creuses",
+              "prix_injection": "Prix de revente du surplus"
+            }
+          },
+          "bilan": {
+            "title": "Chez vous, recharger la nuit est rentable",
+            "description": "Chaque kWh rechargé en heures creuses puis consommé en heures pleines fait gagner environ {gain} centimes (rendement de la batterie compté à {rendement} % dans chaque sens).\n\nLe pilotage rechargera la nuit, juste ce qu'il faut pour tenir jusqu'au relais du soleil. Validez pour enregistrer votre contrat."
+          },
+          "bilan_non_rentable": {
+            "title": "Chez vous, recharger la nuit n'est pas rentable",
+            "description": "Avec ces prix, chaque kWh rechargé en heures creuses puis consommé en heures pleines ferait perdre environ {gain} centimes (rendement de la batterie compté à {rendement} % dans chaque sens).\n\nLe pilotage ne programmera donc pas de recharge sur le réseau ; votre batterie continuera de stocker votre production solaire. Validez pour enregistrer votre contrat."
+          },
+          "bilan_base": {
+            "title": "Contrat sans heures creuses",
+            "description": "Avec un prix unique, recharger la batterie sur le réseau n'apporte rien : le pilotage ne programmera pas de recharge de nuit. Votre batterie continuera de stocker votre production solaire. Validez pour enregistrer votre contrat."
+          }
+        },
+        "error": {
+          "prix_nul": "Indiquez un prix supérieur à 0."
+        },
+        "abort": {
+          "entree_absente": "Cette batterie n'est plus configurée."
+        }
+      }
+    },
+    "etape_jours_ouvres": {
+      "title": "UCANESS : ajouter les jours ouvrés",
+      "description": "Le pilotage distingue la semaine du week-end et des jours fériés : la consommation et, selon le contrat, les heures creuses ne sont pas les mêmes.\n\n[Ajouter l'intégration Workday]({lien}) et choisir votre pays."
+    },
+    "etape_prevision_solaire": {
+      "title": "UCANESS : ajouter la prévision de production solaire",
+      "description": "Pour ne recharger que le nécessaire, le pilotage a besoin de la production prévue aujourd'hui et demain. Sans prévision, aucune recharge n'est programmée.\n\nInstallez l'intégration Solcast PV Forecast depuis le Marketplace (contenu de la communauté, non vérifié par Home Assistant), puis [configurez-la]({lien})."
+    },
+    "etape_notifications": {
+      "title": "UCANESS : choisir où être prévenu",
+      "description": "Facultatif. Pour être prévenu d'un défaut de la batterie ou d'une programmation qui a échoué.\n\nRenseignez « Alertes : service de notification » dans [Paramètres > Entrées]({lien}), par exemple `mobile_app_mon_telephone`."
+    },
+    "etape_solaire": {
+      "title": "UCANESS : avez-vous des panneaux solaires ?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Panneaux solaires",
+            "description": "L'onduleur n'a encore mesuré aucune production solaire. Une batterie peut fonctionner avec ou sans panneaux.\n\nAvec des panneaux, la batterie stocke d'abord votre production, et le pilotage ne recharge la nuit que le complément. Sans panneaux, elle sert à acheter l'électricité aux heures les moins chères pour la consommer aux heures chères : tout dépend alors de votre contrat, que l'assistant examine à l'étape suivante.",
+            "data": {
+              "solaire": "Des panneaux solaires sont raccordés à cet onduleur"
+            }
+          }
+        },
+        "abort": {
+          "entree_absente": "Cette batterie n'est plus configurée."
+        }
       }
     }
   }

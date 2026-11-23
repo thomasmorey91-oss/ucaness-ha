@@ -13,6 +13,7 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.data_entry_flow import FlowResultType
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
 
 from custom_components.ucaness.api import (
     CONFIG_KEYS,
@@ -129,11 +130,12 @@ async def test_entities_created_with_values(hass, fake_client):
     await _create_entry(hass)
     await hass.async_block_till_done()
 
-    soc = hass.states.get("sensor.maison_test_charge_batterie_soc")
+    # Les entités lues par le pilotage portent d'emblée l'identifiant attendu (rien à renommer).
+    soc = hass.states.get("sensor.uhome_soc")
     assert soc is not None and float(soc.state) == pytest.approx(41.0)
     assert soc.attributes["unit_of_measurement"] == "%"
 
-    solar_total = hass.states.get("sensor.maison_test_production_solaire_totale")
+    solar_total = hass.states.get("sensor.uhome_production_solaire_totale")
     assert float(solar_total.state) == pytest.approx(5000.0)
     assert solar_total.attributes["state_class"] == "total_increasing"
     assert solar_total.attributes["device_class"] == "energy"
@@ -141,10 +143,136 @@ async def test_entities_created_with_values(hass, fake_client):
     dod = hass.states.get("sensor.maison_test_reglage_dod_raccorde_au_reseau")
     assert float(dod.state) == pytest.approx(90.0)
 
-    fault = hass.states.get("binary_sensor.maison_test_defaut_ou_alarme_batterie")
+    fault = hass.states.get("binary_sensor.uhome_defaut_batterie")
     assert fault.state == "off"
-    temp = hass.states.get("binary_sensor.maison_test_temperature_batterie_hors_plage_de_charge_0_50_degc")
+    temp = hass.states.get("binary_sensor.uhome_temperature_hors_plage")
     assert temp.state == "off"
+
+
+async def test_identifiants_attendus_par_le_pilotage(hass, fake_client):
+    """Installation neuve : toutes les entités que lit le pilotage existent sous le bon identifiant."""
+    from custom_components.ucaness.const import ENTITES_PILOTAGE, OBJECT_IDS
+
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    assert [e for e in ENTITES_PILOTAGE if hass.states.get(e) is None] == []
+    registre = er.async_get(hass)
+    ids = {e.entity_id.split(".", 1)[1] for e in registre.entities.values() if e.platform == DOMAIN}
+    assert set(OBJECT_IDS.values()) <= ids
+
+
+async def test_identifiant_existant_conserve(hass, fake_client):
+    """Une entité déjà enregistrée (installation existante, entité renommée) garde son identifiant."""
+    registre = er.async_get(hass)
+    registre.async_get_or_create("sensor", DOMAIN, "testcode01_soc", suggested_object_id="ma_batterie_soc")
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.ma_batterie_soc") is not None
+    assert hass.states.get("sensor.uhome_soc") is None
+
+
+# ------------------------------------------------------------------ assistant d'installation
+def _issues(hass):
+    return sorted(i.translation_key for i in ir.async_get(hass).issues.values() if i.domain == DOMAIN)
+
+
+async def _relire(hass):
+    """Nouvelle lecture de l'onduleur : l'assistant réévalue l'installation."""
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+
+async def test_assistant_installation_pas_a_pas(hass, fake_client):
+    """Batterie connectée, rien d'autre : une seule réparation à la fois, dans l'ordre du parcours."""
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    etat = hass.states.get("sensor.ucaness_installation")
+    assert etat.state == "a_configurer"
+    assert etat.attributes["etape_suivante"]["cle"] == "packages"
+    # « solaire » : l'onduleur a déjà mesuré une production, la question n'est pas posée.
+    assert etat.attributes["etapes_faites"] == ["connexion", "entites", "solaire"]
+    assert _issues(hass) == ["etape_packages"]
+
+    # Packages installés, capacité à 0 : étape « batterie ».
+    hass.states.async_set("input_boolean.jarvis_mode_simulation", "on")
+    hass.states.async_set("input_number.jarvis_batterie_capacite", "0")
+    await _relire(hass)
+    assert _issues(hass) == ["etape_batterie"]
+
+    hass.states.async_set("input_number.jarvis_batterie_capacite", "10.24")
+    hass.states.async_set("input_select.jarvis_type_tarif", "Heures pleines / heures creuses")
+    hass.states.async_set("input_number.jarvis_prix_hp", "0.25")
+    hass.states.async_set("input_number.jarvis_prix_hc", "0.18")
+    await _relire(hass)
+    assert _issues(hass) == ["etape_jours_ouvres"]
+
+    hass.states.async_set("binary_sensor.workday_sensor", "on")
+    await _relire(hass)
+    assert _issues(hass) == ["etape_prevision_solaire"]
+    assert hass.states.get("sensor.ucaness_installation").state == "a_configurer"
+
+    # Capteur Solcast présent mais sans prévision heure par heure : l'étape reste à faire.
+    hass.states.async_set("sensor.solcast_pv_forecast_prevision_demain", "12")
+    await _relire(hass)
+    assert _issues(hass) == ["etape_prevision_solaire"]
+    hass.states.async_set("sensor.solcast_pv_forecast_prevision_demain", "12", {"detailedHourly": [{"pv_estimate": 1.0}]})
+    await _relire(hass)
+
+    # Tout l'obligatoire est fait : simulation, et seule l'étape facultative reste proposée.
+    etat = hass.states.get("sensor.ucaness_installation")
+    assert etat.state == "en_simulation"
+    assert _issues(hass) == ["etape_notifications"]
+
+    async def notifier(call):
+        return None
+
+    hass.services.async_register("notify", "mobile_app_essai", notifier)
+    hass.states.async_set("input_text.jarvis_service_notification", "mobile_app_essai")
+    await _relire(hass)
+    etat = hass.states.get("sensor.ucaness_installation")
+    assert _issues(hass) == []
+    assert etat.attributes["progression"] == 100 and etat.attributes["etape_suivante"] is None
+
+
+async def test_assistant_installation_en_service_ne_modifie_rien(hass, cloud, fast_readback):
+    """Installation déjà en service : état « en_service », aucune réparation, aucune écriture."""
+    for entite, valeur in (
+        ("input_boolean.jarvis_mode_simulation", "off"), ("input_number.jarvis_batterie_capacite", "10.24"),
+        ("input_select.jarvis_type_tarif", "Base"), ("input_number.jarvis_prix_hp", "0.25"),
+        ("binary_sensor.workday_sensor", "on"), ("input_text.jarvis_service_notification", "mobile_app_essai"),
+    ):
+        hass.states.async_set(entite, valeur)
+    hass.states.async_set("sensor.solcast_pv_forecast_prevision_aujourdhui", "8", {"detailedHourly": [{"pv_estimate": 1.0}]})
+
+    async def notifier(call):
+        return None
+
+    hass.services.async_register("notify", "mobile_app_essai", notifier)
+    avant = {e: hass.states.get(e).state for e in hass.states.async_entity_ids() if e.startswith("input_")}
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
+    await _relire(hass)
+    assert hass.states.get("sensor.ucaness_installation").state == "en_service"
+    assert _issues(hass) == []
+    assert {e: hass.states.get(e).state for e in avant} == avant
+    assert cloud.updates == []          # rien n'est parti vers l'onduleur
+
+    # Écriture retirée alors que la simulation est éteinte : à vérifier.
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "write_enabled": False})
+    await hass.async_block_till_done()
+    await _relire(hass)
+    assert hass.states.get("sensor.ucaness_installation").state == "a_verifier"
+
+
+async def test_assistant_installation_reparations_retirees_au_dechargement(hass, fake_client):
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    assert _issues(hass) == ["etape_packages"]
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _issues(hass) == []
 
 
 # ------------------------------------------------------------------ pilotage
@@ -404,3 +532,277 @@ def test_services_yaml_selecteurs_valides():
     for service, conf in d.items():
         for champ, f in (conf.get("fields") or {}).items():
             selector.validate_selector(f["selector"])
+
+
+# ------------------------------------------------------------------ réglages dans l'intégration
+PAQUETS = pathlib.Path(__file__).parents[1] / "pilotage" / "packages"
+
+
+async def _entrees_du_pilotage(hass):
+    """Les vraies entrées des packages batterie et tarif (celles que lit le pilotage)."""
+    from homeassistant.setup import async_setup_component
+    from homeassistant.util.yaml import load_yaml
+
+    bat, tarif = (load_yaml(str(PAQUETS / n)) for n in ("jarvis_batterie.yaml", "jarvis_tarif.yaml"))
+    for domaine in ("input_number", "input_select", "input_boolean", "input_datetime"):
+        assert await async_setup_component(hass, domaine, {domaine: {**bat.get(domaine, {}), **tarif.get(domaine, {})}})
+    # Sans valeur restaurée, une liste de choix prend sa première option (« Détection automatique »).
+    await hass.async_block_till_done()
+
+
+async def test_reglages_crees_et_vides_au_depart(hass, fake_client):
+    from custom_components.ucaness.reglages import REGLAGES
+
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    for r in REGLAGES:
+        etat = hass.states.get(f"{r.type}.ucaness_{r.cle}")
+        assert etat is not None, r.cle
+        assert etat.state == "unknown", r.cle       # jamais renseigné : pas de valeur inventée
+
+
+async def test_reglage_enregistre_sans_recharger_l_integration(hass, fake_client):
+    entry = await _entry_with_options(hass)
+    coordinateur = entry.runtime_data
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
+    await hass.services.async_call("select", "select_option", {"entity_id": "select.ucaness_type_tarif", "option": "Base"}, blocking=True)
+    await hass.services.async_call("time", "set_value", {"entity_id": "time.ucaness_hc_debut", "time": "23:00:00"}, blocking=True)
+    await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.ucaness_hc_jours_non_ouvres"}, blocking=True)
+    await hass.async_block_till_done()
+    assert entry.options["reglages"] == {"capacite": 10.24, "type_tarif": "Base", "hc_debut": "23:00:00", "hc_jours_non_ouvres": True}
+    assert float(hass.states.get("number.ucaness_capacite").state) == pytest.approx(10.24)
+    assert hass.states.get("select.ucaness_type_tarif").state == "Base"
+    assert hass.states.get("time.ucaness_hc_debut").state == "23:00:00"
+    assert hass.states.get("switch.ucaness_hc_jours_non_ouvres").state == "on"
+    assert entry.runtime_data is coordinateur            # pas de rechargement, pas de nouvelle connexion
+
+
+async def test_reglage_hors_bornes_refuse(hass, fake_client):
+    from custom_components.ucaness import reglages
+
+    entry = await _entry_with_options(hass)
+    with pytest.raises(ServiceValidationError):
+        await reglages.async_definir(hass, entry, {"capacite": 400})
+    with pytest.raises(ServiceValidationError):
+        await reglages.async_definir(hass, entry, {"type_tarif": "Tempo"})
+    with pytest.raises(ServiceValidationError):
+        await reglages.async_definir(hass, entry, {"inconnu": 1})
+    assert "reglages" not in entry.options
+
+
+async def test_reglage_et_entree_du_package_une_seule_valeur(hass, fake_client):
+    """Tant que le pilotage lit ses entrées, l'entrée est la référence : écrire le réglage la met à
+    jour, la modifier met à jour le réglage."""
+    await _entrees_du_pilotage(hass)
+    entry = await _entry_with_options(hass)
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
+    await hass.services.async_call("time", "set_value", {"entity_id": "time.ucaness_hc_fin", "time": "06:00:00"}, blocking=True)
+    await hass.services.async_call("select", "select_option", {"entity_id": "select.ucaness_type_tarif", "option": "Base"}, blocking=True)
+    await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.ucaness_hc_jours_non_ouvres"}, blocking=True)
+    await hass.async_block_till_done()
+    assert float(hass.states.get("input_number.jarvis_batterie_capacite").state) == pytest.approx(10.24)
+    assert hass.states.get("input_datetime.jarvis_hc_fin").state == "06:00:00"
+    assert hass.states.get("input_select.jarvis_type_tarif").state == "Base"
+    assert hass.states.get("input_boolean.jarvis_hc_jours_non_ouvres").state == "on"
+
+    # Modification dans Paramètres > Entrées : le réglage de l'intégration suit.
+    await hass.services.async_call("input_number", "set_value", {"entity_id": "input_number.jarvis_batterie_capacite", "value": 15}, blocking=True)
+    await hass.async_block_till_done()
+    assert float(hass.states.get("number.ucaness_capacite").state) == pytest.approx(15)
+    assert entry.runtime_data is not None
+
+
+async def test_options_conservent_les_reglages(hass, fake_client):
+    from custom_components.ucaness import reglages
+
+    entry = await _entry_with_options(hass)
+    await reglages.async_definir(hass, entry, {"capacite": 10.24})
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], {"scan_interval": 90, "write_enabled": False})
+    await hass.async_block_till_done()
+    assert entry.options["scan_interval"] == 90
+    assert entry.options["reglages"] == {"capacite": 10.24}
+
+
+async def test_diagnostics_masquent_les_reglages(hass, cloud):
+    from custom_components.ucaness import reglages
+    from custom_components.ucaness.diagnostics import async_get_config_entry_diagnostics
+
+    entry = await _entry_with_options(hass)
+    await reglages.async_definir(hass, entry, {"prix_hp": 0.31234, "capacite": 10.24})
+    texte = json.dumps(await async_get_config_entry_diagnostics(hass, entry), default=str)
+    assert "0.31234" not in texte and "10.24" not in texte
+
+
+# ------------------------------------------------------------------ écrans de questions
+async def _flux(hass, cle):
+    from custom_components.ucaness.repairs import async_create_fix_flow
+
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    issue = next(i for i in ir.async_get(hass).issues.values() if i.domain == DOMAIN and i.translation_key == f"etape_{cle}")
+    assert issue.is_fixable
+    flux = await async_create_fix_flow(hass, issue.issue_id, issue.data)
+    flux.hass = hass
+    return flux, entry
+
+
+async def test_question_batterie(hass, fake_client):
+    """Capacité proposée d'après le nombre de modules lu, confirmée par l'utilisateur, recopiée
+    dans l'entrée du pilotage ; l'assistant passe à l'étape suivante."""
+    await _entrees_du_pilotage(hass)
+    await _create_entry(hass)
+    await _relire(hass)
+    assert _issues(hass) == ["etape_batterie"]
+    flux, entry = await _flux(hass, "batterie")
+    ecran = await flux.async_step_init()
+    assert ecran["type"] is FlowResultType.FORM
+    modules = entry.runtime_data.data["values"]["battery_modules"]
+    assert ecran["description_placeholders"]["modules"] == str(int(modules))
+    assert ecran["description_placeholders"]["proposition"] == f"{round(modules * 5.12, 2):g}"
+
+    refus = await flux.async_step_init({"capacite": 0, "plancher": 20, "puissance_charge": 3})
+    assert refus["errors"] == {"capacite": "capacite_nulle"}
+    fin = await flux.async_step_init({"capacite": 10.24, "plancher": 15, "puissance_charge": 3.3})
+    assert fin["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert float(hass.states.get("input_number.jarvis_batterie_capacite").state) == pytest.approx(10.24)
+    assert float(hass.states.get("input_number.jarvis_batterie_plancher").state) == pytest.approx(15)
+    assert float(hass.states.get("number.ucaness_puissance_charge").state) == pytest.approx(3.3)
+    assert _issues(hass) == ["etape_contrat"]
+
+
+@pytest.mark.parametrize(("reponses", "ecran_attendu", "gain"), [
+    ({"type_tarif": "Heures pleines / heures creuses", "prix_hp": 0.30, "prix_hc": 0.18}, "bilan", "9,1"),            # 0,95² × 0,30 − 0,18
+    ({"type_tarif": "Heures pleines / heures creuses", "prix_hp": 0.22, "prix_hc": 0.21}, "bilan_non_rentable", "1,1"),   # 0,95² × 0,22 − 0,21
+    ({"type_tarif": "Base", "prix_hp": 0.25}, "bilan_base", "0,0"),
+])
+async def test_question_contrat(hass, fake_client, reponses, ecran_attendu, gain):
+    await _entrees_du_pilotage(hass)
+    await _create_entry(hass)
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
+    await _relire(hass)
+    assert _issues(hass) == ["etape_contrat"]
+    flux, entry = await _flux(hass, "contrat")
+    assert (await flux.async_step_init())["type"] is FlowResultType.FORM
+    bilan = await flux.async_step_init({**reponses, "hc_debut": "23:00:00", "hc_fin": "06:00:00", "hc_jours_non_ouvres": True})
+    assert bilan["step_id"] == ecran_attendu
+    assert bilan["description_placeholders"]["gain"] == gain
+    # Rien n'est enregistré avant la validation du bilan.
+    assert float(hass.states.get("input_number.jarvis_prix_hp").state) == 0
+    fin = await getattr(flux, f"async_step_{ecran_attendu}")({})
+    assert fin["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert float(hass.states.get("input_number.jarvis_prix_hp").state) == pytest.approx(reponses["prix_hp"])
+    assert hass.states.get("input_select.jarvis_type_tarif").state == reponses["type_tarif"]
+    assert hass.states.get("input_datetime.jarvis_hc_debut").state == "23:00:00"
+    assert hass.states.get("input_boolean.jarvis_hc_jours_non_ouvres").state == "on"
+    assert _issues(hass) == ["etape_jours_ouvres"]
+
+
+async def test_question_contrat_prix_manquant(hass, fake_client):
+    await _entrees_du_pilotage(hass)
+    await _create_entry(hass)
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
+    await _relire(hass)
+    flux, _ = await _flux(hass, "contrat")
+    refus = await flux.async_step_init({"type_tarif": "Heures pleines / heures creuses", "prix_hp": 0.30})
+    assert refus["errors"] == {"prix_hc": "prix_nul"}
+    refus = await flux.async_step_init({"type_tarif": "Base", "prix_hp": 0})
+    assert refus["errors"] == {"prix_hp": "prix_nul"}
+
+
+# ------------------------------------------------------------------ évaluer des offres
+async def test_evaluer_offres_calcul_seul(hass, cloud):
+    import datetime as dt
+    from homeassistant.util import dt as dt_util
+
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
+    debut = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0) - dt.timedelta(days=40)
+    heures = [debut + dt.timedelta(hours=h) for h in range(24 * 40)]
+    soutirage = [{"debut": h.isoformat(), "kwh": 2.0 if (h.hour >= 23 or h.hour < 6) else 0.2} for h in heures]
+    aujourdhui = dt_util.now().date().isoformat()
+    unique = {"nom": "Prix unique", "fournisseur": "Fournisseur A", "formule": "base",
+              "abonnement_eur_an": {"6": 150, "9": 190}, "prix_kwh": {"base": 0.25},
+              "source": "https://exemple.invalid/a", "date_prix": aujourdhui}
+    nuit = {"nom": "Nuit", "fournisseur": "Fournisseur B", "formule": "hphc",
+            "abonnement_eur_an": {"6": 160}, "prix_kwh": {"hp": 0.30, "hc": 0.20},
+            "plages_hc": [{"debut": "2230", "fin": "0630"}], "source": "https://exemple.invalid/b", "date_prix": aujourdhui}
+    tempo = {"nom": "Couleurs", "formule": "tempo", "abonnement_eur_an": {"6": 160}, "prix_kwh": {"bleu": 0.2}}
+    resp = await hass.services.async_call(DOMAIN, "evaluer_offres", {
+        "offres": [unique, nuit, tempo], "contrat_actuel": unique, "soutirage": soutirage, "puissance_kva": 6,
+        "puissances_max_kva": [2.5] * 40,       # pointe de 2,5 kVA : 3 kVA suffiraient
+    }, blocking=True, return_response=True)
+    assert [l["nom"] for l in resp["classement"]] == ["Nuit", "Prix unique"]
+    assert resp["classement"][0]["ecart_avec_contrat_actuel_eur_an"] < 0
+    assert resp["classement"][0]["fiabilite"] == "indicatif"
+    assert resp["offres_ecartees"][0]["nom"] == "Couleurs"
+    assert resp["puissance"]["conseil"] == "baisser" and resp["puissance"]["sur"] is False
+    assert cloud.updates == []          # rien n'est parti vers l'onduleur
+
+
+# ------------------------------------------------------------------ batterie sans panneaux
+async def _detail_sans_solaire(self, code, tz=3600):
+    """Réponse du portail d'un onduleur qui n'a jamais rien produit (batterie sans panneaux)."""
+    detail = fx("detail_load")
+    for cle in ("solar_power", "usage_solar_today", "usage_solar_month", "usage_solar_total"):
+        detail["status"][cle] = 0
+    return detail
+
+
+async def test_production_mesuree_la_question_des_panneaux_n_est_pas_posee(hass, fake_client):
+    """L'onduleur a déjà mesuré une production : l'assistant sait qu'il y a des panneaux."""
+    await _entrees_du_pilotage(hass)
+    await _create_entry(hass)
+    await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
+    await _relire(hass)
+    assert "solaire" in hass.states.get("sensor.ucaness_installation").attributes["etapes_faites"]
+    assert _issues(hass) == ["etape_contrat"]
+    assert hass.states.get("switch.ucaness_solaire").state == "unknown"       # constaté, pas déclaré
+
+
+async def test_batterie_sans_panneaux(hass, fake_client):
+    """Aucune production mesurée : la question est posée ; sans panneaux, la prévision solaire
+    n'est plus demandée et l'installation peut passer en simulation."""
+    with patch.object(FakeClient, "get_detail", _detail_sans_solaire):
+        await _entrees_du_pilotage(hass)
+        await _create_entry(hass)
+        await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
+        await _relire(hass)
+        assert _issues(hass) == ["etape_solaire"]
+        flux, entry = await _flux(hass, "solaire")
+        assert (await flux.async_step_init())["type"] is FlowResultType.FORM
+        fin = await flux.async_step_init({"solaire": False})
+        assert fin["type"] is FlowResultType.CREATE_ENTRY
+        await hass.async_block_till_done()
+        assert entry.options["reglages"]["solaire"] is False
+        assert hass.states.get("switch.ucaness_solaire").state == "off"
+        # Le pilotage est prévenu : il calculera la recharge de nuit sans prévision solaire.
+        assert hass.states.get("input_select.jarvis_solaire").state == "Sans panneaux"
+        assert _issues(hass) == ["etape_contrat"]
+
+        hass.states.async_set("input_boolean.jarvis_mode_simulation", "on")
+        for entite, valeur in (("number.ucaness_prix_hp", 0.30), ("number.ucaness_prix_hc", 0.18)):
+            await hass.services.async_call("number", "set_value", {"entity_id": entite, "value": valeur}, blocking=True)
+        hass.states.async_set("binary_sensor.workday_sensor", "on")
+        await _relire(hass)
+        etat = hass.states.get("sensor.ucaness_installation")
+        assert etat.state == "en_simulation"
+        assert "prevision_solaire" in etat.attributes["etapes_faites"]
+        assert _issues(hass) == ["etape_notifications"]
+
+
+async def test_reglage_solaire_suit_le_choix_du_pilotage(hass, fake_client):
+    """« Batterie : panneaux solaires » du package : un choix net fait foi ; en détection
+    automatique, c'est la valeur enregistrée (ou la production mesurée) qui compte."""
+    await _entrees_du_pilotage(hass)
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get("input_select.jarvis_solaire").state == "Détection automatique"
+    assert hass.states.get("switch.ucaness_solaire").state == "unknown"
+    await hass.services.async_call("input_select", "select_option", {"entity_id": "input_select.jarvis_solaire", "option": "Sans panneaux"}, blocking=True)
+    await hass.async_block_till_done()
+    assert hass.states.get("switch.ucaness_solaire").state == "off"
+    await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.ucaness_solaire"}, blocking=True)
+    await hass.async_block_till_done()
+    assert hass.states.get("input_select.jarvis_solaire").state == "Avec panneaux"
+    assert hass.states.get("switch.ucaness_solaire").state == "on"

@@ -164,6 +164,52 @@
           "description": "Charge windows available on the inverter (3)."
         }
       }
+    },
+    "evaluer_offres": {
+      "name": "Evaluate electricity offers",
+      "description": "Calculation only: estimated yearly cost of each offer on the measured hourly grid import (battery already deducted), ranking by cost, advice on the subscribed power. Plans: base and hphc. Nothing is subscribed, nothing is sent to the inverter.",
+      "fields": {
+        "offres": {
+          "name": "Offers",
+          "description": "List of {nom, fournisseur, formule (base or hphc), abonnement_eur_an {kVA: € incl. tax}, prix_kwh {base} or {hp, hc} in € incl. tax, plages_hc [{debut, fin}], weekend_hc, source, date_prix}."
+        },
+        "contrat_actuel": {
+          "name": "Current contract",
+          "description": "Same shape as an offer: reference for the yearly difference."
+        },
+        "soutirage": {
+          "name": "Grid import",
+          "description": "List of {debut, kwh}: energy taken from the grid, one value per hour."
+        },
+        "puissance_kva": {
+          "name": "Subscribed power",
+          "description": "Power of the contract, in kVA."
+        },
+        "jours_non_ouvres": {
+          "name": "Public holidays",
+          "description": "Dates counted as a weekend for offers with fully off-peak weekends."
+        },
+        "puissances_max_kva": {
+          "name": "Peak powers",
+          "description": "One peak power per day, in kVA, for the advice on the subscribed power."
+        },
+        "mesure_fine": {
+          "name": "Peaks read from the meter",
+          "description": "Turn on if the peak powers come from the meter itself and not from an estimate."
+        },
+        "capacite_utile_kwh": {
+          "name": "Usable battery capacity",
+          "description": "Capacity above the floor. When given, night charging is estimated for off-peak offers (upper estimate)."
+        },
+        "rendement_pct": {
+          "name": "Efficiency",
+          "description": "Battery efficiency one way (charge or discharge)."
+        },
+        "recharge_deja_active": {
+          "name": "Night charging already active",
+          "description": "Turn on if the house already charges the battery off-peak: the measured grid import already reflects it."
+        }
+      }
     }
   },
   "selector": {
@@ -171,6 +217,109 @@
       "options": {
         "autoconsommation": "Self-consumption",
         "arbitrage_horaire": "Time-of-use (peak shift)"
+      }
+    }
+  },
+  "issues": {
+    "etape_connexion": {
+      "title": "UCANESS: the battery is not responding",
+      "description": "The integration no longer receives readings from \"{appareil}\". Nothing can be computed without them.\n\nCheck the inverter's Internet connection, then [open the integration]({lien})."
+    },
+    "etape_packages": {
+      "title": "UCANESS: install the control packages",
+      "description": "\"{appareil}\" is connected, but the control packages are not installed yet: they decide each evening how much to charge at night.\n\n[Installation guide]({lien}). Control always starts in simulation: nothing is sent to the inverter."
+    },
+    "etape_entites": {
+      "title": "UCANESS: some readings are not found by the control packages",
+      "description": "The packages read the battery under fixed names. Missing: {entites}.\n\nRename the matching entities in [Settings > Entities]({lien}) (\"Entity ID\" field). On a new installation these names are given automatically."
+    },
+    "etape_batterie": {
+      "title": "UCANESS: enter your battery capacity",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Your battery",
+            "description": "The inverter reports {modules} battery module(s). With 5.12 kWh modules, that is {proposition} kWh: confirm or correct.\n\nThe floor is the level below which the battery no longer discharges (watch the lowest level reached on a night without charging). The charge power is what you observe during a grid charge. Both can be refined later.",
+            "data": {
+              "capacite": "Battery capacity",
+              "plancher": "Floor level",
+              "puissance_charge": "Grid charge power"
+            }
+          }
+        },
+        "error": {
+          "capacite_nulle": "Enter a capacity above 0."
+        },
+        "abort": {
+          "entree_absente": "This battery is no longer configured."
+        }
+      }
+    },
+    "etape_contrat": {
+      "title": "UCANESS: enter your electricity contract",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Your electricity contract",
+            "description": "This information is on your bill. With a contract without off-peak hours, choose \"Base\" and leave the off-peak fields aside.",
+            "data": {
+              "type_tarif": "Contract type",
+              "prix_hp": "Peak price per kWh (or single price)",
+              "prix_hc": "Off-peak price per kWh",
+              "hc_debut": "Off-peak start",
+              "hc_fin": "Off-peak end",
+              "hc_jours_non_ouvres": "Weekends and public holidays fully off-peak",
+              "prix_injection": "Feed-in price"
+            }
+          },
+          "bilan": {
+            "title": "Charging at night pays off for you",
+            "description": "Each kWh charged off-peak and used at peak time saves about {gain} cents (battery efficiency counted at {rendement} % each way).\n\nControl will charge at night, just enough to last until the sun takes over. Submit to save your contract."
+          },
+          "bilan_non_rentable": {
+            "title": "Charging at night does not pay off for you",
+            "description": "With these prices, each kWh charged off-peak and used at peak time would lose about {gain} cents (battery efficiency counted at {rendement} % each way).\n\nControl will not plan any grid charge; your battery keeps storing your solar production. Submit to save your contract."
+          },
+          "bilan_base": {
+            "title": "Contract without off-peak hours",
+            "description": "With a single price, charging the battery from the grid brings nothing: control will not plan any night charge. Your battery keeps storing your solar production. Submit to save your contract."
+          }
+        },
+        "error": {
+          "prix_nul": "Enter a price above 0."
+        },
+        "abort": {
+          "entree_absente": "This battery is no longer configured."
+        }
+      }
+    },
+    "etape_jours_ouvres": {
+      "title": "UCANESS: add working days",
+      "description": "Control tells weekdays from weekends and public holidays: consumption and, depending on the contract, off-peak hours differ.\n\n[Add the Workday integration]({lien}) and choose your country."
+    },
+    "etape_prevision_solaire": {
+      "title": "UCANESS: add the solar production forecast",
+      "description": "To charge only what is needed, control needs today's and tomorrow's expected production. Without a forecast, no charge is planned.\n\nInstall the Solcast PV Forecast integration from the Marketplace (community content, not checked by Home Assistant), then [set it up]({lien})."
+    },
+    "etape_notifications": {
+      "title": "UCANESS: choose where to be notified",
+      "description": "Optional. To be told about a battery fault or a failed programming.\n\nFill in \"Alertes : service de notification\" in [Settings > Helpers]({lien}), for example `mobile_app_my_phone`."
+    },
+    "etape_solaire": {
+      "title": "UCANESS: do you have solar panels?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Solar panels",
+            "description": "The inverter has not measured any solar production yet. A battery can work with or without panels.\n\nWith panels, the battery first stores your production, and control only charges the remainder at night. Without panels, it buys electricity at the cheapest hours to use it at the expensive ones: everything then depends on your contract, which the assistant reviews in the next step.",
+            "data": {
+              "solaire": "Solar panels are connected to this inverter"
+            }
+          }
+        },
+        "abort": {
+          "entree_absente": "This battery is no longer configured."
+        }
       }
     }
   }

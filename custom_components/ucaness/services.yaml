@@ -114,3 +114,44 @@ plages_depuis_plan:
       default: 3
       selector:
         number: { min: 1, max: 3, mode: box }
+
+evaluer_offres:
+  fields:
+    offres:
+      required: true
+      example: '[{"nom": "Nuit", "fournisseur": "Fournisseur B", "formule": "hphc", "abonnement_eur_an": {"6": 160}, "prix_kwh": {"hp": 0.30, "hc": 0.20}, "plages_hc": [{"debut": "2230", "fin": "0630"}], "source": "https://…", "date_prix": "2030-01-20"}]'
+      selector:
+        object:
+    contrat_actuel:
+      selector:
+        object:
+    soutirage:
+      required: true
+      example: '[{"debut": "2030-01-14T00:00:00+01:00", "kwh": 0.4}]'
+      selector:
+        object:
+    puissance_kva:
+      required: true
+      selector:
+        number: { min: 1, max: 36, mode: box, unit_of_measurement: kVA }
+    jours_non_ouvres:
+      selector:
+        object:
+    puissances_max_kva:
+      selector:
+        object:
+    mesure_fine:
+      default: false
+      selector:
+        boolean:
+    capacite_utile_kwh:
+      selector:
+        number: { min: 0, max: 200, step: 0.01, unit_of_measurement: kWh, mode: box }
+    rendement_pct:
+      default: 95
+      selector:
+        number: { min: 50, max: 100, step: 0.5, unit_of_measurement: "%", mode: box }
+    recharge_deja_active:
+      default: false
+      selector:
+        boolean:
