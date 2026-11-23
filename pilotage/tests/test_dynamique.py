@@ -64,6 +64,7 @@ async def maison(hass):
 
     hass.states.async_set("sensor.uhome_mode", "Match Load Mode")
     hass.states.async_set("binary_sensor.uhome_temperature_hors_plage", "off")
+    hass.states.async_set("sensor.uhome_soc", "55")
     for e, v in (("input_text.jarvis_mode_attendu", "Match Load Mode"),):
         await hass.services.async_call("input_text", "set_value", {"entity_id": e, "value": v}, blocking=True)
     await hass.services.async_call("input_boolean", "turn_off", {"entity_id": "input_boolean.jarvis_mode_simulation"}, blocking=True)
@@ -187,6 +188,46 @@ async def test_temperature_hors_plage_pas_d_arbitrage(hass, maison):
     assert ("mode", "arbitrage_horaire") not in maison
 
 
+@pytest.mark.parametrize("etat", ["unknown", "unavailable", None])
+async def test_temperature_inconnue_pas_d_arbitrage(hass, maison, etat):
+    """Repli sûr : sans mesure de température, aucune bascule en arbitrage horaire."""
+    if etat is None:
+        hass.states.async_remove("binary_sensor.uhome_temperature_hors_plage")
+    else:
+        hass.states.async_set("binary_sensor.uhome_temperature_hors_plage", etat)
+    n = dt_util.now()
+    _plan(hass, [{"debut": _hhmm(n - dt.timedelta(minutes=5)), "fin": _hhmm(n + dt.timedelta(minutes=50))}])
+    await _tourner(hass)
+    assert ("mode", "arbitrage_horaire") not in maison
+    assert hass.states.get("input_boolean.jarvis_dyn_plan_actif").state == "off"
+
+
+@pytest.mark.parametrize("etat", ["unknown", "unavailable", None])
+async def test_soc_inconnu_pas_d_arbitrage(hass, maison, etat):
+    """Repli sûr : sans SOC, aucune bascule en arbitrage horaire."""
+    if etat is None:
+        hass.states.async_remove("sensor.uhome_soc")
+    else:
+        hass.states.async_set("sensor.uhome_soc", etat)
+    n = dt_util.now()
+    _plan(hass, [{"debut": _hhmm(n - dt.timedelta(minutes=5)), "fin": _hhmm(n + dt.timedelta(minutes=50))}])
+    await _tourner(hass)
+    assert ("mode", "arbitrage_horaire") not in maison
+    assert hass.states.get("input_boolean.jarvis_dyn_plan_actif").state == "off"
+
+
+async def test_donnee_perdue_pendant_une_plage_retour_autoconsommation(hass, maison):
+    """Une donnée qui disparaît pendant l'arbitrage horaire ramène en autoconsommation."""
+    n = dt_util.now()
+    _plan(hass, [{"debut": _hhmm(n - dt.timedelta(minutes=5)), "fin": _hhmm(n + dt.timedelta(minutes=50))}])
+    await _tourner(hass)
+    assert hass.states.get("input_boolean.jarvis_dyn_plan_actif").state == "on"
+    maison.clear()
+    hass.states.async_set("binary_sensor.uhome_temperature_hors_plage", "unavailable")
+    await _tourner(hass)
+    assert [c for c in maison if c[0] != "log"] == [("mode", "autoconsommation")]
+
+
 async def test_retour_a_la_strategie_de_nuit(hass, maison):
     n = dt_util.now()
     _plan(hass, [{"debut": _hhmm(n - dt.timedelta(minutes=5)), "fin": _hhmm(n + dt.timedelta(minutes=50))}])
@@ -228,7 +269,16 @@ async def test_prix_ttc_heures_pleines_et_creuses(hass):
 
 
 # --- Données envoyées au moteur ------------------------------------------------------------------
-async def test_plan_moteur_recoit_les_donnees(hass):
+@pytest.mark.parametrize(("temp_hors_plage", "temperature", "interdite"), [
+    ("off", "21.5", False),
+    ("on", "55", True),
+    ("off", "-2", True),
+    ("unknown", "21.5", True),          # repli sûr : une donnée absente interdit la charge
+    ("unavailable", "21.5", True),
+    ("off", "unavailable", True),
+    ("off", "unknown", True),
+])
+async def test_plan_moteur_recoit_les_donnees(hass, temp_hors_plage, temperature, interdite):
     await hass.config.async_set_time_zone("Europe/Paris")
     bat, dyn = _pkg("jarvis_batterie.yaml"), _pkg("jarvis_dynamique.yaml")
     recu = {}
@@ -257,6 +307,8 @@ async def test_plan_moteur_recoit_les_donnees(hass):
         "jarvis_batterie_capacite": {**bat["input_number"]["jarvis_batterie_capacite"], "initial": 10.24}}})
     minuit = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0)
     hass.states.async_set("sensor.uhome_soc", "55")
+    hass.states.async_set("binary_sensor.uhome_temperature_hors_plage", temp_hors_plage)
+    hass.states.async_set("sensor.uhome_temperature_batterie", temperature)
     hass.states.async_set("sensor.jarvis_prix_dynamiques", "0.2", {"prix": [
         {"debut": (minuit + dt.timedelta(hours=h)).isoformat(), "prix": 0.2} for h in range(48)]})
     for capteur, j in (("sensor.solcast_pv_forecast_prevision_aujourdhui", 0), ("sensor.solcast_pv_forecast_prevision_demain", 1)):
@@ -271,7 +323,7 @@ async def test_plan_moteur_recoit_les_donnees(hass):
     assert recu["conso"][5]["kwh"] == pytest.approx(0.5)                # 500 W mesurés
     assert len(recu["solaire"]) == 48 and len(recu["prix"]) == 48
     assert recu["soc_pct"] == 55 and recu["capacite_kwh"] == pytest.approx(10.24)
-    assert recu["reserve"] is None and recu["charge_interdite"] is False
+    assert recu["reserve"] is None and recu["charge_interdite"] is interdite
     etat = hass.states.get("sensor.jarvis_plan_tarif_dynamique")
     assert float(etat.state) == pytest.approx(5.2)
     assert etat.attributes["plages"] == [{"debut": "0200", "fin": "0400"}]
@@ -297,36 +349,151 @@ async def test_package_dynamique_charge(hass, caplog):
 
 
 # --- Adaptateur EMHASS ---------------------------------------------------------------------------
-async def test_plan_emhass_lu_et_traduit(hass):
+def _optimiseur():
+    """Le vrai moteur de l'intégration (Python pur), chargé sans installer l'intégration."""
+    import importlib.util
+    import sys
+
+    nom = "ucaness_optimiseur_essai"
+    if nom not in sys.modules:
+        chemin = PKG.parent.parent / "custom_components" / "ucaness" / "optimiseur.py"
+        spec = importlib.util.spec_from_file_location(nom, chemin)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[nom] = module
+        spec.loader.exec_module(module)
+    return sys.modules[nom]
+
+
+async def _emhass(hass, service, pas=10):
+    """Package EMHASS prêt : stratégie EMHASS, capteurs d'EMHASS publiés (4 demi-heures de charge
+    réseau à partir de l'heure en cours), température et SOC connus."""
     await hass.config.async_set_time_zone("Europe/Paris")
     bat, dyn = _pkg("jarvis_batterie.yaml"), _pkg("jarvis_dynamique.yaml")
-    recu = {}
-
-    async def depuis_plan(call):
-        recu.update(call.data)
-        return {"valide": True, "plages": [{"debut": "0100", "fin": "0300"}], "charge_reseau_kwh": 6.0,
-                "charge_ecartee_kwh": 0, "fenetres": 1, "charge_en_cours": False}
-
-    hass.services.async_register("ucaness", "plages_depuis_plan", depuis_plan, supports_response=SupportsResponse.ONLY)
+    hass.services.async_register("ucaness", "plages_depuis_plan", service, supports_response=SupportsResponse.ONLY)
     assert await async_setup_component(hass, "input_select", {"input_select": {
         **dyn["input_select"], "jarvis_strategie": {**dyn["input_select"]["jarvis_strategie"], "initial": "Tarif dynamique (EMHASS)"}}})
     assert await async_setup_component(hass, "input_boolean", {"input_boolean": bat["input_boolean"]})
-    textes = dict(dyn["input_text"])
+    assert await async_setup_component(hass, "input_number", {"input_number": dyn["input_number"]})
+    assert await async_setup_component(hass, "input_text", {"input_text": dyn["input_text"]})
     for k, v in (("jarvis_dyn_emhass_batterie", "sensor.p_batt_forecast"), ("jarvis_dyn_emhass_attribut_batterie", "battery_scheduled_power"),
                  ("jarvis_dyn_emhass_reseau", "sensor.p_grid_forecast"), ("jarvis_dyn_emhass_attribut_reseau", "forecasts")):
-        textes[k] = {**textes[k], "initial": v}
-    assert await async_setup_component(hass, "input_text", {"input_text": textes})
+        await hass.services.async_call("input_text", "set_value", {"entity_id": f"input_text.{k}", "value": v}, blocking=True)
     t0 = dt_util.now().replace(minute=0, second=0, microsecond=0)
     hass.states.async_set("sensor.p_batt_forecast", "0", {"battery_scheduled_power": [
-        {"date": (t0 + dt.timedelta(minutes=30 * i)).isoformat(), "p_batt_forecast": "-3000.0" if i < 4 else "500.0"} for i in range(10)]})
+        {"date": (t0 + dt.timedelta(minutes=30 * i)).isoformat(), "p_batt_forecast": "-3000.0" if i < 4 else "500.0"} for i in range(pas)]})
     hass.states.async_set("sensor.p_grid_forecast", "0", {"forecasts": [
-        {"date": (t0 + dt.timedelta(minutes=30 * i)).isoformat(), "p_grid_forecast": "3400.0" if i < 4 else "0.0"} for i in range(10)]})
+        {"date": (t0 + dt.timedelta(minutes=30 * i)).isoformat(), "p_grid_forecast": "3400.0" if i < 4 else "0.0"} for i in range(pas)]})
     hass.states.async_set("binary_sensor.uhome_temperature_hors_plage", "off")
+    hass.states.async_set("sensor.uhome_temperature_batterie", "21.5")
+    hass.states.async_set("sensor.uhome_soc", "55")
     assert await async_setup_component(hass, "template", {"template": [dyn["template"][3]]})
     await hass.async_block_till_done()
+    return dyn
+
+
+async def _recalculer(hass):
     hass.bus.async_fire("jarvis_recalcul_dynamique")
     await hass.async_block_till_done()
+
+
+def _faux_plan(recu):
+    async def depuis_plan(call):
+        recu.update(call.data)
+        return {"valide": True, "plages": [{"debut": "0100", "fin": "0300"}], "charge_reseau_kwh": 6.0,
+                "charge_ecartee_kwh": 0, "nombre_fenetres": 1, "charge_en_cours": False,
+                "fenetres": [{"debut": "2030-01-15T01:00:00+01:00", "fin": "2030-01-15T03:00:00+01:00"}]}
+    return depuis_plan
+
+
+async def test_plan_emhass_lu_et_traduit(hass):
+    recu = {}
+    await _emhass(hass, _faux_plan(recu))
+    await _recalculer(hass)
     assert len(recu["plan"]) == 10
     assert recu["plan"][0]["p_batt"] == -3000.0 and recu["plan"][0]["p_grid"] == 3400.0
     etat = hass.states.get("sensor.jarvis_plan_emhass")
     assert etat.attributes["plages"] == [{"debut": "0100", "fin": "0300"}] and etat.attributes["valide"] is True
+    assert "1 fenêtre(s)" in etat.attributes["justification"]
+
+
+@pytest.mark.parametrize(("entite", "etat"), [
+    ("binary_sensor.uhome_temperature_hors_plage", "on"),
+    ("binary_sensor.uhome_temperature_hors_plage", "unknown"),
+    ("binary_sensor.uhome_temperature_hors_plage", "unavailable"),
+    ("sensor.uhome_temperature_batterie", "unavailable"),
+    ("sensor.uhome_temperature_batterie", "-1"),
+    ("sensor.uhome_soc", "unknown"),
+    ("sensor.uhome_soc", "unavailable"),
+])
+async def test_plan_emhass_non_valide_si_une_donnee_manque(hass, entite, etat):
+    """Repli sûr : température ou SOC absent (ou batterie trop froide) : plan non valide, aucune plage."""
+    await _emhass(hass, _faux_plan({}))
+    hass.states.async_set(entite, etat)
+    await _recalculer(hass)
+    etat_plan = hass.states.get("sensor.jarvis_plan_emhass")
+    assert etat_plan.attributes["valide"] is False and etat_plan.attributes["plages"] == []
+    assert "repli sûr" in etat_plan.attributes["justification"]
+
+
+async def test_plan_emhass_date_de_sa_publication(hass, freezer):
+    """L'âge du plan se compte depuis la publication par EMHASS, pas depuis sa relecture : un plan
+    qu'EMHASS ne met plus à jour devient non valide, même s'il couvre encore des créneaux à venir."""
+    await _emhass(hass, _faux_plan({}), pas=20)
+    publication = dt_util.now()
+    await _recalculer(hass)
+    etat = hass.states.get("sensor.jarvis_plan_emhass")
+    assert etat.attributes["valide"] is True
+    assert dt_util.parse_datetime(etat.attributes["publie_le"]) == publication
+
+    # EMHASS ne publie plus rien ; 30 min plus tard le plan sert encore, 45 min plus tard non.
+    freezer.tick(dt.timedelta(minutes=30))
+    await _recalculer(hass)
+    assert hass.states.get("sensor.jarvis_plan_emhass").attributes["valide"] is True
+    freezer.tick(dt.timedelta(minutes=15))
+    await _recalculer(hass)
+    etat = hass.states.get("sensor.jarvis_plan_emhass")
+    assert etat.attributes["valide"] is False and etat.attributes["plages"] == []
+    assert dt_util.parse_datetime(etat.attributes["publie_le"]) == publication
+    assert "45 min" in etat.attributes["justification"] and "repli sûr" in etat.attributes["justification"]
+
+    # Nouvelle publication : le plan redevient valide.
+    hass.states.async_set("sensor.p_batt_forecast", "1", hass.states.get("sensor.p_batt_forecast").attributes)
+    await _recalculer(hass)
+    assert hass.states.get("sensor.jarvis_plan_emhass").attributes["valide"] is True
+
+
+async def test_plan_emhass_age_maximal_reglable(hass, freezer):
+    """EMHASS lancé une fois par jour : l'âge maximal du plan se règle (entrée « EMHASS : âge maximal »)."""
+    await _emhass(hass, _faux_plan({}), pas=20)
+    await hass.services.async_call("input_number", "set_value", {
+        "entity_id": "input_number.jarvis_dyn_emhass_age_max", "value": 1440}, blocking=True)
+    freezer.tick(dt.timedelta(hours=3))
+    await _recalculer(hass)
+    assert hass.states.get("sensor.jarvis_plan_emhass").attributes["valide"] is True
+
+
+async def test_plan_emhass_applique_de_bout_en_bout(hass, maison):
+    """Plan d'EMHASS -> vrai calcul des plages -> capteur du plan -> arbitrage horaire pendant la
+    fenêtre. (Le plan EMHASS n'était jamais appliqué : « fenetres » valait un nombre.)"""
+    opt = _optimiseur()
+
+    async def depuis_plan(call):
+        return {"valide": True, **opt.plages_depuis_plan(
+            call.data["plan"], maintenant=dt_util.now(), fuseau=dt_util.get_default_time_zone())}
+
+    n = dt_util.now()
+    if (n + dt.timedelta(hours=2)).day != n.day:
+        pytest.skip("test lancé juste avant minuit")
+    await hass.services.async_call("input_select", "select_option", {
+        "entity_id": "input_select.jarvis_strategie", "option": "Tarif dynamique (EMHASS)"}, blocking=True)
+    await _emhass(hass, depuis_plan)
+    maison.clear()
+    await _recalculer(hass)
+    etat = hass.states.get("sensor.jarvis_plan_emhass")
+    assert etat.attributes["valide"] is True
+    assert isinstance(etat.attributes["fenetres"], list) and len(etat.attributes["fenetres"]) == 1
+    assert etat.attributes["charge_en_cours"] is True
+    await _tourner(hass)
+    actions = [c for c in maison if c[0] != "log"]
+    assert actions == [("plages", etat.attributes["plages"]), ("mode", "arbitrage_horaire")]
+    assert hass.states.get("input_boolean.jarvis_dyn_plan_actif").state == "on"

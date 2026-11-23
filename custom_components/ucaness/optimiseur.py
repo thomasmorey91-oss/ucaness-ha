@@ -586,7 +586,7 @@ def plages_depuis_plan(
         "fenetres": [{"debut": w[0].isoformat(), "fin": w[1].isoformat()} for w in gardees],
         "charge_reseau_kwh": round(sum(w[2] for w in gardees), 2),
         "charge_ecartee_kwh": round(ecartee, 2),
-        "fenetres": len(fen),
+        "nombre_fenetres": len(fen),
         "charge_en_cours": any(w[0] <= maintenant < w[1] for w in gardees),
         "prochaine_plage": next((w[0].isoformat() for w in gardees if w[0] >= maintenant), None),
     }
