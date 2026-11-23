@@ -37,7 +37,7 @@ Les règles et les calculs sont décrits dans `REGLES.md`. Pour analyser l'insta
    homeassistant:
      packages: !include_dir_named packages
    ```
-2. Renommer les entités (Paramètres → Entités, champ « ID de l'entité ») pour obtenir :
+2. Vérifier les identifiants des entités. Sur une installation neuve de l'intégration, les entités UCANESS portent déjà l'identifiant attendu : il ne reste que celles de Solcast. Sur une installation plus ancienne, les renommer (Paramètres → Entités, champ « ID de l'entité ») pour obtenir :
 
    | Entité d'origine | ID attendu |
    |---|---|

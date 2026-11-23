@@ -11,8 +11,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from . import parser
-from .const import CONF_DEVICE_CODE, DOMAIN
+from . import assistant, installation, parser
+from .const import CONF_DEVICE_CODE, DOMAIN, OBJECT_IDS
 from .coordinator import UcanessConfigEntry, UcanessCoordinator
 
 DEVICE_CLASSES = {
@@ -47,7 +47,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: UcanessConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = entry.runtime_data
-    async_add_entities(UcanessSensor(coordinator, entry, m) for m in parser.MEASURES)
+    async_add_entities(
+        [*(UcanessSensor(coordinator, entry, m) for m in parser.MEASURES), UcanessInstallation(coordinator, entry)]
+    )
 
 
 class UcanessSensor(CoordinatorEntity[UcanessCoordinator], SensorEntity):
@@ -66,6 +68,8 @@ class UcanessSensor(CoordinatorEntity[UcanessCoordinator], SensorEntity):
         if measure.diagnostic:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_device_info = device_info(entry, coordinator)
+        if measure.key in OBJECT_IDS:
+            self.entity_id = f"sensor.{OBJECT_IDS[measure.key]}"
 
     @property
     def native_value(self) -> Any:
@@ -80,3 +84,34 @@ class UcanessSensor(CoordinatorEntity[UcanessCoordinator], SensorEntity):
             last = (self.coordinator.data or {}).get("last_event")
             return {"dernier_evenement": last} if last else None
         return None
+
+
+class UcanessInstallation(CoordinatorEntity[UcanessCoordinator], SensorEntity):
+    """Où en est l'installation, et quelle est l'étape suivante (assistant.py). Lecture seule."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Installation"
+    _attr_icon = "mdi:clipboard-check-outline"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(installation.ETATS)
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: UcanessCoordinator, entry: UcanessConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._entry = entry
+        self._attr_unique_id = f"{entry.data[CONF_DEVICE_CODE]}_installation"
+        self._attr_device_info = device_info(entry, coordinator)
+        self.entity_id = "sensor.ucaness_installation"
+
+    @property
+    def available(self) -> bool:
+        # Le bilan dit lui-même si la batterie ne répond plus : le capteur reste lisible.
+        return True
+
+    @property
+    def native_value(self) -> str:
+        return assistant.bilan(self.hass, self._entry).etat
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return assistant.bilan(self.hass, self._entry).attributs()

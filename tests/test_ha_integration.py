@@ -13,6 +13,7 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.data_entry_flow import FlowResultType
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
 
 from custom_components.ucaness.api import (
     CONFIG_KEYS,
@@ -129,7 +130,8 @@ async def test_entities_created_with_values(hass, fake_client):
     await _create_entry(hass)
     await hass.async_block_till_done()
 
-    soc = hass.states.get("sensor.maison_test_charge_batterie_soc")
+    # Les entités lues par le pilotage portent d'emblée l'identifiant attendu (rien à renommer).
+    soc = hass.states.get("sensor.uhome_soc")
     assert soc is not None and float(soc.state) == pytest.approx(41.0)
     assert soc.attributes["unit_of_measurement"] == "%"
 
@@ -141,10 +143,135 @@ async def test_entities_created_with_values(hass, fake_client):
     dod = hass.states.get("sensor.maison_test_reglage_dod_raccorde_au_reseau")
     assert float(dod.state) == pytest.approx(90.0)
 
-    fault = hass.states.get("binary_sensor.maison_test_defaut_ou_alarme_batterie")
+    fault = hass.states.get("binary_sensor.uhome_defaut_batterie")
     assert fault.state == "off"
-    temp = hass.states.get("binary_sensor.maison_test_temperature_batterie_hors_plage_de_charge_0_50_degc")
+    temp = hass.states.get("binary_sensor.uhome_temperature_hors_plage")
     assert temp.state == "off"
+
+
+async def test_identifiants_attendus_par_le_pilotage(hass, fake_client):
+    """Installation neuve : toutes les entités que lit le pilotage existent sous le bon identifiant."""
+    from custom_components.ucaness.const import ENTITES_PILOTAGE, OBJECT_IDS
+
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    assert [e for e in ENTITES_PILOTAGE if hass.states.get(e) is None] == []
+    registre = er.async_get(hass)
+    ids = {e.entity_id.split(".", 1)[1] for e in registre.entities.values() if e.platform == DOMAIN}
+    assert set(OBJECT_IDS.values()) <= ids
+
+
+async def test_identifiant_existant_conserve(hass, fake_client):
+    """Une entité déjà enregistrée (installation existante, entité renommée) garde son identifiant."""
+    registre = er.async_get(hass)
+    registre.async_get_or_create("sensor", DOMAIN, "testcode01_soc", suggested_object_id="ma_batterie_soc")
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.ma_batterie_soc") is not None
+    assert hass.states.get("sensor.uhome_soc") is None
+
+
+# ------------------------------------------------------------------ assistant d'installation
+def _issues(hass):
+    return sorted(i.translation_key for i in ir.async_get(hass).issues.values() if i.domain == DOMAIN)
+
+
+async def _relire(hass):
+    """Nouvelle lecture de l'onduleur : l'assistant réévalue l'installation."""
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+
+async def test_assistant_installation_pas_a_pas(hass, fake_client):
+    """Batterie connectée, rien d'autre : une seule réparation à la fois, dans l'ordre du parcours."""
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    etat = hass.states.get("sensor.ucaness_installation")
+    assert etat.state == "a_configurer"
+    assert etat.attributes["etape_suivante"]["cle"] == "packages"
+    assert etat.attributes["etapes_faites"] == ["connexion", "entites"]
+    assert _issues(hass) == ["etape_packages"]
+
+    # Packages installés, capacité à 0 : étape « batterie ».
+    hass.states.async_set("input_boolean.jarvis_mode_simulation", "on")
+    hass.states.async_set("input_number.jarvis_batterie_capacite", "0")
+    await _relire(hass)
+    assert _issues(hass) == ["etape_batterie"]
+
+    hass.states.async_set("input_number.jarvis_batterie_capacite", "10.24")
+    hass.states.async_set("input_select.jarvis_type_tarif", "Heures pleines / heures creuses")
+    hass.states.async_set("input_number.jarvis_prix_hp", "0.25")
+    hass.states.async_set("input_number.jarvis_prix_hc", "0.18")
+    await _relire(hass)
+    assert _issues(hass) == ["etape_jours_ouvres"]
+
+    hass.states.async_set("binary_sensor.workday_sensor", "on")
+    await _relire(hass)
+    assert _issues(hass) == ["etape_prevision_solaire"]
+    assert hass.states.get("sensor.ucaness_installation").state == "a_configurer"
+
+    # Capteur Solcast présent mais sans prévision heure par heure : l'étape reste à faire.
+    hass.states.async_set("sensor.solcast_pv_forecast_prevision_demain", "12")
+    await _relire(hass)
+    assert _issues(hass) == ["etape_prevision_solaire"]
+    hass.states.async_set("sensor.solcast_pv_forecast_prevision_demain", "12", {"detailedHourly": [{"pv_estimate": 1.0}]})
+    await _relire(hass)
+
+    # Tout l'obligatoire est fait : simulation, et seule l'étape facultative reste proposée.
+    etat = hass.states.get("sensor.ucaness_installation")
+    assert etat.state == "en_simulation"
+    assert _issues(hass) == ["etape_notifications"]
+
+    async def notifier(call):
+        return None
+
+    hass.services.async_register("notify", "mobile_app_essai", notifier)
+    hass.states.async_set("input_text.jarvis_service_notification", "mobile_app_essai")
+    await _relire(hass)
+    etat = hass.states.get("sensor.ucaness_installation")
+    assert _issues(hass) == []
+    assert etat.attributes["progression"] == 100 and etat.attributes["etape_suivante"] is None
+
+
+async def test_assistant_installation_en_service_ne_modifie_rien(hass, cloud, fast_readback):
+    """Installation déjà en service : état « en_service », aucune réparation, aucune écriture."""
+    for entite, valeur in (
+        ("input_boolean.jarvis_mode_simulation", "off"), ("input_number.jarvis_batterie_capacite", "10.24"),
+        ("input_select.jarvis_type_tarif", "Base"), ("input_number.jarvis_prix_hp", "0.25"),
+        ("binary_sensor.workday_sensor", "on"), ("input_text.jarvis_service_notification", "mobile_app_essai"),
+    ):
+        hass.states.async_set(entite, valeur)
+    hass.states.async_set("sensor.solcast_pv_forecast_prevision_aujourdhui", "8", {"detailedHourly": [{"pv_estimate": 1.0}]})
+
+    async def notifier(call):
+        return None
+
+    hass.services.async_register("notify", "mobile_app_essai", notifier)
+    avant = {e: hass.states.get(e).state for e in hass.states.async_entity_ids() if e.startswith("input_")}
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
+    await _relire(hass)
+    assert hass.states.get("sensor.ucaness_installation").state == "en_service"
+    assert _issues(hass) == []
+    assert {e: hass.states.get(e).state for e in avant} == avant
+    assert cloud.updates == []          # rien n'est parti vers l'onduleur
+
+    # Écriture retirée alors que la simulation est éteinte : à vérifier.
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "write_enabled": False})
+    await hass.async_block_till_done()
+    await _relire(hass)
+    assert hass.states.get("sensor.ucaness_installation").state == "a_verifier"
+
+
+async def test_assistant_installation_reparations_retirees_au_dechargement(hass, fake_client):
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    assert _issues(hass) == ["etape_packages"]
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _issues(hass) == []
 
 
 # ------------------------------------------------------------------ pilotage

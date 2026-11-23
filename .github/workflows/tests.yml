@@ -31,6 +31,8 @@ jobs:
         run: pytest -p no:homeassistant -p no:socket tests/test_pilotage.py
       - name: Intégration dans Home Assistant
         run: pytest tests/test_ha_integration.py
+      - name: Assistant d'installation
+        run: pytest -p no:homeassistant -p no:socket tests/test_installation.py
       - name: Moteur du tarif dynamique
         run: pytest -p no:homeassistant tests/test_optimiseur.py
       - name: Dimensionnement

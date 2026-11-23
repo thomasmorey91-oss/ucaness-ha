@@ -39,6 +39,12 @@ Compatibilité vérifiée : tests réussis sous Home Assistant 2026.2.3 et 2026.
 4. Saisissez l'e-mail, le mot de passe et l'ID EMS.
 5. Facultatif : **Configurer** permet de changer la fréquence d'interrogation (60 s par défaut, 30 s minimum).
 
+**Assistant d'installation.** Une fois la batterie connectée, l'intégration vous guide une étape à la fois vers une installation complète du pilotage : pilotage installé, capacité de la batterie, contrat d'électricité, jours ouvrés, prévision solaire, notifications.
+- L'étape suivante apparaît dans **Paramètres → Système → Réparations**, avec la raison de l'étape et un lien vers l'écran où la faire. Elle disparaît d'elle-même une fois faite (à la lecture suivante de l'onduleur), et la suivante prend sa place.
+- Le capteur `sensor.ucaness_installation` donne l'état (`a_configurer`, `en_simulation`, `en_service`, `a_verifier`) et, en attributs, la progression, les étapes faites et restantes, l'étape suivante.
+- L'assistant ne fait que constater : il ne modifie aucun réglage, n'installe aucune autre intégration et n'envoie rien à l'onduleur.
+- Les entités lues par le pilotage et par le tableau de bord reçoivent d'emblée leur identifiant (`sensor.uhome_soc`, `sensor.uhome_mode`…) : sur une installation neuve, il n'y a rien à renommer. Une entité déjà enregistrée garde son identifiant.
+
 Tableau de bord Énergie (Paramètres → Tableaux de bord → Énergie) :
 
 | Rubrique | Capteur |
@@ -81,7 +87,8 @@ Dépendances (Python 3.13) : `pip install -r requirements_test.txt`. Les mêmes 
 ```
 pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py   # client et décodage (8 tests)
 pytest -p no:homeassistant -p no:socket tests/test_pilotage.py           # signature, garde-fous, écriture et relecture (28 tests)
-pytest tests/test_ha_integration.py                                       # dans Home Assistant (14 tests)
+pytest tests/test_ha_integration.py                                       # dans Home Assistant
+pytest -p no:homeassistant -p no:socket tests/test_installation.py       # assistant d'installation
 pytest -p no:homeassistant tests/test_optimiseur.py                      # moteur du tarif dynamique (20 tests)
 pytest tools/dimensionnement/tests -q                                     # analyse et dimensionnement (14 tests)
 pytest -p no:homeassistant -p no:socket dashboard/tests -q                # tableau de bord, générateur de maison, rendu dans Chrome (14 tests)
