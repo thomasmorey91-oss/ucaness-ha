@@ -76,12 +76,14 @@ class FakeUcaness:
         self.valid_tokens = set()
         self.calls = []
         self.expire_next = False
+        self.signin_delay = 0.0  # lenteur de la connexion, pour faire se chevaucher des appels
 
     async def handle(self, request):
         path = request.path
         body = await request.json()
         self.calls.append(path)
         if path == "/user/signin":
+            await asyncio.sleep(self.signin_delay)
             if body.get("sign") == "user@example.org" and body.get("password") == self.password_md5:
                 tok = f"tok{len(self.valid_tokens)}"
                 self.valid_tokens.add(tok)
@@ -135,6 +137,18 @@ def test_relogin_when_session_expired():
         detail = await client.get_detail("testcode01")
         assert detail["is_online"] is True
         assert fake.calls.count("/user/signin") == 2
+    asyncio.run(_with_server(scenario))
+
+
+def test_concurrent_calls_sign_in_once():
+    """Trois lectures simultanées sans session : une seule connexion, le jeton est partagé."""
+    async def scenario(fake, session, base):
+        fake.signin_delay = 0.05
+        client = api.UcanessClient(session, "user@example.org", api.hash_password("secret"), base_url=base)
+        await asyncio.gather(
+            client.get_detail("testcode01"), client.get_config("testcode01"), client.get_events("testcode01")
+        )
+        assert fake.calls.count("/user/signin") == 1
     asyncio.run(_with_server(scenario))
 
 

@@ -258,8 +258,15 @@ class UcanessClient:
         return bool(self._app_key and self._app_secret)
 
     async def login(self) -> None:
-        """Ouvre une session et mémorise le jeton (jamais journalisé)."""
+        """Ouvre une session et mémorise le jeton (jamais journalisé).
+
+        Le jeton est revérifié une fois le verrou pris : quand plusieurs appels simultanés
+        trouvent la session fermée, seul le premier se connecte, les autres réutilisent son jeton.
+        Pour forcer une nouvelle connexion (session expirée), vider self._token avant l'appel.
+        """
         async with self._login_lock:
+            if self._token is not None:
+                return
             body = await self._request(
                 "/user/signin",
                 {"sign": self._email, "password": self._password_md5},
