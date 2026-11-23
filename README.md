@@ -92,6 +92,7 @@ pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py   # clie
 pytest -p no:homeassistant -p no:socket tests/test_pilotage.py           # signature, garde-fous, écriture et relecture (28 tests)
 pytest tests/test_ha_integration.py                                       # dans Home Assistant
 pytest -p no:homeassistant -p no:socket tests/test_installation.py       # assistant d'installation
+pytest -p no:homeassistant -p no:socket tests/test_tarifs.py             # évaluation des offres d'électricité
 pytest -p no:homeassistant tests/test_optimiseur.py                      # moteur du tarif dynamique (20 tests)
 pytest tools/dimensionnement/tests -q                                     # analyse et dimensionnement (14 tests)
 pytest -p no:homeassistant -p no:socket dashboard/tests -q                # tableau de bord, générateur de maison, rendu dans Chrome (14 tests)
@@ -116,6 +117,7 @@ Tests du pilotage : voir `pilotage/README.md` (§ Tests).
 | `ucaness.definir_plages_charge` | Jusqu'à 3 plages de charge (HHMM) ; les autres plages de charge et **toutes les plages de décharge** sont vidées |
 | `ucaness.definir_mode` | `autoconsommation` ou `arbitrage_horaire`. Le mode Backup est refusé |
 | `ucaness.optimiser_charge` (0.3) | Calcul seul, rien n'est envoyé : à partir des prix par créneau, de la consommation et de la prévision solaire, jusqu'à 3 plages de charge qui minimisent le coût sous un tarif dynamique (`custom_components/ucaness/optimiseur.py`, `pilotage/REGLES.md` § 8) |
+| `ucaness.evaluer_offres` | Calcul seul : coût annuel estimé de plusieurs offres d'électricité sur le soutirage mesuré heure par heure, classées par coût (seul critère), avec l'écart par rapport au contrat actuel et un avis sur la puissance souscrite. Formules « base » et « heures pleines / heures creuses ». Limites dites dans la réponse : soutirage rejoué tel que mesuré, Tempo et prix dynamiques non pris en charge, estimation annuelle peu fiable avec peu de jours de mesure. Chaque offre porte la source et la date de son prix ; rien n'est souscrit (`custom_components/ucaness/tarifs.py`) |
 | `ucaness.plages_depuis_plan` (0.3) | Calcul seul : traduit le plan batterie d'EMHASS (ou de tout autre moteur) en 3 plages de charge au plus |
 
 Chaque écriture est journalisée, puis relue sur l'onduleur. Si la relecture ne correspond pas, l'action échoue : un script qui enchaîne plages puis mode s'arrête avant de changer de mode.

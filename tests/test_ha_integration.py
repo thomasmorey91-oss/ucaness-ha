@@ -707,3 +707,32 @@ async def test_question_contrat_prix_manquant(hass, fake_client):
     assert refus["errors"] == {"prix_hc": "prix_nul"}
     refus = await flux.async_step_init({"type_tarif": "Base", "prix_hp": 0})
     assert refus["errors"] == {"prix_hp": "prix_nul"}
+
+
+# ------------------------------------------------------------------ évaluer des offres
+async def test_evaluer_offres_calcul_seul(hass, cloud):
+    import datetime as dt
+    from homeassistant.util import dt as dt_util
+
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
+    debut = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0) - dt.timedelta(days=40)
+    heures = [debut + dt.timedelta(hours=h) for h in range(24 * 40)]
+    soutirage = [{"debut": h.isoformat(), "kwh": 2.0 if (h.hour >= 23 or h.hour < 6) else 0.2} for h in heures]
+    aujourdhui = dt_util.now().date().isoformat()
+    unique = {"nom": "Prix unique", "fournisseur": "Fournisseur A", "formule": "base",
+              "abonnement_eur_an": {"6": 150, "9": 190}, "prix_kwh": {"base": 0.25},
+              "source": "https://exemple.invalid/a", "date_prix": aujourdhui}
+    nuit = {"nom": "Nuit", "fournisseur": "Fournisseur B", "formule": "hphc",
+            "abonnement_eur_an": {"6": 160}, "prix_kwh": {"hp": 0.30, "hc": 0.20},
+            "plages_hc": [{"debut": "2230", "fin": "0630"}], "source": "https://exemple.invalid/b", "date_prix": aujourdhui}
+    tempo = {"nom": "Couleurs", "formule": "tempo", "abonnement_eur_an": {"6": 160}, "prix_kwh": {"bleu": 0.2}}
+    resp = await hass.services.async_call(DOMAIN, "evaluer_offres", {
+        "offres": [unique, nuit, tempo], "contrat_actuel": unique, "soutirage": soutirage, "puissance_kva": 6,
+        "puissances_max_kva": [2.5] * 40,       # pointe de 2,5 kVA : 3 kVA suffiraient
+    }, blocking=True, return_response=True)
+    assert [l["nom"] for l in resp["classement"]] == ["Nuit", "Prix unique"]
+    assert resp["classement"][0]["ecart_avec_contrat_actuel_eur_an"] < 0
+    assert resp["classement"][0]["fiabilite"] == "indicatif"
+    assert resp["offres_ecartees"][0]["nom"] == "Couleurs"
+    assert resp["puissance"]["conseil"] == "baisser" and resp["puissance"]["sur"] is False
+    assert cloud.updates == []          # rien n'est parti vers l'onduleur

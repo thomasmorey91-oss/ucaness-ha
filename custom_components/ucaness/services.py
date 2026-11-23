@@ -46,7 +46,7 @@ from .const import (
     READBACK_DELAY_S,
 )
 from .coordinator import UcanessConfigEntry, UcanessCoordinator
-from . import optimiseur
+from . import optimiseur, tarifs
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,6 +55,7 @@ SERVICE_WINDOWS = "definir_plages_charge"
 SERVICE_MODE = "definir_mode"
 SERVICE_OPTIMISER = "optimiser_charge"
 SERVICE_PLAN = "plages_depuis_plan"
+SERVICE_OFFRES = "evaluer_offres"
 
 ATTR_ENTRY = "config_entry_id"
 HHMM = vol.All(cv.string, vol.Match(r"^([01]\d|2[0-3]):?[0-5]\d$"))
@@ -95,6 +96,32 @@ PLAN_SCHEMA = vol.Schema(
         vol.Required("plan"): vol.All(cv.ensure_list, [dict]),
         vol.Optional("seuil_kw", default=0.2): vol.All(vol.Coerce(float), vol.Range(min=0)),
         vol.Optional("max_plages", default=3): vol.All(vol.Coerce(int), vol.Range(min=1, max=3)),
+    }
+)
+PRIX = vol.All(vol.Coerce(float), vol.Range(min=0, max=5))
+OFFRE = vol.Schema(
+    {
+        vol.Required("nom"): cv.string,
+        vol.Optional("fournisseur", default=""): cv.string,
+        vol.Required("formule"): cv.string,
+        # Abonnement annuel TTC par puissance souscrite : {"6": 150.0, "9": 190.0}.
+        vol.Required("abonnement_eur_an"): vol.Schema({vol.Coerce(int): vol.All(vol.Coerce(float), vol.Range(min=0))}),
+        vol.Required("prix_kwh"): vol.Schema({cv.string: PRIX}),
+        vol.Optional("plages_hc", default=list): vol.All(cv.ensure_list, [WINDOW]),
+        vol.Optional("weekend_hc", default=False): cv.boolean,
+        vol.Optional("source", default=""): cv.string,
+        vol.Optional("date_prix"): vol.Any(None, cv.date),
+    }
+)
+OFFRES_SCHEMA = vol.Schema(
+    {
+        vol.Required("offres"): vol.All(cv.ensure_list, [OFFRE]),
+        vol.Optional("contrat_actuel"): vol.Any(None, OFFRE),
+        vol.Required("soutirage"): vol.All(cv.ensure_list, [dict]),
+        vol.Required("puissance_kva"): vol.All(vol.Coerce(int), vol.Range(min=1, max=36)),
+        vol.Optional("jours_non_ouvres", default=list): vol.All(cv.ensure_list, [cv.date]),
+        vol.Optional("puissances_max_kva", default=list): vol.All(cv.ensure_list, [vol.Any(None, vol.Coerce(float))]),
+        vol.Optional("mesure_fine", default=False): cv.boolean,
     }
 )
 MODE_SCHEMA = vol.Schema(
@@ -288,6 +315,51 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             return {"valide": False, "plages": [], "justification": f"Plan illisible ({err}) : pas de charge réseau."}
         return {"valide": True, **r}
 
+    def _offre(d: dict[str, Any]) -> tarifs.Offre:
+        def hhmm(v: str) -> str:
+            v = v.replace(":", "")
+            return f"{v[:2]}:{v[2:]}"
+
+        return tarifs.Offre(
+            nom=d["nom"], fournisseur=d["fournisseur"], formule=d["formule"],
+            abonnement_eur_an=dict(d["abonnement_eur_an"]), prix_kwh=dict(d["prix_kwh"]),
+            plages_hc=tuple((hhmm(p["debut"]), hhmm(p["fin"])) for p in d["plages_hc"]),
+            weekend_hc=d["weekend_hc"], source=d["source"], date_prix=d.get("date_prix"),
+        )
+
+    async def evaluer_offres(call: ServiceCall) -> ServiceResponse:
+        """Calcul seul : coût annuel estimé de chaque offre sur le soutirage mesuré, classement par
+        coût, avis sur la puissance souscrite. Rien n'est souscrit, rien n'est envoyé."""
+        d = call.data
+        fuseau = dt_util.get_default_time_zone()
+        mesures = []
+        for m in d["soutirage"]:
+            debut = dt_util.parse_datetime(str(m.get("debut")))
+            if debut is None:
+                continue
+            if debut.tzinfo is None:
+                debut = debut.replace(tzinfo=fuseau)
+            try:
+                kwh = float(m.get("kwh"))
+            except (TypeError, ValueError):
+                kwh = None
+            mesures.append((debut.astimezone(fuseau), kwh))
+        actuel = d.get("contrat_actuel")
+        resultat = await hass.async_add_executor_job(
+            lambda: tarifs.classer(
+                [_offre(o) for o in d["offres"]], mesures, d["puissance_kva"],
+                contrat_actuel=_offre(actuel) if actuel else None,
+                jours_non_ouvres=d["jours_non_ouvres"], aujourdhui=dt_util.now().date(),
+            )
+        )
+        resultat["puissance"] = tarifs.analyser_puissance(
+            d["puissances_max_kva"], d["puissance_kva"], mesure_fine=d["mesure_fine"]
+        )
+        return resultat
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_OFFRES, evaluer_offres, schema=OFFRES_SCHEMA, supports_response=SupportsResponse.ONLY
+    )
     hass.services.async_register(
         DOMAIN, SERVICE_OPTIMISER, optimiser_charge, schema=OPTIMISER_SCHEMA, supports_response=SupportsResponse.ONLY
     )

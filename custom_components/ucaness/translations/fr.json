@@ -164,6 +164,40 @@
           "description": "Plages de charge disponibles sur l'onduleur (3)."
         }
       }
+    },
+    "evaluer_offres": {
+      "name": "Évaluer des offres d'électricité",
+      "description": "Calcul seul : coût annuel estimé de chaque offre sur le soutirage mesuré heure par heure (batterie déduite), classement par coût, avis sur la puissance souscrite. Formules « base » et « hphc ». Rien n'est souscrit, rien n'est envoyé à l'onduleur.",
+      "fields": {
+        "offres": {
+          "name": "Offres",
+          "description": "Liste de {nom, fournisseur, formule (base ou hphc), abonnement_eur_an {kVA: € TTC}, prix_kwh {base} ou {hp, hc} en € TTC, plages_hc [{debut, fin}], weekend_hc, source, date_prix}."
+        },
+        "contrat_actuel": {
+          "name": "Contrat actuel",
+          "description": "Même forme qu'une offre : sert de référence pour l'écart annuel."
+        },
+        "soutirage": {
+          "name": "Soutirage",
+          "description": "Liste de {debut, kwh} : énergie prise sur le réseau, une valeur par heure."
+        },
+        "puissance_kva": {
+          "name": "Puissance souscrite",
+          "description": "Puissance de l'abonnement, en kVA."
+        },
+        "jours_non_ouvres": {
+          "name": "Jours fériés",
+          "description": "Dates comptées comme un week-end pour les offres « week-end en heures creuses »."
+        },
+        "puissances_max_kva": {
+          "name": "Puissances maximales",
+          "description": "Une puissance maximale par jour, en kVA, pour l'avis sur la puissance souscrite."
+        },
+        "mesure_fine": {
+          "name": "Maximums lus sur le compteur",
+          "description": "À activer si les puissances maximales viennent du compteur (prise TIC) et non d'une estimation."
+        }
+      }
     }
   },
   "selector": {

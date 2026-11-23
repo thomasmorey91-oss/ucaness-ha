@@ -164,6 +164,40 @@
           "description": "Charge windows available on the inverter (3)."
         }
       }
+    },
+    "evaluer_offres": {
+      "name": "Evaluate electricity offers",
+      "description": "Calculation only: estimated yearly cost of each offer on the measured hourly grid import (battery already deducted), ranking by cost, advice on the subscribed power. Plans: base and hphc. Nothing is subscribed, nothing is sent to the inverter.",
+      "fields": {
+        "offres": {
+          "name": "Offers",
+          "description": "List of {nom, fournisseur, formule (base or hphc), abonnement_eur_an {kVA: € incl. tax}, prix_kwh {base} or {hp, hc} in € incl. tax, plages_hc [{debut, fin}], weekend_hc, source, date_prix}."
+        },
+        "contrat_actuel": {
+          "name": "Current contract",
+          "description": "Same shape as an offer: reference for the yearly difference."
+        },
+        "soutirage": {
+          "name": "Grid import",
+          "description": "List of {debut, kwh}: energy taken from the grid, one value per hour."
+        },
+        "puissance_kva": {
+          "name": "Subscribed power",
+          "description": "Power of the contract, in kVA."
+        },
+        "jours_non_ouvres": {
+          "name": "Public holidays",
+          "description": "Dates counted as a weekend for offers with fully off-peak weekends."
+        },
+        "puissances_max_kva": {
+          "name": "Peak powers",
+          "description": "One peak power per day, in kVA, for the advice on the subscribed power."
+        },
+        "mesure_fine": {
+          "name": "Peaks read from the meter",
+          "description": "Turn on if the peak powers come from the meter itself and not from an estimate."
+        }
+      }
     }
   },
   "selector": {
