@@ -1,0 +1,27 @@
+# Dépendances pour lancer TOUS les tests du dépôt (README § 7, pilotage/README.md, dashboard/README.md,
+# tools/dimensionnement/README.md).
+#
+#   python -m venv .venv && . .venv/bin/activate      # Python 3.13 (exigé par le banc ci-dessous)
+#   pip install -r requirements_test.txt
+#
+# Le banc pytest-homeassistant-custom-component fixe lui-même les versions de Home Assistant,
+# pytest, pytest-asyncio, freezegun et numpy : on les recopie ici pour qu'elles soient visibles.
+# Pour suivre une version plus récente de Home Assistant, changer d'abord la version du banc,
+# puis reporter celles qu'il impose.
+
+# Banc de test Home Assistant (tests/test_ha_integration.py, pilotage/tests/*)
+pytest-homeassistant-custom-component==0.13.316
+homeassistant==2026.2.3
+pytest==9.0.0
+pytest-asyncio==1.3.0
+freezegun==1.5.2            # pilotage/tests/test_calcul.py et test_v7.py
+
+# Packages YAML, tableau de bord, outil de dimensionnement
+PyYAML==6.0.3
+numpy==2.3.2
+pandas==3.1.1
+
+# Facultatif : rendu du tableau de bord dans Chrome (dashboard/tests, ignoré si absent).
+#   pip install playwright==1.63.0 && python -m playwright install --with-deps chromium
+# Facultatif : contre-vérification de l'outil de dimensionnement (ignorée si absente).
+#   pip install breos

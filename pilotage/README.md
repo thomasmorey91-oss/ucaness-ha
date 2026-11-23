@@ -95,6 +95,9 @@ Les listes de prix et de plans sont longues : pour alléger la base de données,
 ## Tests
 
 ```bash
+# Dépendances, depuis la racine du dépôt (Python 3.13)
+pip install -r requirements_test.txt
+
 # Calcul (Home Assistant, freezegun, pyyaml)
 python pilotage/tests/test_calcul.py
 # Ajouts v7 : repli sans prévision solaire, moyenne pondérée, fourchette P10-P90, gain réel

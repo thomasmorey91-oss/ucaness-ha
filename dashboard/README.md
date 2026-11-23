@@ -172,7 +172,9 @@ L'aperçu utilise des valeurs inventées et remplace les cartes standard par des
 ## 7. Tests
 
 ```bash
-pytest dashboard/tests -q
+pip install -r requirements_test.txt playwright==1.63.0   # depuis la racine du dépôt
+python -m playwright install chromium
+pytest -p no:homeassistant -p no:socket dashboard/tests -q
 ```
 
 Les tests vérifient le fichier YAML, la cohérence entre le tableau de bord, les cartes et la liste des entités, le générateur de maison, l'absence de données personnelles dans le dossier, la version annoncée de la ressource, et le rendu des cartes dans Chrome : flux, carrousel, onglets, texte repliable (ordinateur et téléphone), redessin limité, mode allégé (ignoré si Playwright n'est pas installé).
