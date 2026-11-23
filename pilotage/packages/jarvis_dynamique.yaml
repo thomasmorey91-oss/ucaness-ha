@@ -30,7 +30,8 @@
 # « Tarif : début / fin des heures creuses » de jarvis_tarif.yaml, chaque jour).
 # À VÉRIFIER sur la grille de votre fournisseur : composition exacte du prix, acheminement.
 #
-# Repli sûr : prix, prévision solaire, SOC ou capacité manquants, plan de plus de 40 min, batterie
+# Repli sûr : prix, prévision solaire, SOC, température ou capacité manquants (y compris « inconnu »
+# ou « indisponible »), plan de plus de 40 min, plan EMHASS publié depuis trop longtemps, batterie
 # hors plage de température : aucune plage, retour en autoconsommation.
 #
 # Entités attendues en plus de celles du pilotage de nuit : aucune (voir pilotage/DYNAMIQUE.md).
@@ -110,6 +111,13 @@ input_number:
     max: 5
     step: 0.01
     unit_of_measurement: "EUR"
+    mode: box
+  jarvis_dyn_emhass_age_max:
+    name: "EMHASS : âge maximal du plan publié (0 = 40 min)"
+    min: 0
+    max: 1440
+    step: 5
+    unit_of_measurement: "min"
     mode: box
 
 template:
@@ -348,9 +356,10 @@ template:
           puissance_charge_kw: "{{ states('input_number.jarvis_batterie_puissance_charge') | float(3) }}"
           prix_revente: "{{ states('input_number.jarvis_prix_injection') | float(0) }}"
           marge_pct: "{{ states('input_number.jarvis_batterie_marge') | float(10) }}"
+          # Repli sûr : température inconnue ou indisponible = charge interdite.
           charge_interdite: >
-            {{ is_state('binary_sensor.uhome_temperature_hors_plage', 'on')
-               or (states('sensor.uhome_temperature_batterie') | float(20)) < 0 }}
+            {{ not is_state('binary_sensor.uhome_temperature_hors_plage', 'off')
+               or (states('sensor.uhome_temperature_batterie') | float(-273)) < 0 }}
           seuil_gain_eur: "{{ states('input_number.jarvis_dyn_seuil_gain') | float(0.05) }}"
           reserve: "{{ reserve }}"
         response_variable: plan
@@ -389,6 +398,9 @@ template:
   # Plan EMHASS traduit en plages, toutes les 5 min. Convention d'EMHASS : P_batt < 0 = charge,
   # P_grid > 0 = soutirage (puissances en W). Noms des capteurs et des attributs à vérifier sur
   # votre version d'EMHASS (Paramètres > Entrées « EMHASS : … »).
+  # Âge du plan : compté depuis la dernière publication du capteur batterie par EMHASS (et non
+  # depuis cette relecture). Au-delà de « EMHASS : âge maximal du plan publié » (40 min si 0 ;
+  # à allonger si EMHASS n'est lancé qu'une fois par jour), le plan n'est plus valide.
   # ---------------------------------------------------------------------------
   - triggers:
       - trigger: time_pattern
@@ -421,6 +433,13 @@ template:
               {% endif %}
             {% endfor %}
             {{ ns.v }}
+          publie_le: >
+            {% set e = states[states('input_text.jarvis_dyn_emhass_batterie')] %}
+            {% set t = e.last_reported if e is not none else none %}
+            {{ t.isoformat() if t else none }}
+          age_max_min: >
+            {% set v = states('input_number.jarvis_dyn_emhass_age_max') | float(0) %}
+            {{ v if v > 0 else 40 }}
       - action: ucaness.plages_depuis_plan
         continue_on_error: true
         data:
@@ -428,11 +447,21 @@ template:
         response_variable: plan
       - variables:
           resultat: >
-            {% set temp_ok = not (is_state('binary_sensor.uhome_temperature_hors_plage', 'on')
-                                  or (states('sensor.uhome_temperature_batterie') | float(20)) < 0) %}
-            {% if plan is defined and plan is mapping and plan_emhass | count > 0 and temp_ok %}{{ plan }}
-            {% else %}{{ {'valide': false, 'plages': [], 'charge_en_cours': false,
-                          'justification': ('Plan EMHASS indisponible' if temp_ok else 'Charge interdite (température)') ~ ' : pas de charge réseau (repli sûr).'} }}{% endif %}
+            {% set temp_ok = is_state('binary_sensor.uhome_temperature_hors_plage', 'off')
+                             and (states('sensor.uhome_temperature_batterie') | float(-273)) >= 0 %}
+            {% set soc_ok = states('sensor.uhome_soc') | float(-1) >= 0 %}
+            {% set d = publie_le | as_datetime if publie_le else none %}
+            {% set age_min = ((now() - d).total_seconds() / 60) if d is not none else none %}
+            {% set frais = age_min is not none and age_min <= (age_max_min | float(40)) %}
+            {% if plan is defined and plan is mapping and plan_emhass | count > 0 and temp_ok and soc_ok and frais %}{{ plan }}
+            {% else %}
+              {% set motif = 'Charge interdite (température indisponible ou hors plage)' if not temp_ok
+                             else ('SOC indisponible' if not soc_ok
+                             else ('Plan EMHASS indisponible' if (age_min is none or plan_emhass | count == 0 or plan is not defined or plan is not mapping)
+                             else 'Plan EMHASS publié il y a ' ~ (age_min | round(0) | int) ~ ' min (' ~ (age_max_min | float(40) | int) ~ ' min au plus)')) %}
+              {{ {'valide': false, 'plages': [], 'charge_en_cours': false,
+                  'justification': motif ~ ' : pas de charge réseau (repli sûr).'} }}
+            {% endif %}
     sensor:
       - name: "Jarvis plan EMHASS"
         unique_id: jarvis_plan_dynamique_emhass
@@ -443,13 +472,14 @@ template:
           strategie: "EMHASS"
           valide: "{{ resultat.get('valide', false) }}"
           calcule_le: "{{ now().isoformat() }}"
+          publie_le: "{{ publie_le }}"
           plages: "{{ resultat.get('plages', []) }}"
           fenetres: "{{ resultat.get('fenetres', []) }}"
           charge_en_cours: "{{ resultat.get('charge_en_cours', false) }}"
           prochaine_plage: "{{ resultat.get('prochaine_plage') }}"
           charge_ecartee_kwh: "{{ resultat.get('charge_ecartee_kwh') }}"
           justification: >
-            {% if resultat.get('valide') %}EMHASS : {{ resultat.get('fenetres') }} fenêtre(s) de charge réseau,
+            {% if resultat.get('valide') %}EMHASS : {{ resultat.get('nombre_fenetres') }} fenêtre(s) de charge réseau,
             {{ resultat.get('plages') | count }} plage(s) retenue(s), {{ resultat.get('charge_reseau_kwh') }} kWh{% if resultat.get('charge_ecartee_kwh', 0) > 0 %}
             ({{ resultat.get('charge_ecartee_kwh') }} kWh écartés : 3 plages au plus){% endif %}.{% else %}{{ resultat.get('justification') }}{% endif %}
           mode: "{{ 'simulation' if is_state('input_boolean.jarvis_mode_simulation', 'on') else 'réel' }}"
@@ -493,8 +523,9 @@ automation:
     description: >
       Écrit les plages du plan quand elles changent, passe en arbitrage horaire pendant une plage
       (ou 3 min avant son début) et revient en autoconsommation en dehors. En simulation, ne fait
-      que journaliser. Repli sûr : plan non valide ou de plus de 40 min, stratégie de nuit choisie
-      ou batterie hors plage de température : retour en autoconsommation.
+      que journaliser. Repli sûr : plan non valide ou de plus de 40 min, stratégie de nuit choisie,
+      température ou SOC de la batterie indisponible, ou batterie hors plage de température :
+      retour en autoconsommation.
     mode: single
     max_exceeded: silent
     triggers:
@@ -514,9 +545,9 @@ automation:
           frais: >
             {{ capteur != '' and calcule is not none and state_attr(capteur, 'valide') == true
                and (now() - (calcule | as_datetime)).total_seconds() < 2400 }}
-          temperature_ok: >
-            {{ is_state('binary_sensor.uhome_temperature_hors_plage', 'off')
-               or states('binary_sensor.uhome_temperature_hors_plage') in ['unknown', 'unavailable'] }}
+          # Repli sûr : « inconnu », « indisponible » ou entité absente = pas d'arbitrage horaire.
+          temperature_ok: "{{ is_state('binary_sensor.uhome_temperature_hors_plage', 'off') }}"
+          soc_ok: "{{ states('sensor.uhome_soc') | float(-1) >= 0 }}"
           plages: "{{ (state_attr(capteur, 'plages') or []) if frais else [] }}"
           plages_txt: >
             {% set ns = namespace(t=[]) %}
@@ -535,7 +566,7 @@ automation:
               {% if d is not none and f is not none and d - timedelta(minutes=3) <= now() < f %}{% set ns.ok = true %}{% endif %}
             {% endfor %}
             {{ ns.ok }}
-          arbitrage_voulu: "{{ strategie != 'Heures pleines / heures creuses (calcul v7)' and frais and plages | count > 0 and dans_plage and temperature_ok }}"
+          arbitrage_voulu: "{{ strategie != 'Heures pleines / heures creuses (calcul v7)' and frais and plages | count > 0 and dans_plage and temperature_ok and soc_ok }}"
           deja_appliquees: "{{ states('input_text.jarvis_dyn_plages_appliquees') }}"
       # Stratégie de nuit (v7) : ce package rend la main proprement.
       - if:
@@ -667,7 +698,8 @@ automation:
                   message: >
                     [réel] Tarif dynamique : retour en autoconsommation{% if not frais %} (plan absent,
                     non valide ou trop ancien : repli sûr){% elif not temperature_ok %} (température batterie
-                    hors plage){% endif %}.
+                    indisponible ou hors plage : repli sûr){% elif not soc_ok %} (SOC indisponible :
+                    repli sûr){% endif %}.
             else:
               - action: script.jarvis_notifier
                 data:

@@ -20,8 +20,21 @@ def _pkg(name):
     return load_yaml(str(PKG / name))
 
 
+# Temps écoulé depuis le début du test. Les avances se CUMULENT : sans cela, chaque avance repartait
+# de l'heure réelle, et le relevé périodique (toutes les 2 min, aux minutes paires) pouvait tomber
+# pendant une avance courte puis ne plus se représenter pendant l'avance de 120 s. Le test échouait
+# alors selon la seconde à laquelle il était lancé.
+_HORLOGE = {"decalage": 0}
+
+
+@pytest.fixture(autouse=True)
+def _horloge_a_zero():
+    _HORLOGE["decalage"] = 0
+
+
 async def _avancer(hass, secondes):
-    async_fire_time_changed(hass, dt_util.utcnow() + dt.timedelta(seconds=secondes))
+    _HORLOGE["decalage"] += secondes
+    async_fire_time_changed(hass, dt_util.utcnow() + dt.timedelta(seconds=_HORLOGE["decalage"]))
     await hass.async_block_till_done()
 
 

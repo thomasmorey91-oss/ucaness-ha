@@ -208,6 +208,9 @@ def test_plages_depuis_plan_emhass():
     r = opt.plages_depuis_plan(plan, maintenant=dt.datetime(2030, 1, 15, 20, 5, tzinfo=TZ), fuseau=TZ)
     assert r["plages"] == [{"debut": "2200", "fin": "2359"}, {"debut": "0000", "fin": "0200"}]
     assert r["charge_reseau_kwh"] == pytest.approx(12.0)
+    # Fenêtres datées (lues par l'automatisme qui applique le plan) et leur nombre : deux clés.
+    assert r["fenetres"] == [{"debut": "2030-01-15T22:00:00+01:00", "fin": "2030-01-16T02:00:00+01:00"}]
+    assert r["nombre_fenetres"] == 1
 
 
 def test_plages_depuis_plan_garde_les_plus_grosses():
@@ -220,3 +223,4 @@ def test_plages_depuis_plan_garde_les_plus_grosses():
     assert r["plages"] == [{"debut": "0100", "fin": "0300"}, {"debut": "0900", "fin": "1000"},
                            {"debut": "1300", "fin": "1600"}]
     assert r["charge_ecartee_kwh"] == pytest.approx(1.0)
+    assert r["nombre_fenetres"] == 4 and len(r["fenetres"]) == 3      # 4 trouvées, 3 gardées
