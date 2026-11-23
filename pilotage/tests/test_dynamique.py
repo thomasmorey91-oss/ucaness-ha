@@ -75,12 +75,20 @@ async def maison(hass):
 
 def _fenetres(plages, jours=0):
     """Fenêtres datées correspondant aux plages (aujourd'hui, ou décalées de quelques jours)."""
-    minuit = dt_util.now().replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(days=jours)
+    maintenant = dt_util.now()
+    minuit = maintenant.replace(hour=0, minute=0, second=0, microsecond=0)
     out = []
     for p in plages:
         d = minuit + dt.timedelta(hours=int(p["debut"][:2]), minutes=int(p["debut"][2:]))
         f = minuit + dt.timedelta(hours=int(p["fin"][:2]), minutes=int(p["fin"][2:]))
-        out.append({"debut": d.isoformat(), "fin": f.isoformat()})
+        # Les essais ne décrivent que des plages en cours ou à venir. Lancés en fin de soirée, une
+        # plage peut passer minuit (fin le lendemain) ou tomber entièrement le lendemain : sans
+        # cela, les fenêtres étaient datées dans le passé et les essais échouaient après 23 h.
+        if f <= d:
+            f += dt.timedelta(days=1)
+        if f <= maintenant:
+            d, f = d + dt.timedelta(days=1), f + dt.timedelta(days=1)
+        out.append({"debut": (d + dt.timedelta(days=jours)).isoformat(), "fin": (f + dt.timedelta(days=jours)).isoformat()})
     return out
 
 
