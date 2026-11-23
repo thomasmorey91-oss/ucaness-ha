@@ -109,4 +109,4 @@ cd pilotage/tests && python -m pytest -q test_scripts_pilotage.py test_v7_config
 cd pilotage/tests && python -m pytest -q test_dynamique.py test_secours.py
 ```
 
-Le test de la décision du soir se joue sur la date du jour et doit être lancé avant 23h.
+Les tests peuvent être lancés à toute heure : la décision du soir est jouée le lendemain quand l'essai démarre après 22 h 59.

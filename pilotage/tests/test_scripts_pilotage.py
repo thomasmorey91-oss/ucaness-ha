@@ -207,6 +207,17 @@ async def _automatisations(hass, ids, notes=None):
     await hass.async_block_till_done()
 
 
+def _jour_de_la_decision():
+    """Jour où jouer la décision de 23 h : aujourd'hui, ou demain si l'essai est lancé après
+    22 h 59 (on ne peut pas remonter le temps du banc ; un saut de plusieurs jours le bloque)."""
+    import datetime as dt
+
+    from homeassistant.util import dt as dt_util
+
+    maintenant = dt_util.now()
+    return maintenant.date() + dt.timedelta(days=0 if maintenant.time() < dt.time(22, 59) else 1)
+
+
 async def _a(hass, freezer, jour, heure):
     import datetime as dt
     from pytest_homeassistant_custom_component.common import async_fire_time_changed
@@ -227,7 +238,7 @@ async def test_decision_a_23h_programme_la_fin_de_nuit(hass, maison, freezer):
         "reevaluation": "04:28", "calcul_valide": True, "mode": "réel", "justification": "test"})
     await _automatisations(hass, {"jarvis_batterie_decision_du_soir"})
     import homeassistant.util.dt as dt_util
-    jour = dt_util.now().date()  # même jour, avant 23h (un saut de plusieurs jours bloque le banc de test)
+    jour = _jour_de_la_decision()
     await _a(hass, freezer, jour, dt.time(22, 59, 50))
     await _a(hass, freezer, jour, dt.time(23, 0, 0))
     assert [c for c in calls if c[0] != "log"] == [("plages", [{"debut": "0528", "fin": "0545"}]), ("mode", "arbitrage_horaire")]
@@ -244,7 +255,7 @@ async def _decision_23h(hass, freezer, notes):
         "plages": [{"debut": "0410", "fin": "0545"}], "plan_fin": "0545", "maintien": True,
         "reevaluation": "03:10", "calcul_valide": True, "mode": "réel", "justification": "test"})
     await _automatisations(hass, {"jarvis_batterie_decision_du_soir"}, notes)
-    jour = dt_util.now().date()
+    jour = _jour_de_la_decision()
     await _a(hass, freezer, jour, dt.time(22, 59, 50))
     await _a(hass, freezer, jour, dt.time(23, 0, 0))
 
@@ -288,7 +299,7 @@ async def test_decision_sans_recharge_ne_reessaie_pas(hass, maison, freezer):
     hass.states.async_set("sensor.jarvis_recharge_reseau_prevue", "0", {
         "plages": [], "plan_fin": None, "maintien": False, "calcul_valide": True, "mode": "réel", "justification": "test"})
     await _automatisations(hass, {"jarvis_batterie_decision_du_soir"}, notes)
-    jour = dt_util.now().date()
+    jour = _jour_de_la_decision()
     await _a(hass, freezer, jour, dt.time(22, 59, 50))
     await _a(hass, freezer, jour, dt.time(23, 0, 0))
     assert [c for c in calls if c[0] != "log"] == []
