@@ -22,7 +22,7 @@ Ce document décrit ce que font les packages de `pilotage/packages/` : pilotage 
 | Modèle confirmé | Écriture permise seulement pour les modèles `uhome` et `mr` |
 | Relecture | Chaque envoi est relu sur l'onduleur. Un réglage absent de la configuration du cloud vaut 0 ; le mode est aussi confirmé par le mode affiché |
 | Fréquence | 2 s entre envois, 20 envois par heure au plus, seuls les réglages modifiés, deux par deux |
-| Simulation | « Batterie : mode simulation » revient à « allumé » à chaque redémarrage de Home Assistant : rien n'est envoyé tant qu'il n'est pas éteint |
+| Simulation | « Batterie : mode simulation » revient à « allumé » à chaque redémarrage de Home Assistant (rien n'est envoyé tant qu'il n'est pas éteint), sauf si « Batterie : garder le mode réel après un redémarrage » est allumé : le mode d'avant le redémarrage est alors conservé |
 | Température | Aucune charge si la batterie est sous 0 °C |
 | Retour sûr | Retour en autoconsommation 2 min avant la fin des heures creuses, contrôle de secours 15 min après, puis alerte |
 | Données manquantes | Prix, capacité, SOC ou consommation inconnus : aucune recharge (repli sûr) |
@@ -170,5 +170,6 @@ Outil hors de Home Assistant, à lancer une fois depuis un PC : `tools/dimension
 | v5 | Consommation mesurée, nuit toujours déduite, marge de sécurité |
 | v6 | Réglages propres à chaque installation dans des entrées (aucune valeur d'installation dans le code), service de notification paramétrable, place pour le solaire comptée avant le point le plus bas |
 | v7 | Moyenne de consommation pondérée par l'ancienneté, aucune recharge sans prévision solaire datée du jour préparé, journal enrichi (fourchette P10-P90, heure de la prévision), gain réel du jour face à l'autoconsommation et cumuls, 3 essais de programmation, mises à jour Solcast pilotées (optionnel) |
+| v7.1 | Correctifs du journal : cumul du gain de l'année (et bilan annuel des coupures) qui repartait de zéro chaque jour, Home Assistant relisant l'attribut « annee » comme un nombre ; aperçu de 22h30 journalisé ; confirmation de la plage ajustée journalisée après la réévaluation. Interrupteur « Batterie : garder le mode réel après un redémarrage » (éteint par défaut : simulation à chaque démarrage, comme avant). Aucun changement du calcul ni des commandes envoyées |
 | Tarif dynamique 1 | Stratégie au choix (nuit, moteur intégré, EMHASS) ; moteur intégré par programmation dynamique ; adaptateur EMHASS ; le pilotage de nuit ne programme rien quand une stratégie dynamique est choisie |
 | Secours 1 | Détection et suivi des coupures, bilan, risque de coupure (vigilance, coupure programmée), réserve de secours pour le tarif dynamique, bilan au redémarrage ; rien n'est écrit sur l'onduleur |
