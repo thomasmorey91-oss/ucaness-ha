@@ -73,7 +73,7 @@ Les règles et les calculs sont décrits dans `REGLES.md`. Pour analyser l'insta
 3. Renseigner, d'après la grille du fournisseur : « coûts ajoutés au prix de marché » en heures pleines et en heures creuses (EUR/kWh HT : frais du fournisseur, acheminement, taxes) et la TVA. Vérifier `sensor.jarvis_prix_dynamiques` sur une facture.
 4. Choisir « Tarif dynamique (moteur intégré) » dans « Pilotage : stratégie de recharge ». Le pilotage de nuit ne programme alors plus rien.
 5. Laisser quelques jours en simulation : `sensor.jarvis_plan_tarif_dynamique` (plages, gain estimé, justification) et le journal montrent ce qui aurait été programmé.
-6. Stratégie EMHASS : installer EMHASS à part, publier son plan, vérifier les noms des capteurs et des attributs (« EMHASS : … » dans les entrées), puis choisir « Tarif dynamique (EMHASS) ».
+6. Stratégie EMHASS (intégration `ucaness` 0.3.1 ou plus) : installer EMHASS à part, publier son plan, vérifier les noms des capteurs et des attributs (« EMHASS : … » dans les entrées), puis choisir « Tarif dynamique (EMHASS) ». Le plan n'est suivi que s'il a été publié depuis moins de 40 min (attribut `publie_le` de `sensor.jarvis_plan_emhass`) : faire publier EMHASS régulièrement (toutes les 5 min, par exemple), ou allonger « EMHASS : âge maximal du plan publié » s'il n'est lancé qu'une fois par jour.
 
 Les listes de prix et de plans sont longues : pour alléger la base de données, on peut exclure `sensor.jarvis_prix_marche_nordpool`, `sensor.jarvis_prix_dynamiques`, `sensor.jarvis_plan_tarif_dynamique` et `sensor.jarvis_plan_emhass` de l'enregistreur (`recorder:` → `exclude:`).
 

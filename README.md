@@ -1,6 +1,6 @@
 # Intégration Home Assistant « UCANESS » (UCanpower UHome)
 
-Version 0.3.0, 21/11/2026. Testée sur un onduleur UHome 6K.
+Version 0.3.1, 23/11/2026. Testée sur un onduleur UHome 6K.
 
 > **Non officielle.** Les mesures sont lues par l'API du portail UCANESS (oss.ucaness.com), qui n'est pas documentée. Le pilotage passe par l'API tierce documentée d'UCanpower (chemins `/api/v1`, clé d'application).
 > **Lecture seule par défaut.** L'onduleur n'est piloté que si l'option « Écriture autorisée » est activée, et seulement sur deux points : le mode (autoconsommation ou arbitrage horaire) et les plages de charge. Tout autre réglage (DOD, hystérésis, courant, protections réseau, type de batterie, retour usine, commandes) est refusé par le client avant d'atteindre le réseau (§ 6 et § 8).
@@ -106,7 +106,7 @@ Tests du pilotage : voir `pilotage/README.md` (§ Tests).
 | `ucaness.definir_plages_charge` | Jusqu'à 3 plages de charge (HHMM) ; les autres plages de charge et **toutes les plages de décharge** sont vidées |
 | `ucaness.definir_mode` | `autoconsommation` ou `arbitrage_horaire`. Le mode Backup est refusé |
 | `ucaness.optimiser_charge` (0.3) | Calcul seul, rien n'est envoyé : à partir des prix par créneau, de la consommation et de la prévision solaire, jusqu'à 3 plages de charge qui minimisent le coût sous un tarif dynamique (`custom_components/ucaness/optimiseur.py`, `pilotage/REGLES.md` § 8) |
-| `ucaness.plages_depuis_plan` (0.3) | Calcul seul : traduit le plan batterie d'EMHASS (ou de tout autre moteur) en 3 plages de charge au plus |
+| `ucaness.plages_depuis_plan` (0.3) | Calcul seul : traduit le plan batterie d'EMHASS (ou de tout autre moteur) en 3 plages de charge au plus. Réponse : `plages`, `fenetres` (fenêtres datées retenues), `nombre_fenetres` (fenêtres trouvées, depuis la 0.3.1), énergie retenue et écartée |
 
 Chaque écriture est journalisée, puis relue sur l'onduleur. Si la relecture ne correspond pas, l'action échoue : un script qui enchaîne plages puis mode s'arrête avant de changer de mode.
 
