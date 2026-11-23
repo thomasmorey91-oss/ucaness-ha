@@ -5,13 +5,12 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import BATTERY_CHARGE_TEMP_MAX, BATTERY_CHARGE_TEMP_MIN, CONF_DEVICE_CODE, DOMAIN, STALE_AFTER_S
-from .coordinator import UcanessCoordinator
+from .const import BATTERY_CHARGE_TEMP_MAX, BATTERY_CHARGE_TEMP_MIN, CONF_DEVICE_CODE, STALE_AFTER_S
+from .coordinator import UcanessConfigEntry, UcanessCoordinator
 from .sensor import device_info
 
 
@@ -61,15 +60,17 @@ CHECKS = (
 )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    coordinator: UcanessCoordinator = hass.data[DOMAIN][entry.entry_id]
+async def async_setup_entry(
+    hass: HomeAssistant, entry: UcanessConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
+    coordinator = entry.runtime_data
     async_add_entities(UcanessCheck(coordinator, entry, c) for c in CHECKS)
 
 
 class UcanessCheck(CoordinatorEntity[UcanessCoordinator], BinarySensorEntity):
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: UcanessCoordinator, entry: ConfigEntry, check: Check) -> None:
+    def __init__(self, coordinator: UcanessCoordinator, entry: UcanessConfigEntry, check: Check) -> None:
         super().__init__(coordinator)
         self._check = check
         self._attr_unique_id = f"{entry.data[CONF_DEVICE_CODE]}_{check.key}"

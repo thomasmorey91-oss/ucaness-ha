@@ -33,7 +33,7 @@ def fx(name):
 
 def _client(hass, entry):
     """Client de l'API de l'entrée chargée."""
-    return hass.data[DOMAIN][entry.entry_id].client
+    return entry.runtime_data.client
 
 
 class FakeClient:
@@ -318,6 +318,25 @@ async def test_write_budget_survives_reload(hass, cloud, fast_readback):
         with pytest.raises(ServiceValidationError, match="écritures en une heure"):
             await hass.services.async_call(DOMAIN, "definir_mode", {"mode": "arbitrage_horaire"}, blocking=True)
         assert len(cloud.updates) == 2   # rien n'est parti vers l'onduleur
+
+
+async def test_diagnostics_masquent_secrets_et_identifiants(hass, cloud):
+    from custom_components.ucaness.api import hash_password
+    from custom_components.ucaness.diagnostics import async_get_config_entry_diagnostics
+
+    entry = await _entry_with_options(hass, app_key="cle-app-test-123", app_secret="secret-app-test-456", write_enabled=True)
+    assert _client(hass, entry).has_token          # le jeton existe bien côté client
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    texte = json.dumps(diag, ensure_ascii=False)
+
+    for secret in ("user@example.org", hash_password("secret"), "cle-app-test-123", "secret-app-test-456", "jeton-test"):
+        assert secret not in texte, secret
+    for identifiant in ("testcode01", "S0000TEST", "REWTEST", "Maison Test"):
+        assert identifiant not in texte, identifiant
+    # Ce qui sert au diagnostic reste lisible.
+    assert diag["donnees"]["valeurs"]["soc"] == pytest.approx(41.0)
+    assert diag["entree"]["options"]["scan_interval"] == 60
+    assert diag["client"] == {"session_ouverte": True, "cle_application_presente": True, "ecriture_autorisee": True}
 
 
 # --- Tarif dynamique : actions de calcul (rien n'est envoyé) -------------------------------------
