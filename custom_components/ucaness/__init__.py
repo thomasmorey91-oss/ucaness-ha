@@ -6,6 +6,8 @@ horaire, plages de charge) par l'API tierce signée d'UCanpower, seulement si l'
 """
 from __future__ import annotations
 
+from collections import deque
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, Platform
 from homeassistant.core import HomeAssistant
@@ -20,6 +22,7 @@ from .const import (
     CONF_DEVICE_CODE,
     CONF_PASSWORD_MD5,
     CONF_SCAN_INTERVAL,
+    DATA_WRITE_LOG,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -36,12 +39,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # Plafond d'écritures par onduleur, conservé d'un rechargement à l'autre de l'entrée.
+    write_log = hass.data.setdefault(DATA_WRITE_LOG, {}).setdefault(entry.data[CONF_DEVICE_CODE], deque())
     client = UcanessClient(
         async_get_clientsession(hass),
         entry.data[CONF_EMAIL],
         entry.data[CONF_PASSWORD_MD5],
         app_key=entry.options.get(CONF_APP_KEY),
         app_secret=entry.options.get(CONF_APP_SECRET),
+        write_log=write_log,
     )
     scan = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = UcanessCoordinator(hass, client, entry.data[CONF_DEVICE_CODE], scan)

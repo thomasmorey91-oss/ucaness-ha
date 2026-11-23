@@ -1,5 +1,8 @@
 """Constantes de l'intégration UCANESS (non officielle)."""
 DOMAIN = "ucaness"
+# hass.data[DATA_WRITE_LOG][ID EMS] : horodatages des écritures de l'heure écoulée, gardés hors de
+# l'entrée de configuration pour que le plafond d'écritures survive à son rechargement.
+DATA_WRITE_LOG = f"{DOMAIN}_write_log"
 
 CONF_DEVICE_CODE = "device_code"      # « ID EMS » affiché dans le portail (ex. abcd1234ef)
 CONF_PASSWORD_MD5 = "password_md5"    # seule l'empreinte du mot de passe est stockée

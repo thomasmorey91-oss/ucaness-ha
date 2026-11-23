@@ -267,6 +267,29 @@ def test_write_budget_blocks_bursts(monkeypatch):
     asyncio.run(_with_server(scenario))
 
 
+def test_write_budget_shared_by_a_new_client(monkeypatch):
+    """Le plafond horaire suit la file d'écritures passée au client, pas l'instance du client."""
+    monkeypatch.setattr(api, "MIN_WRITE_INTERVAL_S", 0.0)
+    monkeypatch.setattr(api, "MAX_WRITES_PER_HOUR", 2)
+    write_log = api.deque()
+
+    async def scenario(fake, client):
+        fake.model = "uhome"
+        first = api.UcanessClient(client._session, "user@example.org", api.hash_password("secret"),
+                                  base_url=client._base_url, app_key=APP_KEY, app_secret=APP_SECRET,
+                                  write_log=write_log)
+        await first.update_settings("testcode01", {1: 1})
+        await first.update_settings("testcode01", {1: 0})
+        # Nouveau client (comme après un rechargement de l'intégration) avec la même file.
+        second = api.UcanessClient(client._session, "user@example.org", api.hash_password("secret"),
+                                   base_url=client._base_url, app_key=APP_KEY, app_secret=APP_SECRET,
+                                   write_log=write_log)
+        with pytest.raises(api.UcanessWriteRefused, match="écritures en une heure"):
+            await second.update_settings("testcode01", {1: 1})
+        assert len(fake.writes) == 2 and len(write_log) == 2
+    asyncio.run(_with_server(scenario))
+
+
 def test_nothing_sent_when_already_in_place():
     async def scenario(fake, client):
         assert await client.update_settings("testcode01", {1: 0}) == []

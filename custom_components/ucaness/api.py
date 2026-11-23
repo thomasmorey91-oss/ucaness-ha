@@ -228,7 +228,14 @@ class UcanessClient:
         timeout: int = DEFAULT_TIMEOUT,
         app_key: str | None = None,
         app_secret: str | None = None,
+        write_log: deque[float] | None = None,
     ) -> None:
+        """write_log : horodatages (time.monotonic) des écritures envoyées, pour le plafond horaire.
+
+        Home Assistant passe une file gardée hors du client (hass.data) : le plafond de
+        MAX_WRITES_PER_HOUR survit ainsi au rechargement de l'intégration (changement d'options).
+        Sans file fournie, le client garde la sienne (sonde, tests).
+        """
         self._session = session
         self._email = email
         self._password_md5 = password_md5
@@ -239,7 +246,7 @@ class UcanessClient:
         self._write_lock = asyncio.Lock()
         self._app_key = (app_key or "").strip()
         self._app_secret = (app_secret or "").strip()
-        self._writes: deque[float] = deque()
+        self._writes: deque[float] = write_log if write_log is not None else deque()
         self._device_v1: tuple[str, str | None] | None = None
 
     @property
