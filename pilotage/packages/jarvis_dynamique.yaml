@@ -313,9 +313,16 @@ template:
               {% endfor %}
             {% endfor %}
             {{ ns.v }}
+          # Sans panneaux solaires (binary_sensor.jarvis_sans_solaire) : production nulle sur 48 h.
           solaire: >
             {% set ns = namespace(v=[]) %}
-            {% for capteur in ['sensor.solcast_pv_forecast_prevision_aujourdhui', 'sensor.solcast_pv_forecast_prevision_demain'] %}
+            {% if is_state('binary_sensor.jarvis_sans_solaire', 'on') %}
+              {% set h0 = now().replace(minute=0, second=0, microsecond=0) %}
+              {% for h in range(48) %}
+                {% set ns.v = ns.v + [{'debut': (h0 + timedelta(hours=h)).isoformat(), 'pv_estimate': 0}] %}
+              {% endfor %}
+            {% endif %}
+            {% for capteur in ([] if ns.v else ['sensor.solcast_pv_forecast_prevision_aujourdhui', 'sensor.solcast_pv_forecast_prevision_demain']) %}
               {% for e in state_attr(capteur, 'detailedHourly') or [] %}
                 {% set ns.v = ns.v + [{'debut': (e.period_start | as_datetime | as_local).isoformat(), 'pv_estimate': e.pv_estimate | float(0)}] %}
               {% endfor %}

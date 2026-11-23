@@ -135,7 +135,7 @@ async def test_entities_created_with_values(hass, fake_client):
     assert soc is not None and float(soc.state) == pytest.approx(41.0)
     assert soc.attributes["unit_of_measurement"] == "%"
 
-    solar_total = hass.states.get("sensor.maison_test_production_solaire_totale")
+    solar_total = hass.states.get("sensor.uhome_production_solaire_totale")
     assert float(solar_total.state) == pytest.approx(5000.0)
     assert solar_total.attributes["state_class"] == "total_increasing"
     assert solar_total.attributes["device_class"] == "energy"
@@ -546,6 +546,7 @@ async def _entrees_du_pilotage(hass):
     bat, tarif = (load_yaml(str(PAQUETS / n)) for n in ("jarvis_batterie.yaml", "jarvis_tarif.yaml"))
     for domaine in ("input_number", "input_select", "input_boolean", "input_datetime"):
         assert await async_setup_component(hass, domaine, {domaine: {**bat.get(domaine, {}), **tarif.get(domaine, {})}})
+    # Sans valeur restaurée, une liste de choix prend sa première option (« Détection automatique »).
     await hass.async_block_till_done()
 
 
@@ -775,6 +776,8 @@ async def test_batterie_sans_panneaux(hass, fake_client):
         await hass.async_block_till_done()
         assert entry.options["reglages"]["solaire"] is False
         assert hass.states.get("switch.ucaness_solaire").state == "off"
+        # Le pilotage est prévenu : il calculera la recharge de nuit sans prévision solaire.
+        assert hass.states.get("input_select.jarvis_solaire").state == "Sans panneaux"
         assert _issues(hass) == ["etape_contrat"]
 
         hass.states.async_set("input_boolean.jarvis_mode_simulation", "on")
@@ -786,3 +789,20 @@ async def test_batterie_sans_panneaux(hass, fake_client):
         assert etat.state == "en_simulation"
         assert "prevision_solaire" in etat.attributes["etapes_faites"]
         assert _issues(hass) == ["etape_notifications"]
+
+
+async def test_reglage_solaire_suit_le_choix_du_pilotage(hass, fake_client):
+    """« Batterie : panneaux solaires » du package : un choix net fait foi ; en détection
+    automatique, c'est la valeur enregistrée (ou la production mesurée) qui compte."""
+    await _entrees_du_pilotage(hass)
+    await _create_entry(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get("input_select.jarvis_solaire").state == "Détection automatique"
+    assert hass.states.get("switch.ucaness_solaire").state == "unknown"
+    await hass.services.async_call("input_select", "select_option", {"entity_id": "input_select.jarvis_solaire", "option": "Sans panneaux"}, blocking=True)
+    await hass.async_block_till_done()
+    assert hass.states.get("switch.ucaness_solaire").state == "off"
+    await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.ucaness_solaire"}, blocking=True)
+    await hass.async_block_till_done()
+    assert hass.states.get("input_select.jarvis_solaire").state == "Avec panneaux"
+    assert hass.states.get("switch.ucaness_solaire").state == "on"

@@ -25,7 +25,7 @@ Les règles et les calculs sont décrits dans `REGLES.md`. Pour analyser l'insta
 | Home Assistant récent (testé avec 2026.10 et 2026.11) | Actions `recorder.get_statistics`, `workday.check_date`, `ucaness.*` |
 | Intégration `ucaness` (ce dépôt) | Avec la clé et le secret d'application UCanpower, et l'option « Écriture autorisée » cochée pour le mode réel |
 | Intégration Workday | Jours ouvrés de votre pays : `binary_sensor.workday_sensor` |
-| Prévision solaire Solcast (`BJReplay/ha-solcast-solar`) | Prévisions du jour et du lendemain, attribut `detailedHourly` |
+| Prévision solaire Solcast (`BJReplay/ha-solcast-solar`) | Prévisions du jour et du lendemain, attribut `detailedHourly`. **Inutile pour une batterie sans panneaux solaires** (voir « Batterie : panneaux solaires » ci-dessous) |
 | Application mobile Home Assistant | Pour les notifications (facultatif) |
 | Tarif dynamique : intégration Nord Pool (officielle) | Ou tout capteur qui publie la liste des prix ; EMHASS pour la stratégie EMHASS |
 | Secours : intégration Météo-France | Facultatif, pour la vigilance (`sensor.<département>_weather_alert`) |
@@ -48,6 +48,7 @@ Les règles et les calculs sont décrits dans `REGLES.md`. Pour analyser l'insta
    | UCANESS : puissance réseau estimée | `sensor.uhome_puissance_reseau` |
    | UCANESS : puissance MPPT 1 / MPPT 2 | `sensor.uhome_puissance_mppt_1` / `sensor.uhome_puissance_mppt_2` |
    | UCANESS : production solaire aujourd'hui | `sensor.uhome_production_solaire_aujourdhui` |
+   | UCANESS : production solaire totale (détection d'une batterie sans panneaux) | `sensor.uhome_production_solaire_totale` |
    | UCANESS : soutirage réseau total | `sensor.uhome_soutirage_reseau_total` |
    | UCANESS : mode de fonctionnement | `sensor.uhome_mode` |
    | UCANESS : code défaut / code alarme batterie | `sensor.uhome_code_defaut_batterie` / `sensor.uhome_code_alarme_batterie` |
@@ -61,6 +62,7 @@ Les règles et les calculs sont décrits dans `REGLES.md`. Pour analyser l'insta
 
 3. Vérifier la configuration, puis redémarrer.
 4. Renseigner les entrées (Paramètres → Appareils et services → Entrées) : capacité de la batterie, plancher, puissance de charge, marge, consommation journalière par défaut, tarif (heures creuses, week-end en heures creuses, prix), service de notification. Le détail est dans `REGLES.md`, § 6.
+   **Batterie sans panneaux solaires.** L'entrée « Batterie : panneaux solaires » vaut « Détection automatique » au départ : la maison est considérée sans panneaux si l'onduleur n'a jamais rien produit (`sensor.uhome_production_solaire_totale` à 0) et que MPPT 1 et MPPT 2 sont à 0 ; dans le doute, elle est considérée avec panneaux. On peut aussi choisir « Avec panneaux » ou « Sans panneaux ». Sans panneaux, la recharge en heures creuses est calculée avec une production nulle, sans prévision Solcast ; `binary_sensor.jarvis_sans_solaire` indique le résultat.
 5. Gain réel : chaque soir, `sensor.jarvis_gain_reel_du_jour` compare le coût réel des 24 dernières heures à l'autoconsommation simple simulée avec les mêmes mesures ; cumuls dans `sensor.jarvis_gain_reel_du_mois` et `sensor.jarvis_gain_reel_de_l_annee`. Les jours sans recharge, il doit rester proche de 0 : l'écart mesure la précision de la simulation.
 6. Laisser tourner quelques jours en simulation : chaque soir, le journal de bord indique la recharge qui aurait été programmée et pourquoi (entité `sensor.jarvis_recharge_reseau_prevue`).
 7. Mode réel : cocher « Écriture autorisée » dans les options de l'intégration UCANESS, puis éteindre « Batterie : mode simulation ». Par défaut, la simulation revient à chaque redémarrage de Home Assistant ; pour garder le mode réel, allumer « Batterie : garder le mode réel après un redémarrage ».

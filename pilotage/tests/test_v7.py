@@ -49,9 +49,9 @@ async def nouveau_hass(d, etats):
 
 
 # --- Calcul de la recharge ------------------------------------------------------------------------
-async def calcul(quand, prevision, mesures, ouvre=True):
+async def calcul(quand, prevision, mesures, ouvre=True, etats_en_plus=None):
     with tempfile.TemporaryDirectory() as d:
-        hass = await nouveau_hass(d, ETATS)
+        hass = await nouveau_hass(d, {**ETATS, **(etats_en_plus or {})})
         for capteur in ("sensor.solcast_pv_forecast_prevision_demain", "sensor.solcast_pv_forecast_prevision_aujourdhui"):
             hass.states.async_set(capteur, "0", {"detailedHourly": prevision})
         actions = paquet()["template"][0]["actions"]
@@ -175,6 +175,25 @@ def verifier():
         assert c["justification"].startswith("Prévision solaire indisponible"), c["justification"]
         assert r["pv_info"]["ok"] is False
         print(f"Prévision {nom} :", c["justification"])
+
+    # 1 bis. Batterie sans panneaux solaires : pas de prévision à attendre, la recharge en heures
+    # creuses est calculée avec une production nulle. Le repli sûr des maisons avec panneaux
+    # (« inconnu » compris) est inchangé.
+    sans = {"binary_sensor.jarvis_sans_solaire": "on"}
+    r = asyncio.run(calcul(base.SOIR, [], base.statistiques(), etats_en_plus=sans))
+    c = r["calcul"]
+    assert r["pv_info"]["ok"] is True and r["pv_info"]["sans_solaire"] is True and r["pv_h"] == [0.0] * 24
+    assert c["calcul_valide"] is True and c["recharge_kwh"] > 0 and c["solaire_prevu_kwh"] == 0, c
+    avec = asyncio.run(calcul(base.SOIR, prevision(), base.statistiques()))["calcul"]
+    assert c["recharge_kwh"] >= avec["recharge_kwh"], (c["recharge_kwh"], avec["recharge_kwh"])
+    # Une prévision Solcast présente n'est pas lue quand il n'y a pas de panneaux.
+    r2 = asyncio.run(calcul(base.SOIR, prevision(), base.statistiques(), etats_en_plus=sans))
+    assert r2["pv_h"] == [0.0] * 24 and r2["calcul"]["recharge_kwh"] == c["recharge_kwh"]
+    for etat in ("off", "unknown", "unavailable"):
+        r3 = asyncio.run(calcul(base.SOIR, [], base.statistiques(), etats_en_plus={"binary_sensor.jarvis_sans_solaire": etat}))
+        assert r3["calcul"]["calcul_valide"] is False and r3["calcul"]["recharge_kwh"] == 0, etat
+        assert r3["calcul"]["justification"].startswith("Prévision solaire indisponible"), etat
+    print(f"Sans panneaux solaires : recharge {c['recharge_kwh']} kWh (avec panneaux : {avec['recharge_kwh']} kWh)")
 
     # 2. Prévision présente : fourchette P10-P90 et heure de mise à jour.
     r = asyncio.run(calcul(base.SOIR, prevision(), base.statistiques()))

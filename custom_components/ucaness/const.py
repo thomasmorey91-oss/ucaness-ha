@@ -54,6 +54,7 @@ OBJECT_IDS = {
     "battery_fault_code": "uhome_code_defaut_batterie",
     "battery_alarm_code": "uhome_code_alarme_batterie",
     "energy_solar_today": "uhome_production_solaire_aujourdhui",
+    "energy_solar_total": "uhome_production_solaire_totale",
     "energy_grid_import_total": "uhome_soutirage_reseau_total",
     "energy_battery_charge_total": "uhome_charge_batterie_totale",
     "energy_battery_discharge_total": "uhome_decharge_batterie_totale",

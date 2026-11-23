@@ -41,6 +41,9 @@ class Reglage:
     pas: float | None = None
     options: tuple[str, ...] = ()
     icone: str | None = None
+    # Réglage oui / non dont l'entrée du package est une liste de choix : (choix « oui », choix « non »).
+    # Tout autre choix de la liste (détection automatique) laisse la valeur enregistrée ici.
+    choix_oui_non: tuple[str, str] | None = None
 
 
 REGLAGES: tuple[Reglage, ...] = (
@@ -51,8 +54,9 @@ REGLAGES: tuple[Reglage, ...] = (
     Reglage("puissance_charge", "Batterie : puissance de charge", NUMBER, "input_number.jarvis_batterie_puissance_charge", "kW", 0.5, 10, 0.1, icone="mdi:flash"),
     Reglage("marge", "Batterie : marge de sécurité", NUMBER, "input_number.jarvis_batterie_marge", "%", 0, 50, 1, icone="mdi:shield-half-full"),
     Reglage("conso_journaliere", "Batterie : consommation journalière par défaut", NUMBER, "input_number.jarvis_conso_journaliere", "kWh", 0, 200, 0.1, icone="mdi:home-lightning-bolt"),
-    # Installation (pas d'entrée dans les packages : réglage propre à l'intégration)
-    Reglage("solaire", "Installation : panneaux solaires raccordés", SWITCH, "", icone="mdi:solar-power"),
+    # Installation (pilotage/packages/jarvis_batterie.yaml : « Batterie : panneaux solaires »)
+    Reglage("solaire", "Installation : panneaux solaires raccordés", SWITCH, "input_select.jarvis_solaire",
+            icone="mdi:solar-power", choix_oui_non=("Avec panneaux", "Sans panneaux")),
     # Contrat (pilotage/packages/jarvis_tarif.yaml)
     Reglage("type_tarif", "Tarif : type de contrat", SELECT, "input_select.jarvis_type_tarif", options=(TARIF_HPHC, TARIF_BASE), icone="mdi:cash-clock"),
     Reglage("prix_hp", "Tarif : prix heures pleines (ou Base)", NUMBER, "input_number.jarvis_prix_hp", "EUR/kWh", 0, 1, 0.00001, icone="mdi:currency-eur"),
@@ -102,7 +106,10 @@ def valeur(hass: HomeAssistant, entry: UcanessConfigEntry, cle: str) -> Any:
     None si le réglage n'a jamais été renseigné (une donnée absente reste absente)."""
     reglage = PAR_CLE[cle]
     etat = hass.states.get(reglage.entree) if reglage.entree else None
-    if etat is not None and etat.state not in INCONNU:
+    if etat is not None and reglage.choix_oui_non:
+        if etat.state in reglage.choix_oui_non:
+            return etat.state == reglage.choix_oui_non[0]
+    elif etat is not None and etat.state not in INCONNU:
         try:
             return normaliser(reglage, etat.state)
         except ValueError:
@@ -124,7 +131,10 @@ async def async_definir(hass: HomeAssistant, entry: UcanessConfigEntry, valeurs:
         if not reglage.entree or hass.states.get(reglage.entree) is None:
             continue
         cible = {"entity_id": reglage.entree}
-        if reglage.type == NUMBER:
+        if reglage.choix_oui_non:
+            choix = reglage.choix_oui_non[0 if v else 1]
+            await hass.services.async_call("input_select", "select_option", {**cible, "option": choix}, blocking=True)
+        elif reglage.type == NUMBER:
             await hass.services.async_call("input_number", "set_value", {**cible, "value": v}, blocking=True)
         elif reglage.type == SELECT:
             await hass.services.async_call("input_select", "select_option", {**cible, "option": v}, blocking=True)
