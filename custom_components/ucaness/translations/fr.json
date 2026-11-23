@@ -189,11 +189,63 @@
     },
     "etape_batterie": {
       "title": "UCANESS : indiquer la capacité de votre batterie",
-      "description": "La capacité sert à savoir combien d'énergie il reste et combien il en faut. Tant qu'elle vaut 0, aucune recharge n'est programmée.\n\nRenseignez « Batterie : capacité brute » dans [Paramètres > Entrées]({lien})."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Votre batterie",
+            "description": "L'onduleur annonce {modules} module(s) de batterie. Avec des modules de 5,12 kWh, cela fait {proposition} kWh : confirmez ou corrigez.\n\nLe plancher est le niveau sous lequel la batterie ne se décharge plus (observez le plus bas atteint une nuit sans recharge). La puissance de charge est celle que vous constatez pendant une recharge sur le réseau. Ces deux valeurs pourront être affinées plus tard.",
+            "data": {
+              "capacite": "Capacité de la batterie",
+              "plancher": "Niveau plancher",
+              "puissance_charge": "Puissance de charge sur le réseau"
+            }
+          }
+        },
+        "error": {
+          "capacite_nulle": "Indiquez une capacité supérieure à 0."
+        },
+        "abort": {
+          "entree_absente": "Cette batterie n'est plus configurée."
+        }
+      }
     },
     "etape_contrat": {
       "title": "UCANESS : indiquer votre contrat d'électricité",
-      "description": "Recharger la nuit n'a d'intérêt que si l'écart de prix entre heures pleines et heures creuses le justifie.\n\nRenseignez le type de contrat, les heures creuses et les prix dans [Paramètres > Entrées]({lien}) (entrées « Tarif : … »)."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Votre contrat d'électricité",
+            "description": "Ces informations figurent sur votre facture. Avec un contrat sans heures creuses, choisissez « Base » et laissez les heures creuses de côté.",
+            "data": {
+              "type_tarif": "Type de contrat",
+              "prix_hp": "Prix du kWh en heures pleines (ou prix unique)",
+              "prix_hc": "Prix du kWh en heures creuses",
+              "hc_debut": "Début des heures creuses",
+              "hc_fin": "Fin des heures creuses",
+              "hc_jours_non_ouvres": "Week-end et jours fériés entièrement en heures creuses",
+              "prix_injection": "Prix de revente du surplus"
+            }
+          },
+          "bilan": {
+            "title": "Chez vous, recharger la nuit est rentable",
+            "description": "Chaque kWh rechargé en heures creuses puis consommé en heures pleines fait gagner environ {gain} centimes (rendement de la batterie compté à {rendement} % dans chaque sens).\n\nLe pilotage rechargera la nuit, juste ce qu'il faut pour tenir jusqu'au relais du soleil. Validez pour enregistrer votre contrat."
+          },
+          "bilan_non_rentable": {
+            "title": "Chez vous, recharger la nuit n'est pas rentable",
+            "description": "Avec ces prix, chaque kWh rechargé en heures creuses puis consommé en heures pleines ferait perdre environ {gain} centimes (rendement de la batterie compté à {rendement} % dans chaque sens).\n\nLe pilotage ne programmera donc pas de recharge sur le réseau ; votre batterie continuera de stocker votre production solaire. Validez pour enregistrer votre contrat."
+          },
+          "bilan_base": {
+            "title": "Contrat sans heures creuses",
+            "description": "Avec un prix unique, recharger la batterie sur le réseau n'apporte rien : le pilotage ne programmera pas de recharge de nuit. Votre batterie continuera de stocker votre production solaire. Validez pour enregistrer votre contrat."
+          }
+        },
+        "error": {
+          "prix_nul": "Indiquez un prix supérieur à 0."
+        },
+        "abort": {
+          "entree_absente": "Cette batterie n'est plus configurée."
+        }
+      }
     },
     "etape_jours_ouvres": {
       "title": "UCANESS : ajouter les jours ouvrés",

@@ -42,7 +42,10 @@ Compatibilité vérifiée : tests réussis sous Home Assistant 2026.2.3 et 2026.
 **Assistant d'installation.** Une fois la batterie connectée, l'intégration vous guide une étape à la fois vers une installation complète du pilotage : pilotage installé, capacité de la batterie, contrat d'électricité, jours ouvrés, prévision solaire, notifications.
 - L'étape suivante apparaît dans **Paramètres → Système → Réparations**, avec la raison de l'étape et un lien vers l'écran où la faire. Elle disparaît d'elle-même une fois faite (à la lecture suivante de l'onduleur), et la suivante prend sa place.
 - Le capteur `sensor.ucaness_installation` donne l'état (`a_configurer`, `en_simulation`, `en_service`, `a_verifier`) et, en attributs, la progression, les étapes faites et restantes, l'étape suivante.
-- L'assistant ne fait que constater : il ne modifie aucun réglage, n'installe aucune autre intégration et n'envoie rien à l'onduleur.
+- Deux étapes se règlent par un court dialogue, depuis la réparation elle-même (bouton **Réparer**) : « Votre batterie » (capacité proposée d'après le nombre de modules lu, à confirmer) et « Votre contrat » (prix, heures creuses ; l'assistant indique ensuite si la recharge de nuit est rentable chez vous, avant d'enregistrer).
+- L'assistant n'installe aucune autre intégration et n'envoie rien à l'onduleur. Il n'enregistre un réglage que lorsque vous validez un écran de questions.
+
+**Réglages du pilotage.** La capacité, le plancher, le rendement, la puissance de charge, la marge, la consommation par défaut et le contrat (type, prix, heures creuses, week-end) sont aussi des entités de l'intégration (`number.ucaness_capacite`, `select.ucaness_type_tarif`, `time.ucaness_hc_debut`…), visibles sur la fiche de l'appareil. Tant que les packages de pilotage lisent leurs entrées (Paramètres → Entrées), il n'y a qu'une valeur par réglage : modifier l'entité met l'entrée à jour, et inversement. Le calcul du pilotage est inchangé. Ces réglages sont masqués dans les diagnostics.
 - Les entités lues par le pilotage et par le tableau de bord reçoivent d'emblée leur identifiant (`sensor.uhome_soc`, `sensor.uhome_mode`…) : sur une installation neuve, il n'y a rien à renommer. Une entité déjà enregistrée garde son identifiant.
 
 Tableau de bord Énergie (Paramètres → Tableaux de bord → Énergie) :

@@ -117,4 +117,10 @@ def test_chaque_etape_a_ses_textes():
     for fichier in ("strings.json", "translations/fr.json", "translations/en.json"):
         issues = json.loads((ROOT / "custom_components" / "ucaness" / fichier).read_text())["issues"]
         for cle in inst.CLES:
-            assert issues[f"etape_{cle}"]["title"] and "{lien}" in issues[f"etape_{cle}"]["description"], (fichier, cle)
+            texte = issues[f"etape_{cle}"]
+            assert texte["title"], (fichier, cle)
+            # Une étape se règle soit par un lien (description), soit par des questions (fix_flow).
+            if "fix_flow" in texte:
+                assert "description" not in texte and texte["fix_flow"]["step"]["init"]["data"], (fichier, cle)
+            else:
+                assert "{lien}" in texte["description"], (fichier, cle)

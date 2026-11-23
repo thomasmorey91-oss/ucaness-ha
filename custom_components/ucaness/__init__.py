@@ -16,6 +16,7 @@ from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.typing import ConfigType
 
 from . import assistant
+from .reglages import CONF_REGLAGES
 from .api import UcanessClient
 from .const import (
     CONF_APP_KEY,
@@ -30,7 +31,7 @@ from .const import (
 from .coordinator import UcanessConfigEntry, UcanessCoordinator
 from .services import async_setup_services
 
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SELECT, Platform.TIME, Platform.SWITCH]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
@@ -54,6 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UcanessConfigEntry) -> b
     coordinator = UcanessCoordinator(hass, client, entry.data[CONF_DEVICE_CODE], scan)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    coordinator.options_chargees = _hors_reglages(entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
 
@@ -75,5 +77,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: UcanessConfigEntry) -> 
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
+def _hors_reglages(entry: UcanessConfigEntry) -> dict:
+    return {k: v for k, v in entry.options.items() if k != CONF_REGLAGES}
+
+
 async def _async_reload(hass: HomeAssistant, entry: UcanessConfigEntry) -> None:
+    # Un réglage du pilotage modifié ne change rien à la liaison avec l'onduleur : pas de
+    # rechargement, les entités sont simplement rafraîchies.
+    if _hors_reglages(entry) == getattr(entry.runtime_data, "options_chargees", None):
+        entry.runtime_data.async_update_listeners()
+        return
     await hass.config_entries.async_reload(entry.entry_id)

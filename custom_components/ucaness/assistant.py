@@ -13,7 +13,7 @@ from typing import Any
 from homeassistant.core import CoreState, HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
-from . import installation
+from . import installation, reglages
 from .const import (
     CONF_APP_KEY,
     CONF_APP_SECRET,
@@ -25,10 +25,8 @@ from .coordinator import UcanessConfigEntry
 
 # Entrées des packages de pilotage (pilotage/packages/*.yaml).
 E_SIMULATION = "input_boolean.jarvis_mode_simulation"
-E_CAPACITE = "input_number.jarvis_batterie_capacite"
-E_TYPE_TARIF = "input_select.jarvis_type_tarif"
-E_PRIX_HP = "input_number.jarvis_prix_hp"
-E_PRIX_HC = "input_number.jarvis_prix_hc"
+# Étapes qui se règlent par un court dialogue dans la réparation elle-même (repairs.py).
+ETAPES_A_QUESTIONS = ("batterie", "contrat")
 E_NOTIFICATION = "input_text.jarvis_service_notification"
 E_JOURS_OUVRES = "binary_sensor.workday_sensor"
 E_PREVISIONS = (
@@ -54,10 +52,10 @@ def construire_contexte(hass: HomeAssistant, entry: UcanessConfigEntry) -> dict[
         "connexion": bool(coordinator.last_update_success and coordinator.data),
         "packages": hass.states.get(E_SIMULATION) is not None,
         "entites_manquantes": [e for e in ENTITES_PILOTAGE if hass.states.get(e) is None],
-        "capacite_kwh": _etat(hass, E_CAPACITE),
-        "type_tarif": _etat(hass, E_TYPE_TARIF),
-        "prix_hp": _etat(hass, E_PRIX_HP),
-        "prix_hc": _etat(hass, E_PRIX_HC),
+        "capacite_kwh": reglages.valeur(hass, entry, "capacite"),
+        "type_tarif": reglages.valeur(hass, entry, "type_tarif"),
+        "prix_hp": reglages.valeur(hass, entry, "prix_hp"),
+        "prix_hc": reglages.valeur(hass, entry, "prix_hc"),
         "jours_ouvres": hass.states.get(E_JOURS_OUVRES) is not None,
         # Une prévision compte si elle porte des valeurs heure par heure (attribut detailedHourly).
         "prevision_solaire": any(
@@ -98,8 +96,9 @@ def signaler_etape_suivante(hass: HomeAssistant, entry: UcanessConfigEntry) -> i
     if suivante is not None:
         ir.async_create_issue(
             hass, DOMAIN, _issue_id(entry, suivante.cle),
-            is_fixable=False,
+            is_fixable=suivante.cle in ETAPES_A_QUESTIONS,
             is_persistent=False,
+            data={"cle": suivante.cle, "entry_id": entry.entry_id},
             severity=ir.IssueSeverity.WARNING,
             translation_key=f"etape_{suivante.cle}",
             translation_placeholders={

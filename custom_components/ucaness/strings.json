@@ -189,11 +189,63 @@
     },
     "etape_batterie": {
       "title": "UCANESS: enter your battery capacity",
-      "description": "The capacity tells how much energy is left and how much is needed. While it is 0, no charge is planned.\n\nFill in \"Batterie : capacité brute\" in [Settings > Helpers]({lien})."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Your battery",
+            "description": "The inverter reports {modules} battery module(s). With 5.12 kWh modules, that is {proposition} kWh: confirm or correct.\n\nThe floor is the level below which the battery no longer discharges (watch the lowest level reached on a night without charging). The charge power is what you observe during a grid charge. Both can be refined later.",
+            "data": {
+              "capacite": "Battery capacity",
+              "plancher": "Floor level",
+              "puissance_charge": "Grid charge power"
+            }
+          }
+        },
+        "error": {
+          "capacite_nulle": "Enter a capacity above 0."
+        },
+        "abort": {
+          "entree_absente": "This battery is no longer configured."
+        }
+      }
     },
     "etape_contrat": {
       "title": "UCANESS: enter your electricity contract",
-      "description": "Charging at night is only worth it if the price gap between peak and off-peak hours justifies it.\n\nFill in the contract type, off-peak hours and prices in [Settings > Helpers]({lien}) (\"Tarif : …\" helpers)."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Your electricity contract",
+            "description": "This information is on your bill. With a contract without off-peak hours, choose \"Base\" and leave the off-peak fields aside.",
+            "data": {
+              "type_tarif": "Contract type",
+              "prix_hp": "Peak price per kWh (or single price)",
+              "prix_hc": "Off-peak price per kWh",
+              "hc_debut": "Off-peak start",
+              "hc_fin": "Off-peak end",
+              "hc_jours_non_ouvres": "Weekends and public holidays fully off-peak",
+              "prix_injection": "Feed-in price"
+            }
+          },
+          "bilan": {
+            "title": "Charging at night pays off for you",
+            "description": "Each kWh charged off-peak and used at peak time saves about {gain} cents (battery efficiency counted at {rendement} % each way).\n\nControl will charge at night, just enough to last until the sun takes over. Submit to save your contract."
+          },
+          "bilan_non_rentable": {
+            "title": "Charging at night does not pay off for you",
+            "description": "With these prices, each kWh charged off-peak and used at peak time would lose about {gain} cents (battery efficiency counted at {rendement} % each way).\n\nControl will not plan any grid charge; your battery keeps storing your solar production. Submit to save your contract."
+          },
+          "bilan_base": {
+            "title": "Contract without off-peak hours",
+            "description": "With a single price, charging the battery from the grid brings nothing: control will not plan any night charge. Your battery keeps storing your solar production. Submit to save your contract."
+          }
+        },
+        "error": {
+          "prix_nul": "Enter a price above 0."
+        },
+        "abort": {
+          "entree_absente": "This battery is no longer configured."
+        }
+      }
     },
     "etape_jours_ouvres": {
       "title": "UCANESS: add working days",

@@ -28,6 +28,7 @@ TO_REDACT = {
     CONF_APP_KEY,
     CONF_APP_SECRET,
     "token",
+    "reglages",          # réglages du pilotage : prix du contrat, capacité
     "signature",
     "sign",
     # identifiants de l'installation
