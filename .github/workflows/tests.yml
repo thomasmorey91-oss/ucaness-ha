@@ -21,6 +21,12 @@ jobs:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: requirements_test.txt
+      - name: Aucun marqueur de conflit de fusion
+        run: |
+          if git grep -n -I -E '^(<<<<<<<|>>>>>>>) |^=======$'; then
+            echo "Marqueur de conflit de fusion laissé dans le ou les fichiers ci-dessus."
+            exit 1
+          fi
       - name: Dépendances
         run: pip install -r requirements_test.txt
 

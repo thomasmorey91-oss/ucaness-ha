@@ -7,7 +7,7 @@ Version 0.4.0, 23/11/2026. Testée sur un onduleur UHome 6K.
 
 ## 1. Ce que vous obtenez
 
-**Un appareil « UHome 6K »** dans Home Assistant, avec 51 capteurs et 3 capteurs de surveillance, rafraîchis toutes les 60 secondes.
+**Un appareil « UHome 6K »** dans Home Assistant, avec 51 capteurs et 3 capteurs de surveillance, rafraîchis toutes les 60 secondes, auxquels s'ajoutent le capteur de l'assistant d'installation et 14 réglages du pilotage (§ 3).
 
 | Famille | Capteurs |
 |---|---|
@@ -17,6 +17,8 @@ Version 0.4.0, 23/11/2026. Testée sur un onduleur UHome 6K.
 | Énergie (kWh, compatibles avec le tableau de bord Énergie) | production solaire, soutirage réseau, injection réseau, consommation maison, charge et décharge batterie. Chaque grandeur existe en version « aujourd'hui » et « totale » |
 | Réglages de l'onduleur (lus, jamais modifiés) | DOD, hystérésis, courant de charge, puissance de décharge, puissance d'export, plage de charge 1 |
 | Surveillance | connexion au cloud (en ligne et données de moins de 15 min), défaut ou alarme batterie, température batterie hors plage de charge (0–50 °C), nombre d'événements dans le journal |
+| Assistant d'installation (0.4) | état de l'installation et étape suivante (`sensor.ucaness_installation`) |
+| Réglages du pilotage (0.4) | 9 nombres, 2 heures, 2 interrupteurs et 1 liste (capacité, plancher, contrat, panneaux solaires…) |
 
 ## 2. Tester avant d'installer (recommandé, 5 minutes)
 
@@ -32,21 +34,21 @@ Le script demande votre e-mail, votre mot de passe (saisie masquée) et votre **
 ## 3. Installation dans Home Assistant
 
 1. Copiez le dossier `custom_components/ucaness` dans le dossier `config/custom_components/` de Home Assistant (par l'application « Samba share » ou « File editor », dans Paramètres → Applications ; les « add-ons » ont été renommés « applications » depuis Home Assistant 2026.2).
-
-Compatibilité vérifiée : tests réussis sous Home Assistant 2026.2.3 et 2026.10.4.
 2. Redémarrez Home Assistant.
 3. Allez dans **Paramètres → Appareils et services → Ajouter une intégration**, puis cherchez « UCANESS ».
 4. Saisissez l'e-mail, le mot de passe et l'ID EMS.
 5. Facultatif : **Configurer** permet de changer la fréquence d'interrogation (60 s par défaut, 30 s minimum).
 
-**Assistant d'installation.** Une fois la batterie connectée, l'intégration vous guide une étape à la fois vers une installation complète du pilotage : pilotage installé, capacité de la batterie, contrat d'électricité, jours ouvrés, prévision solaire, notifications.
+Compatibilité : tests automatiques sous Home Assistant 2026.2.3 (§ 7), tests réussis aussi sous 2026.10.4 ; version 0.3.0 en service sous Home Assistant 2026.11. La version 0.4.0 n'a pas encore été essayée sur une installation réelle (§ 5).
+
+**Assistant d'installation.** Une fois la batterie connectée, l'intégration vous guide une étape à la fois vers une installation complète du pilotage, en 9 étapes : connexion, pilotage installé, mesures reconnues par le pilotage, capacité de la batterie, panneaux solaires, contrat d'électricité, jours ouvrés, prévision solaire (s'il y a des panneaux), notifications (facultative).
 - L'étape suivante apparaît dans **Paramètres → Système → Réparations**, avec la raison de l'étape et un lien vers l'écran où la faire. Elle disparaît d'elle-même une fois faite (à la lecture suivante de l'onduleur), et la suivante prend sa place.
 - Le capteur `sensor.ucaness_installation` donne l'état (`a_configurer`, `en_simulation`, `en_service`, `a_verifier`) et, en attributs, la progression, les étapes faites et restantes, l'étape suivante.
-- Deux étapes se règlent par un court dialogue, depuis la réparation elle-même (bouton **Réparer**) : « Votre batterie » (capacité proposée d'après le nombre de modules lu, à confirmer) et « Votre contrat » (prix, heures creuses ; l'assistant indique ensuite si la recharge de nuit est rentable chez vous, avant d'enregistrer).
+- Trois étapes se règlent par un court dialogue, depuis la réparation elle-même (bouton **Réparer**) : « Votre batterie » (capacité proposée d'après le nombre de modules lu, à confirmer), « Panneaux solaires » (posée seulement si l'onduleur n'a encore mesuré aucune production) et « Votre contrat » (prix, heures creuses ; l'assistant indique ensuite si la recharge de nuit est rentable chez vous, avant d'enregistrer).
 - **Batterie sans panneaux solaires.** Si l'onduleur a déjà mesuré une production, l'assistant sait qu'il y a des panneaux. Sinon il pose la question (étape « Panneaux solaires ») ; sans panneaux, la prévision solaire n'est plus demandée. Le pilotage en est prévenu (« Batterie : panneaux solaires ») et calcule alors la recharge en heures creuses avec une production nulle.
 - L'assistant n'installe aucune autre intégration et n'envoie rien à l'onduleur. Il n'enregistre un réglage que lorsque vous validez un écran de questions.
 
-**Réglages du pilotage.** La capacité, le plancher, le rendement, la puissance de charge, la marge, la consommation par défaut et le contrat (type, prix, heures creuses, week-end) sont aussi des entités de l'intégration (`number.ucaness_capacite`, `select.ucaness_type_tarif`, `time.ucaness_hc_debut`…), visibles sur la fiche de l'appareil. Tant que les packages de pilotage lisent leurs entrées (Paramètres → Entrées), il n'y a qu'une valeur par réglage : modifier l'entité met l'entrée à jour, et inversement. Le calcul du pilotage est inchangé. Ces réglages sont masqués dans les diagnostics.
+**Réglages du pilotage.** La capacité, le plancher, le rendement, la puissance de charge, la marge, la consommation par défaut, le contrat (type, prix, heures creuses, week-end) et la présence de panneaux solaires (`switch.ucaness_solaire`) sont aussi des entités de l'intégration (`number.ucaness_capacite`, `select.ucaness_type_tarif`, `time.ucaness_hc_debut`…), visibles sur la fiche de l'appareil. Tant que les packages de pilotage lisent leurs entrées (Paramètres → Entrées), il n'y a qu'une valeur par réglage : modifier l'entité met l'entrée à jour, et inversement. Le calcul du pilotage est inchangé. Ces réglages sont masqués dans les diagnostics.
 - Les entités lues par le pilotage et par le tableau de bord reçoivent d'emblée leur identifiant (`sensor.uhome_soc`, `sensor.uhome_mode`…) : sur une installation neuve, il n'y a rien à renommer. Une entité déjà enregistrée garde son identifiant.
 
 Tableau de bord Énergie (Paramètres → Tableaux de bord → Énergie) :
@@ -67,8 +69,9 @@ Tableau de bord Énergie (Paramètres → Tableaux de bord → Énergie) :
 ## 5. Limites connues
 
 - **La puissance réseau est calculée**, pas mesurée : maison + batterie − solaire. Elle néglige les pertes de l'onduleur.
-- **Codes d'alarme à interpréter.** Le pack batterie remonte un « code alarme » brut (actuellement 7), alors que le résumé batterie affiche 0. Seul ce résumé (alarme et défaut) déclenche le capteur « Défaut ou alarme batterie ». Le sens des codes est à demander à UCanpower.
+- **Codes d'alarme à interpréter.** Le pack batterie peut remonter un « code alarme » brut non nul alors que le résumé batterie affiche 0. Seul ce résumé (alarme et défaut) déclenche le capteur « Défaut ou alarme batterie ». Le sens des codes est à demander à UCanpower.
 - **Codes défaut 001 à 049 du manuel** : le journal d'événements du portail est vide pour l'instant, il n'a donc pas encore été possible de voir sous quelle forme ils remontent.
+- **Assistant d'installation (0.4.0)** : les liens et les écrans de questions des réparations sont testés dans un Home Assistant de test, pas encore sur une installation réelle.
 - **Rythme d'interrogation** : aucune limite d'appels n'est connue. Le portail web interroge toutes les 10 s ; l'intégration le fait toutes les 60 s par défaut.
 
 ## 6. Points d'accès utilisés (tous en lecture)
@@ -89,19 +92,19 @@ Chemins d'écriture repérés sur le portail, **volontairement bloqués** : `/de
 Dépendances (Python 3.13) : `pip install -r requirements_test.txt`. Les mêmes commandes tournent dans GitHub Actions à chaque envoi et à chaque demande de fusion (`.github/workflows/tests.yml`) ; le rendu dans Chrome y est facultatif.
 
 ```
-pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py   # client et décodage (8 tests)
-pytest -p no:homeassistant -p no:socket tests/test_pilotage.py           # signature, garde-fous, écriture et relecture (28 tests)
-pytest tests/test_ha_integration.py                                       # dans Home Assistant
-pytest -p no:homeassistant -p no:socket tests/test_installation.py       # assistant d'installation
-pytest -p no:homeassistant -p no:socket tests/test_tarifs.py             # évaluation des offres d'électricité
+pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py   # client et décodage (9 tests)
+pytest -p no:homeassistant -p no:socket tests/test_pilotage.py           # signature, garde-fous, écriture et relecture (29 tests)
+pytest tests/test_ha_integration.py                                       # dans Home Assistant (37 tests)
+pytest -p no:homeassistant -p no:socket tests/test_installation.py       # assistant d'installation (28 tests)
+pytest -p no:homeassistant -p no:socket tests/test_tarifs.py             # évaluation des offres d'électricité (38 tests)
 pytest -p no:homeassistant tests/test_optimiseur.py                      # moteur du tarif dynamique (20 tests)
-pytest tools/dimensionnement/tests -q                                     # analyse et dimensionnement (14 tests)
-pytest -p no:homeassistant -p no:socket dashboard/tests -q                # tableau de bord, générateur de maison, rendu dans Chrome (14 tests)
+pytest tools/dimensionnement/tests -q                                     # analyse et dimensionnement (14 tests, dont 1 qui demande le paquet breos)
+pytest -p no:homeassistant -p no:socket dashboard/tests -q                # tableau de bord et générateur de maison (10 tests), rendu dans Chrome (15 tests, ignorés sans Chrome)
 ```
 
-Tests du pilotage : voir `pilotage/README.md` (§ Tests).
+Tests du pilotage : voir `pilotage/README.md` (§ Tests). Un contrôle refuse aussi tout fichier qui contient encore un marqueur de conflit de fusion.
 
-## 8. Pilotage (versions 0.2 et 0.3)
+## 8. Pilotage (versions 0.2 à 0.4)
 
 ### Options de l'intégration (Paramètres → Appareils et services → UCANESS → Configurer)
 
@@ -118,12 +121,8 @@ Tests du pilotage : voir `pilotage/README.md` (§ Tests).
 | `ucaness.definir_plages_charge` | Jusqu'à 3 plages de charge (HHMM) ; les autres plages de charge et **toutes les plages de décharge** sont vidées |
 | `ucaness.definir_mode` | `autoconsommation` ou `arbitrage_horaire`. Le mode Backup est refusé |
 | `ucaness.optimiser_charge` (0.3) | Calcul seul, rien n'est envoyé : à partir des prix par créneau, de la consommation et de la prévision solaire, jusqu'à 3 plages de charge qui minimisent le coût sous un tarif dynamique (`custom_components/ucaness/optimiseur.py`, `pilotage/REGLES.md` § 8) |
-<<<<<<< HEAD
-| `ucaness.evaluer_offres` | Calcul seul : coût annuel estimé de plusieurs offres d'électricité sur le soutirage mesuré heure par heure, classées par coût (seul critère), avec l'écart par rapport au contrat actuel et un avis sur la puissance souscrite. Formules « base » et « heures pleines / heures creuses ». Avec la capacité utile de la batterie, la recharge de nuit est estimée pour les offres à heures creuses (estimation haute, donnée à côté du coût tel que mesuré) ; la réponse désigne la meilleure offre et dit s'il vaut mieux garder le contrat actuel. Limites dites dans la réponse : pilotage non rejoué heure par heure, Tempo et prix dynamiques non pris en charge, estimation annuelle peu fiable avec peu de jours de mesure. Chaque offre porte la source et la date de son prix ; rien n'est souscrit (`custom_components/ucaness/tarifs.py`) |
-| `ucaness.plages_depuis_plan` (0.3) | Calcul seul : traduit le plan batterie d'EMHASS (ou de tout autre moteur) en 3 plages de charge au plus |
-=======
+| `ucaness.evaluer_offres` (0.4) | Calcul seul : coût annuel estimé de plusieurs offres d'électricité sur le soutirage mesuré heure par heure, classées par coût (seul critère), avec l'écart par rapport au contrat actuel et un avis sur la puissance souscrite. Formules « base » et « heures pleines / heures creuses ». Avec la capacité utile de la batterie, la recharge de nuit est estimée pour les offres à heures creuses (estimation haute, donnée à côté du coût tel que mesuré) ; la réponse désigne la meilleure offre et dit s'il vaut mieux garder le contrat actuel. Limites dites dans la réponse : pilotage non rejoué heure par heure, Tempo et prix dynamiques non pris en charge, estimation annuelle peu fiable avec peu de jours de mesure. Chaque offre porte la source et la date de son prix ; rien n'est souscrit (`custom_components/ucaness/tarifs.py`) |
 | `ucaness.plages_depuis_plan` (0.3) | Calcul seul : traduit le plan batterie d'EMHASS (ou de tout autre moteur) en 3 plages de charge au plus. Réponse : `plages`, `fenetres` (fenêtres datées retenues), `nombre_fenetres` (fenêtres trouvées, depuis la 0.3.1), énergie retenue et écartée |
->>>>>>> origin/main
 
 Chaque écriture est journalisée, puis relue sur l'onduleur. Si la relecture ne correspond pas, l'action échoue : un script qui enchaîne plages puis mode s'arrête avant de changer de mode.
 
@@ -139,12 +138,12 @@ Chaque écriture est journalisée, puis relue sur l'onduleur. Si la relecture ne
 | Modèle d'onduleur | Écriture permise seulement pour les modèles dont la table du mode et des plages est confirmée : `uhome` (documentation) et `mr` (UHome 6K, confirmé le 18/11/2026 par un enregistrement fait depuis le portail UCANESS et par la table de son formulaire) |
 | Relecture | Un réglage absent de la configuration du cloud vaut 0, comme dans le portail. Si le cloud ne garde pas le mode, il est confirmé par le mode affiché par l'onduleur |
 
-### Modes du manuel UHome (V1.9, p. 47 à 50)
+### Modes (manuel UHome V1.9, p. 47 à 50, et constats)
 
 | API | Manuel | À retenir |
 |---|---|---|
 | 0 | Autoconsommation | Mode par défaut |
-| 1 | Arbitrage horaire | Charge réseau pendant les plages de charge ; hors plage, la batterie ne sert pas |
+| 1 | Arbitrage horaire | Charge réseau pendant les plages de charge. Selon le manuel, hors plage, la batterie ne sert pas. **Constaté sur un UHome 6K (modèle `mr`) : hors plage, la batterie continue d'alimenter la maison** ; le calcul de nuit en tient compte (`pilotage/REGLES.md`) |
 | 2 | Backup | Batterie maintenue pleine, y compris sur le réseau ; non utilisé |
 
 ## 9. Contenu du dépôt
