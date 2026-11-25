@@ -13,7 +13,7 @@
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
  */
 
-const UC_VERSION = '0.2.3';
+const UC_VERSION = '0.2.4';
 
 /* Dossier où se trouve ce fichier (en général /local/ucaness/). */
 const UC_BASE = (() => {
@@ -187,11 +187,18 @@ class UcanessHeaderCard extends HTMLElement {
     this._timer = setInterval(() => this._render(), 30000);
     this._onLoc = () => this._render();
     window.addEventListener('location-changed', this._onLoc);
+    // 0.2.4 : onglets sous le titre quand ils le chevaucheraient (écran moyen, nombreux onglets).
+    if (!this._ucFit && typeof ResizeObserver !== 'undefined') {
+      this._ucFit = new ResizeObserver(() => this._fitRows());
+      this._ucFit.observe(this);
+    }
   }
 
   disconnectedCallback() {
     clearInterval(this._timer);
     window.removeEventListener('location-changed', this._onLoc);
+    if (this._ucFit) this._ucFit.disconnect();
+    this._ucFit = null;
   }
 
   getCardSize() { return 1; }
@@ -234,6 +241,10 @@ class UcanessHeaderCard extends HTMLElement {
         .clock { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
         .clock b { font: 700 22px var(--uc-font); }
         .clock span { font-size: 12px; color: var(--uc-muted); }
+        :host([rows]) header { height: auto; flex-wrap: wrap; padding: 0 16px 8px; }
+        :host([rows]) .plate { position: relative; left: auto; transform: none; flex: 0 0 min(620px, 60%); margin: 0 auto; }
+        :host([rows]) .right { position: absolute; top: 0; right: 16px; height: 58px; }
+        :host([rows]) .left { flex: 0 0 100%; margin-top: 4px; }
         @media (max-width: 900px) {
           header { height: auto; min-height: 56px; flex-wrap: wrap; gap: 6px 12px; padding: 6px 10px; }
           .plate { display: none; }
@@ -258,6 +269,25 @@ class UcanessHeaderCard extends HTMLElement {
       const t = c.tabs[Number(b.dataset.i)];
       if (t && t.path) ucNavigate(t.path);
     }));
+    this._fitRows();
+  }
+
+  /** Passe les onglets sur une 2e ligne si le bloc de gauche ou de droite empiète sur le titre. */
+  _fitRows() {
+    const r = this.shadowRoot;
+    if (!r) return;
+    if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) { this.removeAttribute('rows'); return; }
+    const plate = r.querySelector('.plate');
+    const left = r.querySelector('.left');
+    const right = r.querySelector('.right');
+    if (!plate || !left || !right) return;
+    this.removeAttribute('rows');
+    const p = plate.getBoundingClientRect();
+    if (!p.width) return;
+    const inset = p.width * 0.05;
+    const clash = left.getBoundingClientRect().right > p.left + inset - 6
+      || right.getBoundingClientRect().left < p.right - inset + 6;
+    this.toggleAttribute('rows', clash);
   }
 }
 
