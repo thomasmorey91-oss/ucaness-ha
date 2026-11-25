@@ -36,7 +36,7 @@ Un tableau de bord Home Assistant qui prolonge le portail UCANESS : même police
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.2.3`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.2.4`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
