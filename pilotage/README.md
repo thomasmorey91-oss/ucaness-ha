@@ -92,7 +92,7 @@ Les listes de prix et de plans sont longues : pour alléger la base de données,
 
 `ucan_conseils.yaml` donne à la carte `custom:ucaness-ucan-card` (dossier `dashboard/`) le conseil du moment, tiré des mesures de la maison : un seul à la fois, recalculé chaque matin à 7h30. Premier conseil, « machines » : la veille, un jour ouvré, les achats en heures pleines ont dépassé « Ucan : achats en heures pleines à partir desquels conseiller » (3 kWh si 0). Le gain affiché est la borne haute : ces kWh au prix des heures creuses. Il faut aussi que ce gain atteigne « Ucan : gain minimal d'un conseil » (0,20 € si 0).
 
-« Pas maintenant » écarte le conseil du jour ; deux fois de suite, ou « Ne plus proposer », et il n'est plus proposé pendant 90 jours. « Je le fais » note la date (pour mesurer l'effet ensuite). Chaque réponse est inscrite au journal sous le nom « Ucan ». Notification sur le téléphone : seulement si « Ucan : me prévenir sur le téléphone » est allumé, au plus une par jour (`script.jarvis_notifier`, `jarvis_alertes.yaml`). Le package ne modifie aucun réglage du pilotage.
+« Pas maintenant » écarte le conseil du jour ; deux fois de suite, ou « Ne plus proposer », et il n'est plus proposé pendant 30 jours. « Je le fais » note la date (pour mesurer l'effet ensuite). Chaque réponse est inscrite au journal sous le nom « Ucan ». Notification sur le téléphone : seulement si « Ucan : me prévenir sur le téléphone » est allumé, au plus une par jour (`script.jarvis_notifier`, `jarvis_alertes.yaml`). Le package ne modifie aucun réglage du pilotage.
 
 Prérequis : `jarvis_batterie.yaml` (gain réel) et `jarvis_tarif.yaml` (prix).
 

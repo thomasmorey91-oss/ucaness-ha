@@ -84,8 +84,8 @@ async def test_deux_fois_pas_maintenant_puis_pause(hass, freezer):
     await hass.async_block_till_done()
     assert hass.states.get(CONSEIL).state == "machines"
     await _repondre(hass, "plus_tard")
-    assert hass.states.get("input_datetime.ucan_pause_machines").state == "2030-04-17"
-    assert "plus proposé pendant 90 jours" in journal[-1]
+    assert hass.states.get("input_datetime.ucan_pause_machines").state == "2030-02-16"
+    assert "plus proposé pendant 30 jours" in journal[-1]
     # Pendant la pause, plus de conseil.
     freezer.move_to(dt.datetime(2030, 1, 18, 7, 0, tzinfo=PARIS))
     hass.states.async_set("sensor.jarvis_gain_reel_du_jour", "1", {
@@ -98,7 +98,7 @@ async def test_deux_fois_pas_maintenant_puis_pause(hass, freezer):
 async def test_ne_plus_proposer(hass, freezer):
     await _maison(hass, freezer)
     await _repondre(hass, "jamais")
-    assert hass.states.get("input_datetime.ucan_pause_machines").state == "2030-04-16"
+    assert hass.states.get("input_datetime.ucan_pause_machines").state == "2030-02-15"
     assert hass.states.get("input_text.ucan_refus_machines").state == "0"
 
 

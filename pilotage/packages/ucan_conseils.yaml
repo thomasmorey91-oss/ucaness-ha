@@ -7,7 +7,7 @@
 #   - un seul conseil à la fois, recalculé chaque matin à 7h30 ;
 #   - chaque conseil part d'une mesure de la maison et donne un gain chiffré ;
 #   - « Pas maintenant » écarte le conseil du jour ; deux fois de suite, ou « Ne plus proposer »,
-#     et ce conseil n'est plus proposé pendant 90 jours ;
+#     et ce conseil n'est plus proposé pendant 30 jours ;
 #   - notification sur le téléphone : seulement si « Ucan : me prévenir sur le téléphone » est
 #     allumé, au plus une par jour, par script.jarvis_notifier (jarvis_alertes.yaml).
 # Aucun réglage n'est modifié par ce package : il n'écrit que ses propres entrées.
@@ -140,7 +140,7 @@ script:
           - action: input_datetime.set_datetime
             target: { entity_id: input_datetime.ucan_pause_machines }
             data:
-              date: "{{ (now().date() + timedelta(days=90)) | string }}"
+              date: "{{ (now().date() + timedelta(days=30)) | string }}"
       - if:
           - condition: template
             value_template: "{{ reponse == 'fait' }}"
@@ -155,7 +155,7 @@ script:
           entity_id: sensor.ucan_conseil
           message: >
             Conseil « machines » du {{ jour }} : {{ {'fait': 'accepté (machines réparties à partir d\'aujourd\'hui)',
-            'plus_tard': 'remis à plus tard', 'jamais': 'refusé'}[reponse] }}{{ ' ; plus proposé pendant 90 jours' if pause else '' }}.
+            'plus_tard': 'remis à plus tard', 'jamais': 'refusé'}[reponse] }}{{ ' ; plus proposé pendant 30 jours' if pause else '' }}.
       - event: ucan_recalcul
 
 automation:
