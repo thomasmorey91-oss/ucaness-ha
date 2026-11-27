@@ -32,11 +32,11 @@
     "step": {
       "init": {
         "title": "Options UCANESS",
-        "description": "La clé d'application est fournie par UCanpower (API tierce). Laissez le secret vide pour garder celui déjà enregistré. « Écriture autorisée » permet à Home Assistant de changer le mode (autoconsommation ou arbitrage horaire) et les plages de charge, rien d'autre.",
+        "description": "L'intégration est livrée avec une clé d'application fournie par UCanpower : laissez les deux champs de clé vides pour l'utiliser. Ne remplissez une clé et un secret personnels que si UCanpower vous en a fourni ; ils passent alors avant. Pour revenir à la clé livrée, videz le champ de la clé. Laissez le secret vide pour garder celui déjà enregistré. « Écriture autorisée » permet à Home Assistant de changer le mode (autoconsommation ou arbitrage horaire) et les plages de charge, rien d'autre.",
         "data": {
           "scan_interval": "Fréquence d'interrogation du cloud (secondes, 30 au minimum)",
-          "app_key": "Clé d'application UCanpower (app_key)",
-          "app_secret": "Secret d'application UCanpower (app_secret)",
+          "app_key": "Clé d'application UCanpower personnelle (facultative)",
+          "app_secret": "Secret d'application UCanpower personnel (facultatif)",
           "write_enabled": "Écriture autorisée (mode et plages de charge seulement)"
         }
       }

@@ -16,6 +16,7 @@ from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 
+from .cle_application import cle_effective
 from .const import CONF_APP_KEY, CONF_APP_SECRET, CONF_DEV_SN, CONF_DEVICE_CODE, CONF_PASSWORD_MD5, CONF_WRITE_ENABLED
 from .coordinator import UcanessConfigEntry
 
@@ -65,6 +66,8 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Ucaness
         "client": {
             "session_ouverte": client.has_token,
             "cle_application_presente": client.has_app_key,
+            # Origine de la clé (« personnelle » ou « livree »), jamais la clé elle-même.
+            "origine_cle_application": cle_effective(entry.options)[2],
             "ecriture_autorisee": bool(entry.options.get(CONF_WRITE_ENABLED, False)),
         },
         "coordinateur": {

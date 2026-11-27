@@ -1,6 +1,6 @@
 # Intégration Home Assistant « UCANESS » (UCanpower UHome)
 
-Version 0.4.0, 23/11/2026. Testée sur un onduleur UHome 6K.
+Version 0.4.1, 27/11/2026. Testée sur un onduleur UHome 6K.
 
 > **Non officielle.** Les mesures sont lues par l'API du portail UCANESS (oss.ucaness.com), qui n'est pas documentée. Le pilotage passe par l'API tierce documentée d'UCanpower (chemins `/api/v1`, clé d'application).
 > **Lecture seule par défaut.** L'onduleur n'est piloté que si l'option « Écriture autorisée » est activée, et seulement sur deux points : le mode (autoconsommation ou arbitrage horaire) et les plages de charge. Tout autre réglage (DOD, hystérésis, courant, protections réseau, type de batterie, retour usine, commandes) est refusé par le client avant d'atteindre le réseau (§ 6 et § 8).
@@ -110,8 +110,10 @@ Tests du pilotage : voir `pilotage/README.md` (§ Tests). Un contrôle refuse au
 
 | Option | Rôle |
 |---|---|
-| Clé et secret d'application | Fournis par UCanpower pour l'API tierce. Le secret n'est jamais réaffiché ; laisser le champ vide garde celui enregistré |
+| Clé et secret d'application | **Facultatifs depuis la 0.4.1** : l'intégration est livrée avec une clé d'application fournie par UCanpower (voir ci-dessous). Une clé personnelle complète (clé et secret), si UCanpower vous en a fourni une, passe avant ; vider le champ de la clé revient à la clé livrée. Le secret n'est jamais réaffiché ; laisser son champ vide garde celui enregistré |
 | Écriture autorisée | Interrupteur général, **éteint par défaut**. Sans lui, les actions d'écriture sont refusées |
+
+**Clé d'application livrée (0.4.1).** UCanpower a délivré pour cette intégration une paire clé et secret d'application dédiée à Home Assistant, et en a autorisé par écrit la diffusion publique le 27/11/2026 (`custom_components/ucaness/cle_application.py`). Elle identifie l'application, pas un propriétaire : elle ne donne accès à aucun appareil par elle-même. Chaque propriétaire se connecte avec son propre compte UCANESS et n'accède qu'à ses propres appareils. UCanpower limite cette clé aux fonctions dont l'intégration a besoin (connexion, liste des appareils, configuration, état, écriture des réglages) ; ce que l'intégration écrit reste filtré par la liste blanche ci-dessous, UCanpower ne filtrant pas encore les réglages de son côté. Aucune limite d'appels n'est fixée. Le renouvellement de la clé est manuel : si elle devait être révoquée, une nouvelle version de l'intégration la remplacerait, et une clé personnelle saisie dans les options permet de continuer en attendant.
 
 ### Actions
 
