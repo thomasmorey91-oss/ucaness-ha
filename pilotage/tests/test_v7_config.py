@@ -18,7 +18,8 @@ async def test_package_v7_charge(hass, caplog):
     for domaine in ("input_boolean", "input_datetime", "input_number"):
         conf = {**tarif.get(domaine, {}), **bat.get(domaine, {})}
         assert await async_setup_component(hass, domaine, {domaine: conf})
-    assert await async_setup_component(hass, "input_select", {"input_select": tarif["input_select"]})
+    assert await async_setup_component(hass, "input_select", {"input_select": {**tarif["input_select"], **bat["input_select"]}})
+    assert await async_setup_component(hass, "input_text", {"input_text": bat["input_text"]})
     assert await async_setup_component(hass, "template", {"template": bat["template"]})
     assert await async_setup_component(hass, "automation", {"automation": bat["automation"]})
     await hass.async_block_till_done()

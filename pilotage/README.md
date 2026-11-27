@@ -51,6 +51,7 @@ Les règles et les calculs sont décrits dans `REGLES.md`. Pour analyser l'insta
    | UCANESS : production solaire totale (détection d'une batterie sans panneaux) | `sensor.uhome_production_solaire_totale` |
    | UCANESS : soutirage réseau total | `sensor.uhome_soutirage_reseau_total` |
    | UCANESS : injection réseau totale (gain réel ; sans elle, l'injection est estimée) | `sensor.uhome_injection_reseau_totale` |
+   | UCANESS : charge batterie totale (calibration de la durée de charge, facultatif) | `sensor.uhome_charge_batterie_totale` |
    | UCANESS : mode de fonctionnement | `sensor.uhome_mode` |
    | UCANESS : code défaut / code alarme batterie | `sensor.uhome_code_defaut_batterie` / `sensor.uhome_code_alarme_batterie` |
    | UCANESS : connexion au cloud | `binary_sensor.uhome_connexion_cloud` |
@@ -94,6 +95,18 @@ Les listes de prix et de plans sont longues : pour alléger la base de données,
 | Puissance de charge | Puissance batterie pendant une plage de charge réseau (souvent bridée par le réglage « puissance réseau » de l'installateur) |
 | Plancher | SOC le plus bas atteint une nuit sans recharge |
 | Consommation journalière par défaut | Moyenne de « consommation maison aujourd'hui » sur quelques jours ; elle ne sert que pour les heures pas encore mesurées |
+
+## Jours exceptionnels
+
+La prévision de consommation est la moyenne pondérée des 7 derniers jours mesurés. Un jour qui ne se répétera pas (plusieurs lessives, invités, absence) la fausse pendant une semaine. Pour l'écarter, ajouter sa date (AAAA-MM-JJ) dans « Batterie : jours exceptionnels » ; plusieurs dates se séparent par des espaces ou des virgules. Les dates de plus de 8 jours sont retirées chaque jour à midi. Le journal de la décision du soir cite les jours écartés.
+
+## Calibration de la durée de charge
+
+La plage de charge dure « recharge ÷ puissance de charge », majorée de 10 % pour la montée en puissance. Si la puissance réelle dépasse le réglage, la batterie charge plus que prévu.
+
+Chaque nuit de recharge (mode réel), Jarvis note le compteur de charge de l'onduleur au départ, puis le relit 20 min après la fin des heures creuses : « Jarvis calibration de la charge » garde les 7 dernières nuits et propose un facteur de durée (médiane des 5 dernières nuits valides, au moins 3, borné entre 0,9 et 1,3). Une nuit n'est pas retenue si la recharge programmée est sous 1 kWh, si la plage a été raccourcie faute de temps, si la batterie est pleine ou si l'écart est hors bornes. Le journal donne chaque matin l'énergie chargée et le facteur.
+
+Le facteur ne sert que si « Batterie : calibration de la durée de charge » est sur « Automatique » ; sur « Désactivée » (par défaut), la majoration de 10 % reste en place. La marge de sécurité sur le besoin n'est pas touchée.
 
 ## Tests
 

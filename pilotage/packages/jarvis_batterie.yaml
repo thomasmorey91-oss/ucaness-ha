@@ -76,6 +76,32 @@ input_select:
       - "Avec panneaux"
       - "Sans panneaux"
 
+  # Durée des plages de charge. « Désactivée » : durée = recharge ÷ puissance de charge, majorée de
+  # 10 % (comportement d'origine). « Automatique » : la majoration est remplacée par le facteur
+  # mesuré par « Jarvis calibration de la charge » (rapport entre l'énergie réellement chargée et
+  # la recharge calculée, médiane des 5 dernières nuits valides, au moins 3), borné entre 0,9 et 1,3.
+  jarvis_calibration_charge:
+    name: "Batterie : calibration de la durée de charge"
+    icon: mdi:tune-variant
+    options:
+      - "Désactivée"
+      - "Automatique"
+
+input_text:
+  # Jours écartés de la prévision de consommation (lessives multiples, invités, absence…), au
+  # format AAAA-MM-JJ, séparés par des espaces ou des virgules. Les dates de plus de 8 jours sont
+  # retirées chaque jour à midi (elles ne servent plus : la prévision lit les 7 derniers jours).
+  jarvis_jours_exceptionnels:
+    name: "Batterie : jours exceptionnels (écartés de la prévision de consommation)"
+    icon: mdi:calendar-remove
+    max: 255
+  # Interne : recharge programmée de la nuit en cours (compteur de charge au départ, recharge
+  # calculée, facteur de durée, durée limitée), relue après la recharge pour la calibration.
+  jarvis_charge_suivi:
+    name: "Batterie : suivi de la recharge de la nuit (interne)"
+    icon: mdi:clipboard-text-clock
+    max: 255
+
 input_boolean:
   jarvis_mode_simulation:
     name: "Batterie : mode simulation (aucune consigne envoyée)"
@@ -195,13 +221,15 @@ template:
           conso_mesuree: >
             {% set st = mesures.statistics if (mesures is defined and mesures is mapping and 'statistics' in mesures) else {} %}
             {% set rows = st['sensor.uhome_puissance_maison'] if 'sensor.uhome_puissance_maison' in st else [] %}
+            {% set exclus = states('input_text.jarvis_jours_exceptionnels') | regex_findall('\\d{4}-\\d{2}-\\d{2}') %}
             {% set nj = namespace(meme=[], tous=[]) %}
             {% for r in rows %}
               {% if r.mean is number %}
                 {% set t = r.start | as_datetime | as_local %}
                 {% set d = t.date() | string %}
-                {% if d not in nj.tous %}{% set nj.tous = nj.tous + [d] %}{% endif %}
-                {% if (t.weekday() < 5) == demain_ouvre and d not in nj.meme %}{% set nj.meme = nj.meme + [d] %}{% endif %}
+                {% if d in exclus %}
+                {% elif d not in nj.tous %}{% set nj.tous = nj.tous + [d] %}{% endif %}
+                {% if d not in exclus and (t.weekday() < 5) == demain_ouvre and d not in nj.meme %}{% set nj.meme = nj.meme + [d] %}{% endif %}
               {% endif %}
             {% endfor %}
             {% set meme = nj.meme | sort(reverse=true) %}
@@ -212,8 +240,8 @@ template:
               {% for r in rows %}
                 {% if r.mean is number %}
                   {% set t = r.start | as_datetime | as_local %}
-                  {% if t.hour == h %}
-                    {% set d = t.date() | string %}
+                  {% set d = t.date() | string %}
+                  {% if t.hour == h and d in tous %}
                     {% set w2 = 0.5 ** (tous.index(d)) %}
                     {% set a.s2 = a.s2 + w2 * r.mean %}
                     {% set a.n2 = a.n2 + w2 %}
@@ -229,6 +257,17 @@ template:
               {% set ns.v = ns.v + [(val | round(3)) if val is not none else none] %}
             {% endfor %}
             {{ ns.v }}
+          # Jours exceptionnels effectivement écartés (présents dans les 7 derniers jours mesurés).
+          jours_ecartes: >
+            {% set exclus = states('input_text.jarvis_jours_exceptionnels') | regex_findall('\\d{4}-\\d{2}-\\d{2}') %}
+            {% set st = mesures.statistics if (mesures is defined and mesures is mapping and 'statistics' in mesures) else {} %}
+            {% set rows = st['sensor.uhome_puissance_maison'] if 'sensor.uhome_puissance_maison' in st else [] %}
+            {% set ns = namespace(v=[]) %}
+            {% for r in rows %}
+              {% set d = (r.start | as_datetime | as_local).date() | string %}
+              {% if d in exclus and d not in ns.v %}{% set ns.v = ns.v + [d] %}{% endif %}
+            {% endfor %}
+            {{ ns.v | sort }}
           # Prévision Solcast du jour préparé : seules comptent les valeurs datées de ce jour (v7).
           capteur_pv: >
             {{ 'sensor.solcast_pv_forecast_prevision_aujourdhui' if jour_cible == now().date() | string else 'sensor.solcast_pv_forecast_prevision_demain' }}
@@ -360,7 +399,11 @@ template:
             {# Plage en fin d'heures creuses : fin 15 min avant leur fin, durée majorée de 10 %. #}
             {% set fin_ch = (fin_hc_min - 15) % 1440 %}
             {% set dispo = (fin_ch - deb_min) % 1440 %}
-            {% set duree_min = [((recharge / p_ch * 60 * 1.1) | round(0, 'ceil') | int) if (recharge > 0 and p_ch > 0) else 0, dispo] | min %}
+            {# Facteur de durée : 1,1 (majoration d'origine), ou facteur calibré (au moins 3 nuits mesurées). #}
+            {% set k_mes = states('sensor.jarvis_calibration_de_la_charge') | float(none) %}
+            {% set k = ([0.9, [k_mes, 1.3] | min] | max) if (is_state('input_select.jarvis_calibration_charge', 'Automatique') and k_mes is number) else 1.1 %}
+            {% set duree_brute = ((recharge / p_ch * 60 * k) | round(0, 'ceil') | int) if (recharge > 0 and p_ch > 0) else 0 %}
+            {% set duree_min = [duree_brute, dispo] | min %}
             {% set debut_min = (fin_ch - duree_min) % 1440 %}
             {% set debut = '%02d%02d' | format(debut_min // 60, debut_min % 60) %}
             {% set fin_txt = '%02d%02d' | format(fin_ch // 60, fin_ch % 60) %}
@@ -400,6 +443,8 @@ template:
               'reevaluation': reeval,
               'calcul_valide': ns2.motif[:10] not in ['Consommati', 'SOC batter', 'Capacité d', 'Prévision '],
               'borne_capacite': besoin >= cap and cap > 0,
+              'facteur_duree': k | round(3),
+              'duree_limitee': duree_brute > dispo,
               'justification': ns2.motif
             } }}
     sensor:
@@ -441,7 +486,10 @@ template:
           prevision_solaire_ok: "{{ pv_info.ok }}"
           sans_solaire: "{{ pv_info.get('sans_solaire', false) }}"
           batterie_pleine_de_toute_facon: "{{ calcul.borne_capacite }}"
-          methode_conso: "Moyenne pondérée des 7 derniers jours (même type de jour en priorité)"
+          methode_conso: "Moyenne pondérée des 7 derniers jours (même type de jour en priorité, jours exceptionnels écartés)"
+          jours_ecartes: "{{ jours_ecartes }}"
+          facteur_duree: "{{ calcul.facteur_duree }}"
+          duree_limitee: "{{ calcul.duree_limitee }}"
 
   - sensor:
       - name: "Jarvis coût réseau du jour"
@@ -709,6 +757,35 @@ template:
             {{ n + 1 if (gain.valide and a.get('dernier_jour') != gain.jour) else n }}
 
   # ---------------------------------------------------------------------------
+  # Calibration de la durée de charge : chaque nuit mesurée (événement « jarvis_calibration_nuit »)
+  # est gardée (7 dernières). Facteur = 1 ÷ médiane du rapport puissance réelle ÷ puissance réglée
+  # des 5 dernières nuits valides, au moins 3, borné entre 0,9 et 1,3 ; inconnu sinon.
+  # ---------------------------------------------------------------------------
+  - triggers:
+      - trigger: event
+        event_type: jarvis_calibration_nuit
+    sensor:
+      - name: "Jarvis calibration de la charge"
+        unique_id: jarvis_calibration_charge
+        icon: mdi:tune-variant
+        state: >
+          {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+          {% set n = ((a.get('nuits') or []) + [trigger.event.data]) [-7:] %}
+          {% set q = (n | selectattr('valide') | map(attribute='rapport_puissance') | select('number') | list)[-5:] | sort %}
+          {% if q | count >= 3 %}
+            {% set m = q[(q | count) // 2] if (q | count) % 2 else (q[(q | count) // 2 - 1] + q[(q | count) // 2]) / 2 %}
+            {{ ([0.9, [1 / m, 1.3] | min] | max) | round(3) }}
+          {% else %}{{ none }}{% endif %}
+        attributes:
+          nuits: >
+            {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+            {{ ((a.get('nuits') or []) + [trigger.event.data]) [-7:] }}
+          nuits_valides: >
+            {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+            {{ ((a.get('nuits') or []) + [trigger.event.data]) [-7:] | selectattr('valide') | list | count }}
+          derniere_nuit: "{{ trigger.event.data }}"
+
+  # ---------------------------------------------------------------------------
   # Batterie sans panneaux solaires : choix de l'utilisateur, ou détection (voir input_select).
   # Lu par le calcul de nuit et par le tarif dynamique : production prévue nulle, sans prévision.
   # ---------------------------------------------------------------------------
@@ -839,7 +916,8 @@ automation:
             gain estimé {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'gain_estime_eur') }} €.
             Fourchette solaire P10-P90 : {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_p10_kwh') }} à {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'solaire_p90_kwh') }} kWh
             (prévision du {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'prevision_solaire_maj') }}) ;
-            consommation mesurée sur {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'heures_mesurees') }} h sur 24 (moyenne pondérée).
+            consommation mesurée sur {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'heures_mesurees') }} h sur 24 (moyenne pondérée{% set je = state_attr('sensor.jarvis_recharge_reseau_prevue', 'jours_ecartes') or [] %}{% if je %}, jours exceptionnels écartés : {{ je | join(', ') }}{% endif %}).
+            Durée de charge : recharge ÷ puissance × {{ state_attr('sensor.jarvis_recharge_reseau_prevue', 'facteur_duree') }}{{ ' (calibré)' if is_state('input_select.jarvis_calibration_charge', 'Automatique') and state_attr('sensor.jarvis_recharge_reseau_prevue', 'facteur_duree') != 1.1 else '' }}.
             {% if state_attr('sensor.jarvis_recharge_reseau_prevue', 'batterie_pleine_de_toute_facon') %}Besoin supérieur à la capacité : batterie remplie quelle que soit la prévision.{% endif %}
             {% set pl = state_attr('sensor.jarvis_recharge_reseau_prevue', 'plages') or [] %}
             {% if state_attr('sensor.jarvis_recharge_reseau_prevue', 'maintien') %}Arbitrage horaire pendant les heures creuses{% if pl %}, plages {% for x in pl %}{{ x.debut }}-{{ x.fin }} {% endfor %}{% endif %}.{% endif %}
@@ -964,6 +1042,16 @@ automation:
                   entity_id: sensor.jarvis_recharge_reseau_prevue
                   message: >
                     [réel] Réévaluation appliquée et confirmée : {% if plages %}plages {% for x in plages %}{{ x.debut }}-{{ x.fin }} {% endfor %}{% else %}aucune plage (réserve seule){% endif %}.
+              # Calibration : la recharge programmée devient celle de la réévaluation (compteur inchangé).
+              - action: input_text.set_value
+                continue_on_error: true
+                target: { entity_id: input_text.jarvis_charge_suivi }
+                data:
+                  value: >
+                    {% set s = states('input_text.jarvis_charge_suivi') %}
+                    {% set e = 'sensor.jarvis_recharge_reseau_prevue' %}
+                    {% if s[:1] == '{' and plages | count > 0 %}{% set o = s | from_json %}{{ dict(o, r=states(e) | float(0), k=state_attr(e, 'facteur_duree') | float(1.1),
+                         l=state_attr(e, 'duree_limitee') == true) | to_json }}{% endif %}
 
   - id: jarvis_batterie_retour_autoconsommation
     alias: "Jarvis · Batterie : retour en autoconsommation après la recharge"
@@ -1005,6 +1093,86 @@ automation:
               message: >
                 Le retour en autoconsommation a échoué deux fois. Hors plage, la batterie ne sert pas :
                 remettre le mode Autoconsommation depuis le portail UCANESS.
+
+  - id: jarvis_batterie_calibration_mesure
+    alias: "Jarvis · Batterie : mesure de la recharge de la nuit (calibration)"
+    description: >
+      20 min après la fin des heures creuses, compare l'énergie réellement chargée (compteur de charge
+      de l'onduleur) à la recharge programmée. La nuit compte pour la calibration si la recharge
+      programmée dépasse 1 kWh, si la plage n'a pas été raccourcie faute de temps, si la batterie
+      n'est pas pleine (SOC sous 95 %) et si le rapport puissance réelle ÷ puissance réglée reste
+      entre 0,6 et 1,5. Le suivi est ensuite vidé. Sans effet sur le pilotage tant que « Batterie :
+      calibration de la durée de charge » est sur « Désactivée ».
+    mode: single
+    triggers:
+      - trigger: time
+        at:
+          entity_id: input_datetime.jarvis_hc_fin
+          offset: "00:20:00"
+    conditions:
+      - condition: template
+        value_template: "{{ states('input_text.jarvis_charge_suivi')[:1] == '{' }}"
+    actions:
+      - variables:
+          suivi: "{{ states('input_text.jarvis_charge_suivi') | from_json }}"
+          compteur: "{{ states('sensor.uhome_charge_batterie_totale') | float(none) }}"
+          soc: "{{ states('sensor.uhome_soc') | float(none) }}"
+          nuit: >
+            {% set r = suivi.r | float(0) %}
+            {% set k = suivi.k | float(1.1) %}
+            {% set ch = ((compteur - suivi.c | float(0)) | round(2)) if compteur is number else none %}
+            {% set q = (ch / (r * k)) if (ch is number and r > 0 and k > 0) else none %}
+            {% set motif = 'compteur de charge indisponible' if ch is none
+                 else ('recharge programmée trop faible (moins de 1 kWh)' if r < 1
+                 else ('plage raccourcie faute de temps' if suivi.l
+                 else ('batterie pleine' if (soc is number and soc >= 95)
+                 else ('écart hors bornes' if not (0.6 <= q <= 1.5) else 'ok')))) %}
+            {{ {'jour': suivi.j, 'prevue_kwh': r | round(2), 'chargee_kwh': ch, 'facteur': k,
+                'rapport_puissance': (q | round(3)) if q is number else none, 'valide': motif == 'ok', 'motif': motif} }}
+      - event: jarvis_calibration_nuit
+        event_data:
+          jour: "{{ nuit.jour }}"
+          prevue_kwh: "{{ nuit.prevue_kwh }}"
+          chargee_kwh: "{{ nuit.chargee_kwh }}"
+          facteur: "{{ nuit.facteur }}"
+          rapport_puissance: "{{ nuit.rapport_puissance }}"
+          valide: "{{ nuit.valide }}"
+          motif: "{{ nuit.motif }}"
+      - action: input_text.set_value
+        target: { entity_id: input_text.jarvis_charge_suivi }
+        data:
+          value: ""
+      - delay: "00:00:02"
+      - action: logbook.log
+        data:
+          name: "Jarvis batterie"
+          entity_id: sensor.jarvis_calibration_de_la_charge
+          message: >
+            Recharge de la nuit : {{ nuit.chargee_kwh }} kWh chargés pour {{ nuit.prevue_kwh }} kWh programmés
+            (facteur de durée {{ nuit.facteur }}) ;
+            {% if nuit.valide %}nuit retenue pour la calibration (puissance réelle = {{ (nuit.rapport_puissance * 100) | round(0) | int }} % de la puissance réglée).
+            {% else %}nuit non retenue : {{ nuit.motif }}.{% endif %}
+            Facteur calibré : {{ states('sensor.jarvis_calibration_de_la_charge') }}
+            ({{ state_attr('sensor.jarvis_calibration_de_la_charge', 'nuits_valides') }} nuit(s) valide(s) ; utilisé si la calibration est sur « Automatique »).
+
+  - id: jarvis_batterie_jours_exceptionnels_nettoyage
+    alias: "Jarvis · Batterie : jours exceptionnels de plus de 8 jours retirés"
+    mode: single
+    triggers:
+      - trigger: time
+        at: "12:00:00"
+    conditions:
+      - condition: template
+        value_template: >
+          {% set l = states('input_text.jarvis_jours_exceptionnels') | regex_findall('\\d{4}-\\d{2}-\\d{2}') %}
+          {{ l | select('lt', (now().date() - timedelta(days=8)) | string) | list | count > 0 }}
+    actions:
+      - action: input_text.set_value
+        target: { entity_id: input_text.jarvis_jours_exceptionnels }
+        data:
+          value: >
+            {% set l = states('input_text.jarvis_jours_exceptionnels') | regex_findall('\\d{4}-\\d{2}-\\d{2}') %}
+            {{ l | reject('lt', (now().date() - timedelta(days=8)) | string) | unique | sort | join(' ') }}
 
   - id: jarvis_batterie_journal_gain_reel
     alias: "Jarvis · Batterie : journal du gain réel"
@@ -1216,6 +1384,16 @@ script:
             [réel] Consigne envoyée et confirmée : {% if plages %}plages {% for x in plages %}{{ x.debut }}-{{ x.fin }} {% endfor %}{% else %}aucune plage (réserve seule){% endif %}
             puis arbitrage horaire (batterie en réserve) ; {% if reeval is string %}réévaluation à {{ reeval }} ; {% endif %}retour en autoconsommation 2 min avant {{ retour }}.
             Mode affiché : {{ states('sensor.uhome_mode') }}.
+      # Calibration : compteur de charge au départ et recharge programmée (relus après la recharge).
+      - action: input_text.set_value
+        continue_on_error: true
+        target: { entity_id: input_text.jarvis_charge_suivi }
+        data:
+          value: >
+            {% set c = states('sensor.uhome_charge_batterie_totale') | float(none) %}
+            {% set e = 'sensor.jarvis_recharge_reseau_prevue' %}
+            {% if c is number and plages | count > 0 %}{{ {'c': c, 'r': states(e) | float(0), 'k': state_attr(e, 'facteur_duree') | float(1.1),
+                 'l': state_attr(e, 'duree_limitee') == true, 'j': now().date() | string} | to_json }}{% endif %}
       - variables:
           resultat:
             ok: true
