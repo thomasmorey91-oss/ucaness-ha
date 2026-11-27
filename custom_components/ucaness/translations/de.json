@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Verbindung mit dem UCANESS-Portal",
-        "description": "INOFFIZIELLE Integration. Standardmäßig nur lesend: Der Wechselrichter wird (Betriebsmodus, Ladefenster) nur gesteuert, wenn die Option „Schreiben erlaubt“ aktiviert ist. Die „EMS-ID“ finden Sie im Portal im Feld „Details“ Ihrer Anlage.",
+        "description": "INOFFIZIELLE Integration. Standardmäßig nur lesend: Der Wechselrichter wird (Betriebsmodus, Ladefenster) nur gesteuert, wenn die Option „Schreiben erlaubt“ aktiviert ist. Die „EMS-ID“ findest du im Portal im Feld „Details“ deiner Anlage.",
         "data": {
           "email": "E-Mail-Adresse des UCANESS-Kontos",
           "password": "UCANESS-Passwort",
@@ -12,7 +12,7 @@
       },
       "reauth_confirm": {
         "title": "Erneute Verbindung mit UCANESS",
-        "description": "Die Sitzung wurde abgelehnt. Geben Sie das UCANESS-Passwort erneut ein.",
+        "description": "Die Sitzung wurde abgelehnt. Gib das UCANESS-Passwort erneut ein.",
         "data": {
           "password": "UCANESS-Passwort"
         }
@@ -32,7 +32,7 @@
     "step": {
       "init": {
         "title": "UCANESS-Optionen",
-        "description": "Die Integration enthält einen von UCanpower bereitgestellten Anwendungsschlüssel: Lassen Sie beide Schlüsselfelder leer, um ihn zu verwenden. Tragen Sie einen persönlichen Schlüssel und ein Secret nur ein, wenn UCanpower Ihnen diese gegeben hat; sie haben dann Vorrang. Um zum mitgelieferten Schlüssel zurückzukehren, leeren Sie das Schlüsselfeld. Lassen Sie das Secret leer, um das bereits gespeicherte zu behalten. „Schreiben erlaubt“ erlaubt Home Assistant, den Betriebsmodus (Eigenverbrauch oder Zeitarbitrage) und die Ladefenster zu ändern, sonst nichts.",
+        "description": "Die Integration enthält einen von UCanpower bereitgestellten Anwendungsschlüssel: Lass beide Schlüsselfelder leer, um ihn zu verwenden. Trage einen persönlichen Schlüssel und ein Secret nur ein, wenn UCanpower dir diese gegeben hat; sie haben dann Vorrang. Um zum mitgelieferten Schlüssel zurückzukehren, leere das Schlüsselfeld. Lass das Secret leer, um das bereits gespeicherte zu behalten. „Schreiben erlaubt“ erlaubt Home Assistant, den Betriebsmodus (Eigenverbrauch oder Zeitarbitrage) und die Ladefenster zu ändern, sonst nichts.",
         "data": {
           "scan_interval": "Abfrageintervall der Cloud (Sekunden, mindestens 30)",
           "app_key": "Persönlicher UCanpower-Anwendungsschlüssel (optional)",
@@ -267,7 +267,7 @@
   "issues": {
     "etape_connexion": {
       "title": "UCANESS: Die Batterie antwortet nicht",
-      "description": "Die Integration erhält keine Messwerte mehr von „{appareil}“. Ohne sie kann nichts berechnet werden.\n\nPrüfen Sie die Internetverbindung des Wechselrichters und [öffnen Sie dann die Integration]({lien})."
+      "description": "Die Integration erhält keine Messwerte mehr von „{appareil}“. Ohne sie kann nichts berechnet werden.\n\nPrüfe die Internetverbindung des Wechselrichters und [öffne dann die Integration]({lien})."
     },
     "etape_packages": {
       "title": "UCANESS: Steuerung installieren",
@@ -275,15 +275,15 @@
     },
     "etape_entites": {
       "title": "UCANESS: Einige Messwerte werden von der Steuerung nicht erkannt",
-      "description": "Die Steuerung liest die Batterie unter bestimmten Namen. Nicht gefunden: {entites}.\n\nBenennen Sie die entsprechenden Entitäten unter [Einstellungen > Entitäten]({lien}) um (Feld „Entitäts-ID“). Bei einer Neuinstallation werden diese Namen automatisch vergeben."
+      "description": "Die Steuerung liest die Batterie unter bestimmten Namen. Nicht gefunden: {entites}.\n\nBenenne die entsprechenden Entitäten unter [Einstellungen > Entitäten]({lien}) um (Feld „Entitäts-ID“). Bei einer Neuinstallation werden diese Namen automatisch vergeben."
     },
     "etape_batterie": {
-      "title": "UCANESS: Kapazität Ihrer Batterie angeben",
+      "title": "UCANESS: Kapazität deiner Batterie angeben",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Ihre Batterie",
-            "description": "Der Wechselrichter meldet {modules} Batteriemodul(e). Bei Modulen mit 5,12 kWh ergibt das {proposition} kWh: Bestätigen oder korrigieren Sie.\n\nDie Untergrenze ist der Ladestand, unter den die Batterie nicht mehr entladen wird (beobachten Sie den tiefsten Wert in einer Nacht ohne Nachladen). Die Ladeleistung ist die Leistung, die Sie beim Laden aus dem Netz feststellen. Beide Werte können später verfeinert werden.",
+            "title": "Deine Batterie",
+            "description": "Der Wechselrichter meldet {modules} Batteriemodul(e). Bei Modulen mit 5,12 kWh ergibt das {proposition} kWh: Bestätige oder korrigiere den Wert.\n\nDie Untergrenze ist der Ladestand, unter den die Batterie nicht mehr entladen wird (beobachte den tiefsten Wert in einer Nacht ohne Nachladen). Die Ladeleistung ist die Leistung, die du beim Laden aus dem Netz feststellst. Beide Werte können später verfeinert werden.",
             "data": {
               "capacite": "Batteriekapazität",
               "plancher": "Untergrenze",
@@ -292,7 +292,7 @@
           }
         },
         "error": {
-          "capacite_nulle": "Geben Sie eine Kapazität größer als 0 an."
+          "capacite_nulle": "Gib eine Kapazität größer als 0 an."
         },
         "abort": {
           "entree_absente": "Diese Batterie ist nicht mehr eingerichtet."
@@ -300,12 +300,12 @@
       }
     },
     "etape_contrat": {
-      "title": "UCANESS: Ihren Stromvertrag angeben",
+      "title": "UCANESS: Deinen Stromvertrag angeben",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Ihr Stromvertrag",
-            "description": "Diese Angaben finden Sie auf Ihrer Stromrechnung. Bei einem Vertrag ohne Niedertarif wählen Sie „Einheitstarif“ und lassen die Niedertarif-Felder leer.",
+            "title": "Dein Stromvertrag",
+            "description": "Diese Angaben findest du auf deiner Stromrechnung. Bei einem Vertrag ohne Niedertarif wähle „Einheitstarif“ und lass die Niedertarif-Felder leer.",
             "data": {
               "type_tarif": "Vertragsart",
               "prix_hp": "Preis pro kWh im Hochtarif (oder Einheitspreis)",
@@ -317,20 +317,20 @@
             }
           },
           "bilan": {
-            "title": "Bei Ihnen lohnt sich nächtliches Nachladen",
-            "description": "Jede kWh, die im Niedertarif geladen und im Hochtarif verbraucht wird, spart etwa {gain} Cent (Wirkungsgrad der Batterie mit {rendement} % in jede Richtung gerechnet).\n\nDie Steuerung lädt nachts, gerade so viel, wie bis zur Ablösung durch die Sonne nötig ist. Bestätigen Sie, um Ihren Vertrag zu speichern."
+            "title": "Bei dir lohnt sich nächtliches Nachladen",
+            "description": "Jede kWh, die im Niedertarif geladen und im Hochtarif verbraucht wird, spart etwa {gain} Cent (Wirkungsgrad der Batterie mit {rendement} % in jede Richtung gerechnet).\n\nDie Steuerung lädt nachts, gerade so viel, wie bis zur Ablösung durch die Sonne nötig ist. Bestätige, um deinen Vertrag zu speichern."
           },
           "bilan_non_rentable": {
-            "title": "Bei Ihnen lohnt sich nächtliches Nachladen nicht",
-            "description": "Mit diesen Preisen würde jede kWh, die im Niedertarif geladen und im Hochtarif verbraucht wird, etwa {gain} Cent kosten (Wirkungsgrad der Batterie mit {rendement} % in jede Richtung gerechnet).\n\nDie Steuerung plant daher kein Laden aus dem Netz; Ihre Batterie speichert weiterhin Ihren Solarstrom. Bestätigen Sie, um Ihren Vertrag zu speichern."
+            "title": "Bei dir lohnt sich nächtliches Nachladen nicht",
+            "description": "Mit diesen Preisen würde jede kWh, die im Niedertarif geladen und im Hochtarif verbraucht wird, etwa {gain} Cent kosten (Wirkungsgrad der Batterie mit {rendement} % in jede Richtung gerechnet).\n\nDie Steuerung plant daher kein Laden aus dem Netz; deine Batterie speichert weiterhin deinen Solarstrom. Bestätige, um deinen Vertrag zu speichern."
           },
           "bilan_base": {
             "title": "Vertrag ohne Niedertarif",
-            "description": "Bei einem Einheitspreis bringt das Laden der Batterie aus dem Netz nichts: Die Steuerung plant kein nächtliches Nachladen. Ihre Batterie speichert weiterhin Ihren Solarstrom. Bestätigen Sie, um Ihren Vertrag zu speichern."
+            "description": "Bei einem Einheitspreis bringt das Laden der Batterie aus dem Netz nichts: Die Steuerung plant kein nächtliches Nachladen. Deine Batterie speichert weiterhin deinen Solarstrom. Bestätige, um deinen Vertrag zu speichern."
           }
         },
         "error": {
-          "prix_nul": "Geben Sie einen Preis größer als 0 an."
+          "prix_nul": "Gib einen Preis größer als 0 an."
         },
         "abort": {
           "entree_absente": "Diese Batterie ist nicht mehr eingerichtet."
@@ -339,23 +339,23 @@
     },
     "etape_jours_ouvres": {
       "title": "UCANESS: Arbeitstage hinzufügen",
-      "description": "Die Steuerung unterscheidet Werktage von Wochenenden und Feiertagen: Der Verbrauch und, je nach Vertrag, der Niedertarif sind nicht gleich.\n\n[Workday-Integration hinzufügen]({lien}) und Ihr Land auswählen."
+      "description": "Die Steuerung unterscheidet Werktage von Wochenenden und Feiertagen: Der Verbrauch und, je nach Vertrag, der Niedertarif sind nicht gleich.\n\n[Workday-Integration hinzufügen]({lien}) und dein Land auswählen."
     },
     "etape_prevision_solaire": {
       "title": "UCANESS: Solarprognose hinzufügen",
-      "description": "Um nur das Nötige nachzuladen, braucht die Steuerung die erwartete Erzeugung für heute und morgen. Ohne Prognose wird kein Nachladen geplant.\n\nInstallieren Sie die Integration Solcast PV Forecast aus dem Marketplace (Community-Inhalt, nicht von Home Assistant geprüft) und [richten Sie sie ein]({lien})."
+      "description": "Um nur das Nötige nachzuladen, braucht die Steuerung die erwartete Erzeugung für heute und morgen. Ohne Prognose wird kein Nachladen geplant.\n\nInstalliere die Integration Solcast PV Forecast aus dem Marketplace (Community-Inhalt, nicht von Home Assistant geprüft) und [richte sie ein]({lien})."
     },
     "etape_notifications": {
       "title": "UCANESS: Benachrichtigungsziel wählen",
-      "description": "Optional. Um bei einem Batteriefehler oder einer fehlgeschlagenen Planung benachrichtigt zu werden.\n\nTragen Sie unter [Einstellungen > Helfer]({lien}) den Wert „Alertes : service de notification“ ein, zum Beispiel `mobile_app_mon_telephone`."
+      "description": "Optional. Um bei einem Batteriefehler oder einer fehlgeschlagenen Planung benachrichtigt zu werden.\n\nTrage unter [Einstellungen > Helfer]({lien}) den Wert „Alertes : service de notification“ ein, zum Beispiel `mobile_app_mon_telephone`."
     },
     "etape_solaire": {
-      "title": "UCANESS: Haben Sie Solarmodule?",
+      "title": "UCANESS: Hast du Solarmodule?",
       "fix_flow": {
         "step": {
           "init": {
             "title": "Solarmodule",
-            "description": "Der Wechselrichter hat noch keine Solarerzeugung gemessen. Eine Batterie funktioniert mit oder ohne Solarmodule.\n\nMit Solarmodulen speichert die Batterie zuerst Ihre Erzeugung, und die Steuerung lädt nachts nur den Rest nach. Ohne Solarmodule dient sie dazu, Strom zu den günstigsten Zeiten zu kaufen und zu den teuren Zeiten zu verbrauchen: Alles hängt dann von Ihrem Vertrag ab, den der Assistent im nächsten Schritt prüft.",
+            "description": "Der Wechselrichter hat noch keine Solarerzeugung gemessen. Eine Batterie funktioniert mit oder ohne Solarmodule.\n\nMit Solarmodulen speichert die Batterie zuerst deine Erzeugung, und die Steuerung lädt nachts nur den Rest nach. Ohne Solarmodule dient sie dazu, Strom zu den günstigsten Zeiten zu kaufen und zu den teuren Zeiten zu verbrauchen: Alles hängt dann von deinem Vertrag ab, den der Assistent im nächsten Schritt prüft.",
             "data": {
               "solaire": "An diesen Wechselrichter sind Solarmodule angeschlossen"
             }
@@ -633,7 +633,7 @@
       "message": "Daten abgelehnt: {detail}"
     },
     "puissance_actuelle_manquante": {
-      "message": "Geben Sie die aktuelle vertragliche Leistung an (puissance_actuelle_kva)."
+      "message": "Gib die aktuelle vertragliche Leistung an (puissance_actuelle_kva)."
     },
     "aucune_mesure_horaire": {
       "message": "Keine stündlichen Messwerte von {entite} in den letzten {jours} Tagen."
