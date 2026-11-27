@@ -121,28 +121,35 @@ def autoconsommation(stock, recharge=0.0):
     return cout, stock, achats, injections
 
 
-def stats(soutirage, soc0, soc1, injection=None):
+def stats(soutirage, soc0, soc1, injection=None, compteur_injection=None, fictive=None):
+    """compteur_injection : variations horaires du compteur d'injection de l'onduleur (absent si None).
+    fictive : injection fictive ajoutée à l'estimation (puissance réseau moyenne trop basse, comme
+    quand la puissance est « inconnue » une partie de l'heure)."""
     injection = injection or [0.0] * 24
+    fictive = fictive or [0.0] * 24
     t = lambda i: (DEB + dt.timedelta(hours=i)).isoformat()
     moy = {"sensor.uhome_puissance_maison": [{"start": t(i), "mean": CHARGE[i] * 1000} for i in range(24)],
            # Comme sur un UHome 6K : pas de valeur MPPT la nuit (ni statistique).
            "sensor.uhome_puissance_mppt_1": [{"start": t(i), "mean": SOLAIRE[i] * 600} for i in range(8, 19)],
            "sensor.uhome_puissance_mppt_2": [{"start": t(i), "mean": SOLAIRE[i] * 400} for i in range(8, 19)],
-           "sensor.uhome_puissance_reseau": [{"start": t(i), "mean": (soutirage[i] - injection[i]) * 1000} for i in range(24)],
+           "sensor.uhome_puissance_reseau": [{"start": t(i), "mean": (soutirage[i] - injection[i] - fictive[i]) * 1000} for i in range(24)],
            "sensor.uhome_soc": [{"start": t(-1), "mean": soc0}] + [{"start": t(i), "mean": 50} for i in range(23)]
            + [{"start": t(23), "mean": soc1}]}
     cpt = {"sensor.uhome_soutirage_reseau_total": [{"start": t(i), "change": soutirage[i]} for i in range(24)]}
+    if compteur_injection is not None:
+        cpt["sensor.uhome_injection_reseau_totale"] = [{"start": t(i), "change": compteur_injection[i]}
+                                                       for i in range(24) if compteur_injection[i] is not None]
     return {"statistics": moy}, {"statistics": cpt}
 
 
-async def gain(soutirage, soc0, soc1, injection=None, quand="2030-01-15 22:25:00"):
+async def gain(soutirage, soc0, soc1, injection=None, quand="2030-01-15 22:25:00", compteur_injection=None, fictive=None):
     with tempfile.TemporaryDirectory() as d:
         hass = await nouveau_hass(d, ETATS)
         bloc = next(b for b in paquet()["template"]
                     if any(t.get("event_type") == "jarvis_calcul_gain" for t in b.get("triggers", [])))
         v1 = bloc["actions"][0]["variables"]
         v2 = bloc["actions"][-1]["variables"]
-        moy, cpt = stats(soutirage, soc0, soc1, injection)
+        moy, cpt = stats(soutirage, soc0, soc1, injection, compteur_injection, fictive)
         with freeze_time(quand):
             r1 = ScriptVariables({k: tpl.Template(v, hass) for k, v in v1.items()}).async_render(hass, {})
             run = {**r1, "jour_debut": {"binary_sensor.workday_sensor": {"workday": True}},
@@ -237,6 +244,26 @@ def verifier():
     assert abs(float(rendu["suite"][0]) - round(10 + g["gain"], 2)) < 0.001 and int(rendu["suite"][1]) == 4
     assert float(rendu["nouveau_mois"][0]) == round(g["gain"], 2) and int(rendu["nouveau_mois"][1]) == 1
     print("Cumul du mois :", rendu)
+
+    # 6 bis. Injection : le compteur de l'onduleur passe avant l'estimation soutirage - puissance
+    # réseau, qui compte une injection fictive quand la puissance réseau manque une partie de
+    # l'heure (batterie à l'arrêt au plancher).
+    fictive = [0.0] * 24
+    for i in (0, 1, 2, 21, 22):          # heures de nuit, batterie au plancher
+        fictive[i] = 0.4
+    g_estime, _ = asyncio.run(gain(reel, soc0, soc1, inj_reel, fictive=fictive))
+    assert abs(g_estime["injection_kwh"] - round(sum(inj_reel) + 2.0, 1)) < 0.05, g_estime["injection_kwh"]
+    assert g_estime["gain"] > round(attendu, 2) and g_estime["injection_source"] == "estimée"
+    g_cpt, _ = asyncio.run(gain(reel, soc0, soc1, inj_reel, fictive=fictive, compteur_injection=inj_reel))
+    assert abs(g_cpt["injection_kwh"] - round(sum(inj_reel), 1)) < 0.05, g_cpt["injection_kwh"]
+    assert abs(g_cpt["gain"] - round(attendu, 2)) < 0.011 and g_cpt["injection_source"] == "compteur", g_cpt
+    # Compteur absent pour deux heures : estimation pour ces deux heures seulement.
+    trous = [None if i in (21, 22) else x for i, x in enumerate(inj_reel)]
+    g_mix, _ = asyncio.run(gain(reel, soc0, soc1, inj_reel, fictive=fictive, compteur_injection=trous))
+    assert abs(g_mix["injection_kwh"] - round(sum(inj_reel) + 0.8, 1)) < 0.05, g_mix["injection_kwh"]
+    assert g_mix["injection_source"] == "compteur 22 h sur 24", g_mix["injection_source"]
+    print(f"Injection fictive 2,0 kWh : gain {g_estime['gain']} € estimé, {g_cpt['gain']} € avec le compteur"
+          f" ({g_mix['gain']} € avec 2 h sans compteur)")
 
     # 7. Mesures incomplètes : pas de gain.
     g, _ = asyncio.run(gain(reel, None, soc1))

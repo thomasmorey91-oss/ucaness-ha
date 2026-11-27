@@ -50,6 +50,7 @@ Les règles et les calculs sont décrits dans `REGLES.md`. Pour analyser l'insta
    | UCANESS : production solaire aujourd'hui | `sensor.uhome_production_solaire_aujourdhui` |
    | UCANESS : production solaire totale (détection d'une batterie sans panneaux) | `sensor.uhome_production_solaire_totale` |
    | UCANESS : soutirage réseau total | `sensor.uhome_soutirage_reseau_total` |
+   | UCANESS : injection réseau totale (gain réel ; sans elle, l'injection est estimée) | `sensor.uhome_injection_reseau_totale` |
    | UCANESS : mode de fonctionnement | `sensor.uhome_mode` |
    | UCANESS : code défaut / code alarme batterie | `sensor.uhome_code_defaut_batterie` / `sensor.uhome_code_alarme_batterie` |
    | UCANESS : connexion au cloud | `binary_sensor.uhome_connexion_cloud` |
