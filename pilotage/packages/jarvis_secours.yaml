@@ -12,7 +12,7 @@
 #     puissance maximale) ;
 #   - fait le bilan à la fin (durée, énergie fournie, SOC le plus bas, puissance la plus haute) et
 #     tient les cumuls de l'année ;
-#   - prévient d'un RISQUE de coupure (vigilance Météo-France orange ou rouge pour le vent, les
+#   - prévient d'un RISQUE de coupure (vigilance Météo-France rouge (ou orange, au choix) pour le vent, les
 #     orages, la neige ou les inondations, ou coupure programmée annoncée par Enedis) et, si vous
 #     l'autorisez, demande au pilotage en tarif dynamique de garder une réserve dans la batterie ;
 #   - signale un arrêt de Home Assistant (coupure probable) au redémarrage ;
@@ -84,9 +84,20 @@ input_number:
     unit_of_measurement: kW
     mode: box
 
+input_select:
+  # Vigilance qui compte comme risque de coupure. « Rouge » par défaut (première option) ; « Orange et rouge »
+  # pour une maison souvent coupée (ligne aérienne, bout de réseau).
+  jarvis_secours_niveau_vigilance:
+    name: "Secours : niveau de vigilance retenu comme risque de coupure"
+    options:
+      - "Rouge"
+      - "Orange et rouge"
+    icon: mdi:alert-octagon
+
 input_text:
+  # Vide : le premier capteur « …_weather_alert » de l'intégration Météo-France est pris d'office.
   jarvis_secours_vigilance:
-    name: "Secours : capteur de vigilance Météo-France (ex. sensor.<département>_weather_alert)"
+    name: "Secours : capteur de vigilance Météo-France (vide = trouvé d'office)"
     max: 100
 
 input_datetime:
@@ -133,11 +144,13 @@ template:
         icon: mdi:weather-lightning-rainy
         state: >
           {% set c = states('input_text.jarvis_secours_vigilance') %}
+          {% if c in ['', 'unknown', 'unavailable'] %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
           {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Vagues-submersion'] %}
+          {% set niveaux = ['Rouge'] if is_state('input_select.jarvis_secours_niveau_vigilance', 'Rouge') else ['Orange', 'Rouge'] %}
           {% set ns = namespace(v=false) %}
           {% if c not in ['', 'unknown'] and states(c) not in ['unknown', 'unavailable'] %}
             {% for p in phen %}
-              {% if state_attr(c, p) in ['Orange', 'Rouge'] %}{% set ns.v = true %}{% endif %}
+              {% if state_attr(c, p) in niveaux %}{% set ns.v = true %}{% endif %}
             {% endfor %}
           {% endif %}
           {% set d = states('input_datetime.jarvis_secours_coupure_prevue_debut') | as_datetime(none) %}
@@ -145,13 +158,19 @@ template:
           {% set prevue = d is not none and f is not none and (d | as_local) - timedelta(hours=12) <= now() < (f | as_local) %}
           {{ ns.v or prevue }}
         attributes:
+          capteur_vigilance: >
+            {% set c = states('input_text.jarvis_secours_vigilance') %}
+            {% if c in ['', 'unknown', 'unavailable'] %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
+            {{ c if c else 'aucun' }}
           motif: >
             {% set c = states('input_text.jarvis_secours_vigilance') %}
+            {% if c in ['', 'unknown', 'unavailable'] %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
             {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Vagues-submersion'] %}
+            {% set niveaux = ['Rouge'] if is_state('input_select.jarvis_secours_niveau_vigilance', 'Rouge') else ['Orange', 'Rouge'] %}
             {% set ns = namespace(m=[]) %}
             {% if c not in ['', 'unknown'] %}
               {% for p in phen %}
-                {% if state_attr(c, p) in ['Orange', 'Rouge'] %}{% set ns.m = ns.m + [p ~ ' (' ~ state_attr(c, p) | lower ~ ')'] %}{% endif %}
+                {% if state_attr(c, p) in niveaux %}{% set ns.m = ns.m + [p ~ ' (' ~ state_attr(c, p) | lower ~ ')'] %}{% endif %}
               {% endfor %}
             {% endif %}
             {% set d = states('input_datetime.jarvis_secours_coupure_prevue_debut') | as_datetime(none) %}
