@@ -408,9 +408,234 @@ def test_mode_allege_memorise(site):
             got = pg.evaluate("""async () => {
                 const { UC_LIGHT } = await import('../www/ucaness/ucaness-cards.js');
                 const css = document.querySelector('ucaness-layout-card').shadowRoot.querySelector('style').textContent;
-                return { light: UC_LIGHT, css: /\* \{ animation: none !important; transition: none !important; \}/.test(css) };
+                return { light: UC_LIGHT, css: /\*:not\(\.uc-flow\) \{ animation: none !important; \}/.test(css) };
             }""")
             assert got == {"light": expected, "css": expected}, query or "sans paramètre"
             pg.close()
     finally:
         ctx.close()
+
+
+# ---------------------------------------------------------------- 0.5.0 : vue 3D, ciel, animations, téléphone
+
+SCENE = "document.querySelector('ucaness-layout-card').shadowRoot.querySelector('ucaness-flow-card').shadowRoot"
+CIELS = DASH_DIR / "www" / "ucaness" / "ciel"
+
+
+@pytest.fixture(scope="module")
+def scene(site):
+    pg = open_page(site, "/tests/scene.html", width=1600, height=1000)
+    yield pg
+    pg.close()
+
+
+def scene_state(pg) -> dict:
+    return pg.evaluate(f"""() => {{
+        const r = {SCENE};
+        const flows = [...r.querySelectorAll('path.uc-flow')];
+        return {{ flows: flows.length, idle: r.querySelectorAll('path[stroke-dasharray="9 9"]').length,
+                  reverse: flows.filter(p => p.style.animationDirection === 'reverse').length,
+                  waves: r.querySelectorAll('.uc-wave').length, glow: r.querySelectorAll('ellipse').length,
+                  text: r.querySelector('.lbls').textContent.replace(/\\s+/g, ' '),
+                  uh: !!r.querySelector('.uh'), bulb: !!r.querySelector('.bulb.lit'), borne: !!r.querySelector('.borne'),
+                  balls: r.querySelectorAll('.ball').length }};
+    }}""")
+
+
+def set_scene(pg, changes: dict):
+    pg.evaluate("""(changes) => {
+        const h = JSON.parse(JSON.stringify(window.fakeHass));
+        h.callWS = window.fakeHass.callWS; h.connection = window.fakeHass.connection;
+        for (const [k, v] of Object.entries(changes)) h.states[k].state = String(v);
+        window.fakeHass = h;
+        document.querySelector('ucaness-layout-card').hass = h;
+    }""", changes)
+    pg.wait_for_timeout(1100)                  # chiffres qui défilent : 0,8 s
+
+
+def test_scene_sans_erreur_ni_pastille(scene):
+    assert scene.errors == []
+    st = scene_state(scene)
+    assert st["uh"] and st["borne"] and st["balls"] == 0
+
+
+def test_scene_flux_selon_l_etat(scene):
+    set_scene(scene, {"sensor.uhome_puissance_solaire": 1240, "sensor.uhome_puissance_batterie": 820,
+                      "sensor.uhome_puissance_reseau": 0, "sensor.uhome_puissance_maison": 420})
+    st = scene_state(scene)
+    assert st["flows"] == 2 and st["idle"] == 2          # soleil et maison ; réseau et borne au repos
+    assert st["glow"] == 1 and st["bulb"]                  # panneaux illuminés, ampoule allumée
+    assert "1,24 kW" in st["text"] and "42 % · 0,82 kW" in st["text"] and "en charge" in st["text"]
+    assert "autoconsommation" in st["text"]
+    set_scene(scene, {"sensor.uhome_puissance_solaire": 0, "sensor.uhome_puissance_batterie": -900,
+                      "sensor.uhome_puissance_reseau": 500})
+    st = scene_state(scene)
+    assert st["flows"] == 2 and st["reverse"] == 0 and st["glow"] == 0
+    assert "en décharge" in st["text"] and "0,50 kW" in st["text"]
+    set_scene(scene, {"sensor.uhome_puissance_reseau": -600})
+    st = scene_state(scene)
+    assert st["reverse"] == 1 and "injection" in st["text"]   # le réseau change de sens
+    set_scene(scene, {"sensor.borne_puissance_de_charge": 7.4, "sensor.borne_description_de_l_etat": "Charging"})
+    st = scene_state(scene)
+    assert st["flows"] == 3 and "7,40 kW" in st["text"] and "en charge" in st["text"]
+    set_scene(scene, {"sensor.borne_puissance_de_charge": 0, "sensor.borne_description_de_l_etat": "Ready",
+                      "sensor.uhome_puissance_reseau": 0, "sensor.uhome_puissance_solaire": 1240,
+                      "sensor.uhome_puissance_batterie": 820})
+
+
+def test_scene_flux_garde_ses_animations_entre_deux_mesures(scene):
+    """Une nouvelle mesure de même allure ne redessine que les chiffres (les tirets ne repartent pas de zéro)."""
+    scene.evaluate(f"() => {{ window._flux = {SCENE}.querySelector('path.uc-flow'); }}")
+    set_scene(scene, {"sensor.uhome_puissance_maison": 430})
+    assert scene.evaluate(f"() => window._flux === {SCENE}.querySelector('path.uc-flow')")
+    assert "0,43 kW" in scene_state(scene)["text"]
+
+
+def test_scene_appui_sur_l_uhome(scene):
+    path = scene.evaluate(f"""() => new Promise(res => {{
+        window.addEventListener('location-changed', () => res(location.pathname), {{ once: true }});
+        {SCENE}.querySelector('.uh').click();
+    }})""")
+    assert path == "/batterie"
+    scene.evaluate("history.back()")
+
+
+def test_scene_fiche_au_clic_sur_les_chiffres(scene):
+    got = scene.evaluate(f"""() => new Promise(res => {{
+        window.addEventListener('hass-more-info', e => res(e.detail.entityId), {{ once: true }});
+        {SCENE}.querySelector('.lb[data-entity="sensor.uhome_puissance_maison"]').click();
+    }})""")
+    assert got == "sensor.uhome_puissance_maison"
+
+
+def sky(pg, tag="ucaness-layout-card") -> dict:
+    return pg.evaluate(f"""() => {{
+        const host = document.querySelector('{tag}');
+        const on = host.shadowRoot.querySelector('.uc-sl.on');
+        return {{ night: host.style.getPropertyValue('--uc-night'), img: on ? on.style.backgroundImage : '',
+                  meteo: host.shadowRoot.querySelector('.uc-sky').dataset.meteo,
+                  drift: host.shadowRoot.querySelectorAll('.uc-sl.drift').length }};
+    }}""")
+
+
+def test_ciel_de_jour_et_bascule_de_nuit(scene):
+    scene.wait_for_timeout(300)
+    st = sky(scene)
+    assert st["night"] == "0" and "ciel-jour-beau.jpg" in st["img"] and st["meteo"] == "0"
+    set_scene(scene, {"sun.sun": "below_horizon", "weather.maison": "lightning"})
+    scene.wait_for_timeout(1600)
+    st = sky(scene)
+    assert st["night"] == "1" and "ciel-nuit-orage.jpg" in st["img"] and st["meteo"] == "3"
+    set_scene(scene, {"sun.sun": "above_horizon", "weather.maison": "sunny"})
+
+
+def test_apercu_d_ambiance_par_l_adresse(site):
+    for query, night, image in (("?ambiance=nuit", "1", "ciel-nuit-claire"), ("?ambiance=nuit&meteo=pluie", "1", "ciel-nuit-couverte"),
+                                ("?meteo=nuageux", "0", "ciel-jour-nuageux"), ("?coucher=1", "0", "ciel-coucher")):
+        pg = open_page(site, f"/tests/scene.html{query}", width=1280, height=800)
+        try:
+            pg.wait_for_timeout(300)
+            st = sky(pg)
+            assert pg.errors == [] and st["night"] == night and f"{image}.jpg" in st["img"], query
+        finally:
+            pg.close()
+
+
+def test_ciels_fournis():
+    js = JS.read_text(encoding="utf-8")
+    assert "ciel/ciel-${amb.img}.jpg" in js
+    noms = {"jour-beau", "jour-nuageux", "jour-pluie", "jour-orage", "coucher", "nuit-claire", "nuit-couverte", "nuit-orage"}
+    for nom in noms:
+        assert f"'{nom}'" in js, nom
+        f = CIELS / f"ciel-{nom}.jpg"
+        assert f.exists() and 20_000 < f.stat().st_size < 400_000, f
+        assert f.read_bytes()[:3] == b"\xff\xd8\xff", f            # JPEG
+
+
+def test_scene_mode_allege(site):
+    browser, _ = site
+    ctx = browser.new_context()
+    try:
+        pg = open_page(site, "/tests/scene.html?leger=1", width=1280, height=800, context=ctx)
+        st = scene_state(pg)
+        assert pg.errors == [] and st["flows"] >= 1 and st["waves"] == 0     # flux gardés, ni onde ni halo
+        assert sky(pg)["drift"] == 0                                         # ciel figé
+        pg.close()
+        open_page(site, "/tests/scene.html?leger=0", context=ctx).close()
+    finally:
+        ctx.close()
+
+
+def test_moins_de_mouvement(site):
+    browser, base = site
+    for reduced, expected in (("reduce", 0), ("no-preference", 1)):
+        ctx = browser.new_context(reduced_motion=reduced, viewport={"width": 1280, "height": 800})
+        try:
+            pg = ctx.new_page()
+            pg.goto(f"{base}/tests/scene.html")
+            pg.wait_for_selector("body[data-ready='1']", timeout=5000)
+            running = pg.evaluate("""() => {
+                const layout = document.querySelector('ucaness-layout-card');
+                return [...layout.shadowRoot.querySelectorAll('.col > *')].map(e => e.getAnimations().length).reduce((a, b) => a + b, 0);
+            }""")
+            assert (running > 0) == bool(expected), reduced
+        finally:
+            ctx.close()
+
+
+@pytest.fixture(scope="module")
+def tel(site):
+    pg = open_page(site, "/tests/scene.html?ecran=tel", width=390, height=844)
+    pg.wait_for_timeout(600)
+    yield pg
+    pg.close()
+
+
+def test_ecran_de_telephone(tel):
+    assert tel.errors == []
+    got = tel.evaluate("""() => {
+        const app = document.querySelector('ucaness-app-card').shadowRoot;
+        const flow = app.querySelector('ucaness-flow-card').shadowRoot;
+        const short = app.querySelector('ucaness-shortcuts-card').shadowRoot;
+        const hours = app.querySelector('ucaness-hours-card').shadowRoot;
+        return { nav: app.querySelectorAll('nav button').length, meteo: !!app.querySelector('.meteo ha-icon'),
+                 sky: !!app.querySelector('.uc-sl.on'), scene: !!flow.querySelector('.stage.scene'),
+                 details: [...flow.querySelectorAll('.lb .o')].every(e => getComputedStyle(e).display === 'none'),
+                 shortcuts: short.querySelectorAll('button').length, on: short.querySelectorAll('button.on').length,
+                 bars: hours.querySelectorAll('path.bar').length, width: document.documentElement.scrollWidth };
+    }""")
+    assert got["nav"] == 2 and got["meteo"] and got["sky"] and got["scene"]
+    assert got["details"]                                   # téléphone : noms et puissances seulement
+    assert got["shortcuts"] == 1 and got["on"] == 1         # raccourci sans entité masqué, appareil allumé en cyan
+    assert got["bars"] > 0                                  # barres qui poussent à la première ouverture
+    assert got["width"] <= 390                              # pas de défilement horizontal
+
+
+def test_carte_de_decision_qui_se_retourne(tel):
+    flips = tel.evaluate("""async () => {
+        const det = document.querySelector('ucaness-app-card').shadowRoot.querySelector('ucaness-detail-card');
+        window.annoncer('Recharge de 4,2 kWh');
+        await new Promise(r => setTimeout(r, 50));
+        const sec = det.shadowRoot.querySelector('section');
+        return { anim: sec.getAnimations().length, text: sec.textContent };
+    }""")
+    assert flips["anim"] == 1 and "Recharge de 4,2 kWh" in flips["text"]
+
+
+def test_courbe_qui_se_trace(tel):
+    got = tel.evaluate("""async () => {
+        const hours = document.querySelector('ucaness-app-card').shadowRoot.querySelector('ucaness-hours-card').shadowRoot;
+        hours.querySelectorAll('.tabs button')[1].click();
+        await new Promise(r => setTimeout(r, 300));
+        return { trace: hours.querySelectorAll('path.trace').length, area: hours.querySelectorAll('path[fill="url(#ucarea)"]').length };
+    }""")
+    assert got["trace"] == 1 and got["area"] == 1
+
+
+def test_chiffres_qui_defilent_jusqu_a_la_valeur(tel):
+    got = tel.evaluate("""async () => {
+        const stats = document.querySelector('ucaness-app-card').shadowRoot.querySelector('ucaness-stats-card').shadowRoot;
+        await new Promise(r => setTimeout(r, 1000));
+        return [...stats.querySelectorAll('.v')].map(v => v.textContent.replace(/\\s/g, ' '));
+    }""")
+    assert got[0].startswith("6,4") and got[1].startswith("42")

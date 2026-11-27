@@ -53,6 +53,8 @@ Les vues satellite ou 3D des services de cartographie en ligne servent de **rep�
 
 ## 3. Installer et caler
 
+### a. Vue à pastilles
+
 1. Copier l'image dans `config/www/ucaness/` (par exemple `ma-maison.png`).
 2. Dans le tableau de bord, carte `custom:ucaness-flow-card` :
    ```yaml
@@ -74,6 +76,19 @@ Les vues satellite ou 3D des services de cartographie en ligne servent de **rep�
 4. Si une ligne traverse un endroit gênant, imposez son tracé dans le nœud concerné : `path: [[20, 73], [20, 60], [44, 60], [44, 52]]` (points en %, toujours de la boule vers l'onduleur ; la carte inverse le sens selon le flux).
 5. Ajuster si besoin `image_area` (`x`, `y`, `w` en %) pour déplacer ou agrandir l'image, et `aspect_ratio` pour la hauteur de la carte.
 6. Retirer `calibration: true`. Après chaque changement d'image, augmenter le numéro `?v=` pour forcer le rechargement.
+
+### b. Vue 3D, sans pastilles (`scene: 3d`, cartes 0.5.0)
+
+Dans cette vue, les objets dessinés remplacent les boules : la colonne UHome devant la maison, une ampoule, le poteau du réseau (celui de votre image), éventuellement une borne de recharge. Les chiffres sont écrits à côté. Le calage se fait de la même façon, avec `calibration: true` (grille tous les 5 %) :
+
+1. **Colonne UHome** (`nodes.battery.uhome: {x, y, w}`) : coin haut gauche et largeur, en % de la carte. Placez-la devant la maison, au sol, là où elle ne cache ni porte ni panneau (8 à 9 % de large).
+2. **Soleil** (`nodes.solar`) : `routes` part du bas du champ de panneaux, longe la façade et arrive sur le haut de la colonne (un trajet par champ de panneaux) ; `glow` pose une lueur sur chaque champ (`[centre x, centre y, demi-largeur, demi-hauteur, angle]`, largeurs en % de la largeur de la carte) ; `x`, `y` placent les chiffres au-dessus du toit, `leader` trace un pointillé des chiffres vers les panneaux.
+3. **Réseau** (`nodes.grid.route`) : du haut du poteau, le long du poteau puis au sol, jusqu'au bas de la colonne. Les chiffres (`x`, `y`) se placent près du haut du poteau.
+4. **Maison** (`nodes.home`) : `route` de la colonne vers l'ampoule, `bulb: {x, y, w}` pour l'ampoule, chiffres en dessous.
+5. **Borne** (facultative, `ev`) : `borne: {x, y, w}` sur le mur du garage, `route` de la colonne vers la borne, au-dessus du trajet de la maison pour que les deux restent séparés.
+6. Les trajets vont toujours de la source vers la colonne (soleil, réseau) ou de la colonne vers l'usage (maison, borne) ; la carte inverse seule le sens du réseau quand vous injectez.
+
+La maison d'exemple du tableau de bord (`dashboards/ucaness-home-assistant.yaml`) montre une configuration complète.
 
 ## 4. Confidentialité
 
