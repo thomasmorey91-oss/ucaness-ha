@@ -324,6 +324,24 @@ def test_carte_ucan_conseil_et_reponse(cartes):
     assert etat["appels"] == [["script", "ucan_conseil_reponse", {"reponse": "plus_tard"}]]
 
 
+def test_ucan_en_bulle_en_bas_a_droite(cartes):
+    etat = cartes.evaluate("""() => {
+      const hote = document.querySelector('body > .ucaness-ucan-bulle');
+      const r = hote.shadowRoot;
+      const fab = r.querySelector('.fab');
+      const avant = { pastille: !!r.querySelector('.pastille'), panneau: !!r.querySelector('.panneau'),
+                      pos: getComputedStyle(hote).position, bas: getComputedStyle(hote).bottom };
+      fab.click();
+      const ouvert = { panneau: !!r.querySelector('.panneau'), boutons: r.querySelectorAll('button[data-r]').length,
+                       expanded: r.querySelector('.fab').getAttribute('aria-expanded') };
+      r.querySelector('.fermer').click();
+      return { avant, ouvert, ferme: !r.querySelector('.panneau') };
+    }""")
+    assert etat["avant"] == {"pastille": True, "panneau": False, "pos": "fixed", "bas": "84px"}
+    assert etat["ouvert"] == {"panneau": True, "boutons": 3, "expanded": "true"}
+    assert etat["ferme"]
+
+
 def test_texte_court_non_replie(cartes):
     st = note_state(cartes, "court")
     assert not st["cut"] and not st["more"] and not st["less"]
