@@ -129,6 +129,12 @@ views:
               # (pilotage/packages/ucan_conseils.yaml). Ne prend aucune place dans la colonne.
               - type: custom:ucaness-ucan-card
                 floating: true
+                # Questions « Et si… » (cartes 0.5.5) : renseignez votre puissance souscrite et votre abonnement
+                # annuel TTC (facture). Sans cette option, la fenêtre d'Ucan ne propose pas de simulation.
+                # simulateur:
+                #   puissance_actuelle_kva: 9
+                #   abonnement_actuel_eur_an: 240
+                #   jours: 30
                 alert_entities:
                   - binary_sensor.uhome_defaut_batterie
                   - binary_sensor.uhome_temperature_hors_plage
