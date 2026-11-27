@@ -1,0 +1,657 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Verbindung mit dem UCANESS-Portal",
+        "description": "INOFFIZIELLE Integration. Standardmäßig nur lesend: Der Wechselrichter wird (Betriebsmodus, Ladefenster) nur gesteuert, wenn die Option „Schreiben erlaubt“ aktiviert ist. Die „EMS-ID“ finden Sie im Portal im Feld „Details“ Ihrer Anlage.",
+        "data": {
+          "email": "E-Mail-Adresse des UCANESS-Kontos",
+          "password": "UCANESS-Passwort",
+          "device_code": "EMS-ID des Geräts"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Erneute Verbindung mit UCANESS",
+        "description": "Die Sitzung wurde abgelehnt. Geben Sie das UCANESS-Passwort erneut ein.",
+        "data": {
+          "password": "UCANESS-Passwort"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Anmeldedaten von UCANESS abgelehnt.",
+      "device_not_found": "Kein Gerät mit dieser EMS-ID gefunden.",
+      "cannot_connect": "UCANESS-Portal nicht erreichbar."
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist bereits eingerichtet.",
+      "reauth_successful": "Erneute Verbindung erfolgreich."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "UCANESS-Optionen",
+        "description": "Die Integration enthält einen von UCanpower bereitgestellten Anwendungsschlüssel: Lassen Sie beide Schlüsselfelder leer, um ihn zu verwenden. Tragen Sie einen persönlichen Schlüssel und ein Secret nur ein, wenn UCanpower Ihnen diese gegeben hat; sie haben dann Vorrang. Um zum mitgelieferten Schlüssel zurückzukehren, leeren Sie das Schlüsselfeld. Lassen Sie das Secret leer, um das bereits gespeicherte zu behalten. „Schreiben erlaubt“ erlaubt Home Assistant, den Betriebsmodus (Eigenverbrauch oder Zeitarbitrage) und die Ladefenster zu ändern, sonst nichts.",
+        "data": {
+          "scan_interval": "Abfrageintervall der Cloud (Sekunden, mindestens 30)",
+          "app_key": "Persönlicher UCanpower-Anwendungsschlüssel (optional)",
+          "app_secret": "Persönliches UCanpower-Anwendungs-Secret (optional)",
+          "write_enabled": "Schreiben erlaubt (nur Betriebsmodus und Ladefenster)"
+        }
+      }
+    }
+  },
+  "services": {
+    "tester_api": {
+      "name": "UCanpower-API testen",
+      "description": "Nur lesende Prüfung der signierten Dritt-API: Geräte-ID, Wechselrichtermodell, Betriebsmodus und Zeitfenster. Es wird nichts an den Wechselrichter gesendet.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Gerät",
+          "description": "Zu verwendender UCANESS-Eintrag (optional, wenn es nur ein Gerät gibt)."
+        }
+      }
+    },
+    "definir_plages_charge": {
+      "name": "Ladefenster festlegen",
+      "description": "Programmiert bis zu 3 Ladefenster des Zeitarbitrage-Modus (HHMM). Die übrigen Lade- und alle Entladefenster werden geleert. Erfordert „Schreiben erlaubt“.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Gerät",
+          "description": "Zu verwendender UCANESS-Eintrag (optional, wenn es nur ein Gerät gibt)."
+        },
+        "plages": {
+          "name": "Zeitfenster",
+          "description": "Liste von {debut, fin} im Format HHMM, zum Beispiel 2300 bis 2359, dann 0000 bis 0130."
+        }
+      }
+    },
+    "definir_mode": {
+      "name": "Betriebsmodus festlegen",
+      "description": "Schaltet den Wechselrichter auf Eigenverbrauch oder Zeitarbitrage. Der Backup-Modus wird abgelehnt. Erfordert „Schreiben erlaubt“.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Gerät",
+          "description": "Zu verwendender UCANESS-Eintrag (optional, wenn es nur ein Gerät gibt)."
+        },
+        "mode": {
+          "name": "Modus",
+          "description": "Eigenverbrauch oder Zeitarbitrage."
+        }
+      }
+    },
+    "optimiser_charge": {
+      "name": "Laden planen (dynamischer Tarif)",
+      "description": "Berechnet, ohne etwas an den Wechselrichter zu senden, bis zu 3 Netz-Ladefenster, die die Kosten bei variablem Preis minimieren, aus Preisen, erwartetem Verbrauch und Solarprognose.",
+      "fields": {
+        "prix": {
+          "name": "Preise",
+          "description": "Liste von {debut, prix} (oder {start, price}) in EUR/kWh brutto, stündlich oder viertelstündlich."
+        },
+        "conso": {
+          "name": "Verbrauch",
+          "description": "24 Werte (kWh pro Stunde des Tages) oder Liste von {debut, kwh}."
+        },
+        "solaire": {
+          "name": "Solarprognose",
+          "description": "Liste detailedHourly oder detailedForecast von Solcast, oder {debut, kwh}."
+        },
+        "capacite_kwh": {
+          "name": "Batteriekapazität",
+          "description": "Nennkapazität."
+        },
+        "plancher_pct": {
+          "name": "SOC-Untergrenze",
+          "description": "SOC, unter dem der Wechselrichter nicht mehr entlädt."
+        },
+        "soc_pct": {
+          "name": "Aktueller SOC",
+          "description": "Ladestand der Batterie jetzt."
+        },
+        "rendement_pct": {
+          "name": "Wirkungsgrad",
+          "description": "Wirkungsgrad in eine Richtung (Laden oder Entladen)."
+        },
+        "puissance_charge_kw": {
+          "name": "Ladeleistung aus dem Netz",
+          "description": "Tatsächlich beobachtete Leistung während eines Ladefensters."
+        },
+        "prix_revente": {
+          "name": "Einspeisevergütung",
+          "description": "EUR/kWh, die für eingespeiste Energie gezahlt werden."
+        },
+        "marge_pct": {
+          "name": "Reserve",
+          "description": "Aufschlag auf den erwarteten Verbrauch."
+        },
+        "charge_interdite": {
+          "name": "Laden verboten",
+          "description": "Wahr, wenn die Batterie unter 0 °C ist."
+        },
+        "reserve": {
+          "name": "Notstromreserve",
+          "description": "{debut, fin, soc_pct}: Mindest-SOC, der zwischen zwei Zeitpunkten zu halten ist (Ausfallrisiko)."
+        },
+        "seuil_gain_eur": {
+          "name": "Mindestgewinn",
+          "description": "Unter diesem geschätzten Gewinn wird kein Zeitfenster geplant."
+        },
+        "valeur_stock_eur_kwh": {
+          "name": "Wert des Speicherinhalts",
+          "description": "EUR pro kWh, die am Ende des Zeitraums in der Batterie verbleibt (Standard: niedrigster Preis / Wirkungsgrad)."
+        },
+        "max_plages": {
+          "name": "Höchstens Zeitfenster",
+          "description": "Am Wechselrichter verfügbare Ladefenster (3)."
+        }
+      }
+    },
+    "plages_depuis_plan": {
+      "name": "Zeitfenster aus externem Plan",
+      "description": "Übersetzt den Batterieplan einer anderen Engine (EMHASS: P_batt < 0 = Laden, P_grid > 0 = Netzbezug) in höchstens 3 Ladefenster. Es wird nichts an den Wechselrichter gesendet.",
+      "fields": {
+        "plan": {
+          "name": "Plan",
+          "description": "Liste von {debut, charge_reseau_kw} oder EMHASS-Elemente {date, p_batt, p_grid} in W."
+        },
+        "seuil_kw": {
+          "name": "Schwelle",
+          "description": "Netz-Ladeleistung, unter der ein Zeitschlitz ignoriert wird."
+        },
+        "max_plages": {
+          "name": "Höchstens Zeitfenster",
+          "description": "Am Wechselrichter verfügbare Ladefenster (3)."
+        }
+      }
+    },
+    "evaluer_offres": {
+      "name": "Stromangebote bewerten",
+      "description": "Nur Berechnung: geschätzte Jahreskosten jedes Angebots anhand des stündlich gemessenen Netzbezugs (Batterie abgezogen), Rangfolge nach Kosten, Einschätzung der vertraglichen Leistung. Tarifformen „base“ und „hphc“. Es wird nichts abgeschlossen und nichts an den Wechselrichter gesendet.",
+      "fields": {
+        "offres": {
+          "name": "Angebote",
+          "description": "Liste von Angeboten; jedes Angebot enthält: nom, fournisseur, formule (base oder hphc), abonnement_eur_an (€ brutto je Leistung in kVA), prix_kwh (base, oder hp und hc, in € brutto), plages_hc (Liste aus Beginn und Ende), weekend_hc, source, date_prix; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo optional."
+        },
+        "contrat_actuel": {
+          "name": "Aktueller Vertrag",
+          "description": "Gleiche Form wie ein Angebot: dient als Bezug für die jährliche Differenz."
+        },
+        "soutirage": {
+          "name": "Netzbezug",
+          "description": "Liste von {debut, kwh}: aus dem Netz bezogene Energie, ein Wert pro Stunde."
+        },
+        "puissance_kva": {
+          "name": "Vertragliche Leistung",
+          "description": "Leistung des Vertrags, in kVA."
+        },
+        "jours_non_ouvres": {
+          "name": "Feiertage",
+          "description": "Daten, die bei Angeboten „Wochenende im Niedertarif“ wie ein Wochenende gezählt werden."
+        },
+        "puissances_max_kva": {
+          "name": "Höchstleistungen",
+          "description": "Eine Höchstleistung pro Tag, in kVA, für die Einschätzung der vertraglichen Leistung."
+        },
+        "mesure_fine": {
+          "name": "Vom Zähler gelesene Maxima",
+          "description": "Aktivieren, wenn die Höchstleistungen vom Zähler (TIC-Schnittstelle) stammen und nicht geschätzt sind."
+        },
+        "capacite_utile_kwh": {
+          "name": "Nutzbare Batteriekapazität",
+          "description": "Kapazität oberhalb der Untergrenze. Wird sie angegeben, wird das nächtliche Nachladen für Angebote mit Niedertarif geschätzt (hohe Schätzung)."
+        },
+        "rendement_pct": {
+          "name": "Wirkungsgrad",
+          "description": "Wirkungsgrad der Batterie in eine Richtung (Laden oder Entladen)."
+        },
+        "recharge_deja_active": {
+          "name": "Nächtliches Nachladen bereits aktiv",
+          "description": "Aktivieren, wenn das Haus die Batterie bereits im Niedertarif lädt: Der gemessene Netzbezug berücksichtigt das bereits."
+        },
+        "couleurs_tempo": {
+          "name": "Tempo-Farben",
+          "description": "Farbe jedes gemessenen Tempo-Tages (6 Uhr bis 6 Uhr): Datum, dann bleu, blanc oder rouge (blau, weiß, rot). Ohne sie erhält jede Farbe den Verbrauch eines durchschnittlichen Tages."
+        }
+      }
+    },
+    "simuler": {
+      "name": "Simulieren (was wäre, wenn…)",
+      "description": "Nur Berechnung mit den Messwerten des Hauses, nichts wird angewendet. „contrat“: geschätzte Jahreskosten des aktuellen Vertrags und der Referenzangebote (regulierte Tarife, einschließlich Tempo) oder übergebener Angebote; „puissance“: Passt die vertragliche Leistung?",
+      "fields": {
+        "question": {
+          "name": "Frage",
+          "description": "contrat (Vertrag) oder puissance (Leistung)."
+        },
+        "jours": {
+          "name": "Messtage",
+          "description": "Anzahl der Tage mit stündlichen Messwerten (standardmäßig 30)."
+        },
+        "puissance_actuelle_kva": {
+          "name": "Aktuelle vertragliche Leistung",
+          "description": "In kVA."
+        },
+        "abonnement_actuel_eur_an": {
+          "name": "Aktueller Grundpreis",
+          "description": "Jährlicher Grundpreis brutto des aktuellen Vertrags, in €."
+        },
+        "offres": {
+          "name": "Angebote",
+          "description": "Optional: zu vergleichende Angebote, im Format von „Stromangebote bewerten“. Ohne sie: Referenzangebote."
+        },
+        "soutirage": {
+          "name": "Netzbezug",
+          "description": "Zähler der aus dem Netz bezogenen Energie (kWh kumuliert)."
+        },
+        "puissance_reseau": {
+          "name": "Netzleistung",
+          "description": "Aus dem Netz bezogene Leistung (W)."
+        }
+      }
+    }
+  },
+  "selector": {
+    "mode": {
+      "options": {
+        "autoconsommation": "Eigenverbrauch",
+        "arbitrage_horaire": "Zeitarbitrage"
+      }
+    },
+    "type_tarif": {
+      "options": {
+        "hphc": "Hochtarif / Niedertarif",
+        "base": "Einheitstarif"
+      }
+    }
+  },
+  "issues": {
+    "etape_connexion": {
+      "title": "UCANESS: Die Batterie antwortet nicht",
+      "description": "Die Integration erhält keine Messwerte mehr von „{appareil}“. Ohne sie kann nichts berechnet werden.\n\nPrüfen Sie die Internetverbindung des Wechselrichters und [öffnen Sie dann die Integration]({lien})."
+    },
+    "etape_packages": {
+      "title": "UCANESS: Steuerung installieren",
+      "description": "„{appareil}“ ist verbunden, aber die Steuerung ist noch nicht installiert: Die Packages entscheiden jeden Abend über das nächtliche Nachladen.\n\n[Installationsanleitung der Steuerung]({lien}). Die Steuerung startet immer im Simulationsmodus: Es wird nichts an den Wechselrichter gesendet."
+    },
+    "etape_entites": {
+      "title": "UCANESS: Einige Messwerte werden von der Steuerung nicht erkannt",
+      "description": "Die Steuerung liest die Batterie unter bestimmten Namen. Nicht gefunden: {entites}.\n\nBenennen Sie die entsprechenden Entitäten unter [Einstellungen > Entitäten]({lien}) um (Feld „Entitäts-ID“). Bei einer Neuinstallation werden diese Namen automatisch vergeben."
+    },
+    "etape_batterie": {
+      "title": "UCANESS: Kapazität Ihrer Batterie angeben",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Ihre Batterie",
+            "description": "Der Wechselrichter meldet {modules} Batteriemodul(e). Bei Modulen mit 5,12 kWh ergibt das {proposition} kWh: Bestätigen oder korrigieren Sie.\n\nDie Untergrenze ist der Ladestand, unter den die Batterie nicht mehr entladen wird (beobachten Sie den tiefsten Wert in einer Nacht ohne Nachladen). Die Ladeleistung ist die Leistung, die Sie beim Laden aus dem Netz feststellen. Beide Werte können später verfeinert werden.",
+            "data": {
+              "capacite": "Batteriekapazität",
+              "plancher": "Untergrenze",
+              "puissance_charge": "Ladeleistung aus dem Netz"
+            }
+          }
+        },
+        "error": {
+          "capacite_nulle": "Geben Sie eine Kapazität größer als 0 an."
+        },
+        "abort": {
+          "entree_absente": "Diese Batterie ist nicht mehr eingerichtet."
+        }
+      }
+    },
+    "etape_contrat": {
+      "title": "UCANESS: Ihren Stromvertrag angeben",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Ihr Stromvertrag",
+            "description": "Diese Angaben finden Sie auf Ihrer Stromrechnung. Bei einem Vertrag ohne Niedertarif wählen Sie „Einheitstarif“ und lassen die Niedertarif-Felder leer.",
+            "data": {
+              "type_tarif": "Vertragsart",
+              "prix_hp": "Preis pro kWh im Hochtarif (oder Einheitspreis)",
+              "prix_hc": "Preis pro kWh im Niedertarif",
+              "hc_debut": "Beginn des Niedertarifs",
+              "hc_fin": "Ende des Niedertarifs",
+              "hc_jours_non_ouvres": "Wochenende und Feiertage ganztägig im Niedertarif",
+              "prix_injection": "Vergütung für eingespeisten Überschuss"
+            }
+          },
+          "bilan": {
+            "title": "Bei Ihnen lohnt sich nächtliches Nachladen",
+            "description": "Jede kWh, die im Niedertarif geladen und im Hochtarif verbraucht wird, spart etwa {gain} Cent (Wirkungsgrad der Batterie mit {rendement} % in jede Richtung gerechnet).\n\nDie Steuerung lädt nachts, gerade so viel, wie bis zur Ablösung durch die Sonne nötig ist. Bestätigen Sie, um Ihren Vertrag zu speichern."
+          },
+          "bilan_non_rentable": {
+            "title": "Bei Ihnen lohnt sich nächtliches Nachladen nicht",
+            "description": "Mit diesen Preisen würde jede kWh, die im Niedertarif geladen und im Hochtarif verbraucht wird, etwa {gain} Cent kosten (Wirkungsgrad der Batterie mit {rendement} % in jede Richtung gerechnet).\n\nDie Steuerung plant daher kein Laden aus dem Netz; Ihre Batterie speichert weiterhin Ihren Solarstrom. Bestätigen Sie, um Ihren Vertrag zu speichern."
+          },
+          "bilan_base": {
+            "title": "Vertrag ohne Niedertarif",
+            "description": "Bei einem Einheitspreis bringt das Laden der Batterie aus dem Netz nichts: Die Steuerung plant kein nächtliches Nachladen. Ihre Batterie speichert weiterhin Ihren Solarstrom. Bestätigen Sie, um Ihren Vertrag zu speichern."
+          }
+        },
+        "error": {
+          "prix_nul": "Geben Sie einen Preis größer als 0 an."
+        },
+        "abort": {
+          "entree_absente": "Diese Batterie ist nicht mehr eingerichtet."
+        }
+      }
+    },
+    "etape_jours_ouvres": {
+      "title": "UCANESS: Arbeitstage hinzufügen",
+      "description": "Die Steuerung unterscheidet Werktage von Wochenenden und Feiertagen: Der Verbrauch und, je nach Vertrag, der Niedertarif sind nicht gleich.\n\n[Workday-Integration hinzufügen]({lien}) und Ihr Land auswählen."
+    },
+    "etape_prevision_solaire": {
+      "title": "UCANESS: Solarprognose hinzufügen",
+      "description": "Um nur das Nötige nachzuladen, braucht die Steuerung die erwartete Erzeugung für heute und morgen. Ohne Prognose wird kein Nachladen geplant.\n\nInstallieren Sie die Integration Solcast PV Forecast aus dem Marketplace (Community-Inhalt, nicht von Home Assistant geprüft) und [richten Sie sie ein]({lien})."
+    },
+    "etape_notifications": {
+      "title": "UCANESS: Benachrichtigungsziel wählen",
+      "description": "Optional. Um bei einem Batteriefehler oder einer fehlgeschlagenen Planung benachrichtigt zu werden.\n\nTragen Sie unter [Einstellungen > Helfer]({lien}) den Wert „Alertes : service de notification“ ein, zum Beispiel `mobile_app_mon_telephone`."
+    },
+    "etape_solaire": {
+      "title": "UCANESS: Haben Sie Solarmodule?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Solarmodule",
+            "description": "Der Wechselrichter hat noch keine Solarerzeugung gemessen. Eine Batterie funktioniert mit oder ohne Solarmodule.\n\nMit Solarmodulen speichert die Batterie zuerst Ihre Erzeugung, und die Steuerung lädt nachts nur den Rest nach. Ohne Solarmodule dient sie dazu, Strom zu den günstigsten Zeiten zu kaufen und zu den teuren Zeiten zu verbrauchen: Alles hängt dann von Ihrem Vertrag ab, den der Assistent im nächsten Schritt prüft.",
+            "data": {
+              "solaire": "An diesen Wechselrichter sind Solarmodule angeschlossen"
+            }
+          }
+        },
+        "abort": {
+          "entree_absente": "Diese Batterie ist nicht mehr eingerichtet."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "solar_power": {
+        "name": "Solarleistung"
+      },
+      "pv1_power": {
+        "name": "Leistung MPPT 1"
+      },
+      "pv2_power": {
+        "name": "Leistung MPPT 2"
+      },
+      "battery_power": {
+        "name": "Batterieleistung (Laden > 0)"
+      },
+      "load_power": {
+        "name": "Hausleistung"
+      },
+      "grid_power": {
+        "name": "Geschätzte Netzleistung (Bezug > 0)"
+      },
+      "inverter_power": {
+        "name": "Wechselrichterleistung"
+      },
+      "soc": {
+        "name": "Batterieladestand (SOC)"
+      },
+      "soh": {
+        "name": "Batteriezustand (SOH)"
+      },
+      "battery_voltage": {
+        "name": "Batteriespannung"
+      },
+      "battery_current": {
+        "name": "Batteriestrom"
+      },
+      "battery_temp": {
+        "name": "Batterietemperatur"
+      },
+      "cell_temp_max": {
+        "name": "Maximale Zelltemperatur"
+      },
+      "cell_temp_min": {
+        "name": "Minimale Zelltemperatur"
+      },
+      "cell_voltage_max": {
+        "name": "Maximale Zellspannung"
+      },
+      "cell_voltage_min": {
+        "name": "Minimale Zellspannung"
+      },
+      "battery_modules": {
+        "name": "Anzahl der Batteriemodule"
+      },
+      "battery_alarm_code": {
+        "name": "Batterie-Alarmcode"
+      },
+      "battery_fault_code": {
+        "name": "Batterie-Fehlercode"
+      },
+      "battery_pack_alarm_raw": {
+        "name": "Pack-Alarmcode (roh, zu interpretieren)"
+      },
+      "grid_voltage": {
+        "name": "Netzspannung"
+      },
+      "grid_frequency": {
+        "name": "Netzfrequenz"
+      },
+      "solar_voltage": {
+        "name": "Solarspannung"
+      },
+      "inverter_temp": {
+        "name": "Wechselrichtertemperatur"
+      },
+      "ambient_temp": {
+        "name": "Umgebungstemperatur des Wechselrichters"
+      },
+      "pv_module_temp": {
+        "name": "Temperatur der PV-Stufe"
+      },
+      "leakage_current_raw": {
+        "name": "Fehlerstrom (roh)"
+      },
+      "work_mode": {
+        "name": "Betriebsmodus"
+      },
+      "work_state": {
+        "name": "Betriebszustand"
+      },
+      "last_update": {
+        "name": "Letzter empfangener Messwert"
+      },
+      "data_age": {
+        "name": "Alter der Daten"
+      },
+      "energy_solar_today": {
+        "name": "Solarerzeugung heute"
+      },
+      "energy_solar_total": {
+        "name": "Solarerzeugung gesamt"
+      },
+      "energy_grid_import_today": {
+        "name": "Netzbezug heute"
+      },
+      "energy_grid_import_total": {
+        "name": "Netzbezug gesamt"
+      },
+      "energy_grid_export_today": {
+        "name": "Netzeinspeisung heute"
+      },
+      "energy_grid_export_total": {
+        "name": "Netzeinspeisung gesamt"
+      },
+      "energy_load_today": {
+        "name": "Hausverbrauch heute"
+      },
+      "energy_load_total": {
+        "name": "Hausverbrauch gesamt"
+      },
+      "energy_battery_charge_today": {
+        "name": "Batterieladung heute"
+      },
+      "energy_battery_charge_total": {
+        "name": "Batterieladung gesamt"
+      },
+      "energy_battery_discharge_today": {
+        "name": "Batterieentladung heute"
+      },
+      "energy_battery_discharge_total": {
+        "name": "Batterieentladung gesamt"
+      },
+      "setting_dod": {
+        "name": "Einstellung DOD am Netz"
+      },
+      "setting_hysteresis": {
+        "name": "Einstellung Hysterese"
+      },
+      "setting_charge_current": {
+        "name": "Einstellung Ladestrom"
+      },
+      "setting_discharge_power": {
+        "name": "Einstellung Entladeleistung"
+      },
+      "setting_export_power": {
+        "name": "Einstellung Einspeiseleistung"
+      },
+      "setting_charge1_start": {
+        "name": "Ladefenster 1: Beginn"
+      },
+      "setting_charge1_end": {
+        "name": "Ladefenster 1: Ende"
+      },
+      "event_count": {
+        "name": "Aufgezeichnete Ereignisse"
+      },
+      "installation": {
+        "name": "Installation",
+        "state": {
+          "a_configurer": "Einzurichten",
+          "en_simulation": "In Simulation",
+          "en_service": "In Betrieb",
+          "a_verifier": "Zu prüfen"
+        }
+      }
+    },
+    "binary_sensor": {
+      "cloud_connection": {
+        "name": "Verbindung zur UCANESS-Cloud"
+      },
+      "battery_fault": {
+        "name": "Batteriefehler oder -alarm"
+      },
+      "battery_temp_out_of_charge_range": {
+        "name": "Batterietemperatur außerhalb des Ladebereichs (0–50 °C)"
+      }
+    },
+    "number": {
+      "capacite": {
+        "name": "Batterie: Kapazität"
+      },
+      "plancher": {
+        "name": "Batterie: SOC-Untergrenze"
+      },
+      "rendement": {
+        "name": "Batterie: Wirkungsgrad"
+      },
+      "puissance_charge": {
+        "name": "Batterie: Ladeleistung"
+      },
+      "marge": {
+        "name": "Batterie: Sicherheitsreserve"
+      },
+      "conso_journaliere": {
+        "name": "Batterie: Standard-Tagesverbrauch"
+      },
+      "prix_hp": {
+        "name": "Tarif: Preis Hochtarif (oder Einheitstarif)"
+      },
+      "prix_hc": {
+        "name": "Tarif: Preis Niedertarif"
+      },
+      "prix_injection": {
+        "name": "Tarif: Vergütung für eingespeisten Überschuss"
+      }
+    },
+    "switch": {
+      "solaire": {
+        "name": "Installation: Solarmodule angeschlossen"
+      },
+      "hc_jours_non_ouvres": {
+        "name": "Tarif: Wochenende und Feiertage im Niedertarif"
+      }
+    },
+    "select": {
+      "type_tarif": {
+        "name": "Tarif: Vertragsart",
+        "state": {
+          "hphc": "Hochtarif / Niedertarif",
+          "base": "Einheitstarif"
+        }
+      }
+    },
+    "time": {
+      "hc_debut": {
+        "name": "Tarif: Beginn des Niedertarifs"
+      },
+      "hc_fin": {
+        "name": "Tarif: Ende des Niedertarifs"
+      }
+    }
+  },
+  "exceptions": {
+    "appareil_introuvable": {
+      "message": "UCANESS-Gerät nicht gefunden oder nicht eindeutig (config_entry_id angeben)"
+    },
+    "ecriture_desactivee": {
+      "message": "Schreiben auf den Wechselrichter ist deaktiviert (Option „Schreiben erlaubt“ der UCANESS-Integration)"
+    },
+    "consigne_refusee": {
+      "message": "Befehl von der Schutzfunktion abgelehnt: {detail}"
+    },
+    "plages_non_envoyees": {
+      "message": "Befehl nicht gesendet (Ladefenster {plages}): {detail}"
+    },
+    "mode_non_envoye": {
+      "message": "Befehl nicht gesendet (Modus {mode}): {detail}"
+    },
+    "plages_non_confirmees": {
+      "message": "Ladefenster {plages}: Befehl gesendet, aber vom Wechselrichter nicht bestätigt ({ecarts})"
+    },
+    "mode_non_confirme": {
+      "message": "Modus {mode}: Befehl gesendet, aber vom Wechselrichter nicht bestätigt ({ecarts})"
+    },
+    "plages_relecture_impossible": {
+      "message": "Ladefenster {plages}: Befehl gesendet, aber vom Wechselrichter nicht bestätigt (Rücklesen nicht möglich)"
+    },
+    "mode_relecture_impossible": {
+      "message": "Modus {mode}: Befehl gesendet, aber vom Wechselrichter nicht bestätigt (Rücklesen nicht möglich)"
+    },
+    "api_tierce": {
+      "message": "UCANESS-Dritt-API: {detail}"
+    },
+    "donnees_refusees": {
+      "message": "Daten abgelehnt: {detail}"
+    },
+    "puissance_actuelle_manquante": {
+      "message": "Geben Sie die aktuelle vertragliche Leistung an (puissance_actuelle_kva)."
+    },
+    "aucune_mesure_horaire": {
+      "message": "Keine stündlichen Messwerte von {entite} in den letzten {jours} Tagen."
+    },
+    "reglage_inconnu": {
+      "message": "Einstellung abgelehnt: unbekannte Einstellung ({reglage})"
+    },
+    "reglage_hors_bornes": {
+      "message": "Einstellung abgelehnt: {reglage}: {valeur} außerhalb des Bereichs {mini} bis {maxi}"
+    },
+    "reglage_choix_impossible": {
+      "message": "Einstellung abgelehnt: {reglage}: {valeur} ist keine verfügbare Auswahl"
+    },
+    "reglage_heure_invalide": {
+      "message": "Einstellung abgelehnt: {reglage}: {valeur} ist keine Uhrzeit (HH:MM)"
+    },
+    "reglage_ni_vrai_ni_faux": {
+      "message": "Einstellung abgelehnt: {reglage}: {valeur} ist weder wahr noch falsch"
+    }
+  }
+}
