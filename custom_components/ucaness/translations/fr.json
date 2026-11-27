@@ -214,6 +214,40 @@
           "description": "Couleur de chaque jour Tempo mesuré (de 6h à 6h) : date puis bleu, blanc ou rouge. Sans elle, chaque couleur prend la consommation d'un jour moyen."
         }
       }
+    },
+    "simuler": {
+      "name": "Simuler (et si…)",
+      "description": "Calcul seul sur les mesures de la maison, rien n'est appliqué. « contrat » : coût annuel estimé du contrat actuel et des offres de référence (tarifs réglementés, dont Tempo) ou passées ; « puissance » : la puissance souscrite convient-elle.",
+      "fields": {
+        "question": {
+          "name": "Question",
+          "description": "contrat ou puissance."
+        },
+        "jours": {
+          "name": "Jours de mesure",
+          "description": "Nombre de jours de mesures horaires à utiliser (30 par défaut)."
+        },
+        "puissance_actuelle_kva": {
+          "name": "Puissance souscrite actuelle",
+          "description": "En kVA."
+        },
+        "abonnement_actuel_eur_an": {
+          "name": "Abonnement actuel",
+          "description": "Abonnement annuel TTC du contrat actuel, en €."
+        },
+        "offres": {
+          "name": "Offres",
+          "description": "Facultatif : offres à comparer, au format de « Évaluer les offres ». Sans elles : offres de référence."
+        },
+        "soutirage": {
+          "name": "Soutirage réseau",
+          "description": "Compteur d'énergie prise au réseau (kWh cumulés)."
+        },
+        "puissance_reseau": {
+          "name": "Puissance réseau",
+          "description": "Puissance prise au réseau (W)."
+        }
+      }
     }
   },
   "selector": {

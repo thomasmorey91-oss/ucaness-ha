@@ -159,3 +159,37 @@ evaluer_offres:
       example: '{"2030-01-14": "blanc", "2030-01-15": "rouge"}'
       selector:
         object:
+
+simuler:
+  fields:
+    question:
+      required: true
+      example: contrat
+      selector:
+        select:
+          options:
+            - contrat
+            - puissance
+    jours:
+      default: 30
+      selector:
+        number: { min: 1, max: 400, mode: box, unit_of_measurement: j }
+    puissance_actuelle_kva:
+      selector:
+        number: { min: 1, max: 36, mode: box, unit_of_measurement: kVA }
+    abonnement_actuel_eur_an:
+      selector:
+        number: { min: 0, max: 2000, step: 0.01, mode: box, unit_of_measurement: "€" }
+    offres:
+      selector:
+        object:
+    soutirage:
+      default: sensor.uhome_soutirage_reseau_total
+      selector:
+        entity:
+          domain: sensor
+    puissance_reseau:
+      default: sensor.uhome_puissance_reseau
+      selector:
+        entity:
+          domain: sensor
