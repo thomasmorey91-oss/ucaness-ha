@@ -8,6 +8,7 @@ import pathlib
 from unittest.mock import patch
 
 import pytest
+import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.data_entry_flow import FlowResultType
@@ -739,6 +740,25 @@ async def test_evaluer_offres_calcul_seul(hass, cloud):
     assert resp["offres_ecartees"][0]["nom"] == "Couleurs"
     assert resp["puissance"]["conseil"] == "baisser" and resp["puissance"]["sur"] is False
     assert cloud.updates == []          # rien n'est parti vers l'onduleur
+
+    # Tempo complet, avec la couleur de deux jours mesurés.
+    tempo_complet = {"nom": "Tempo", "formule": "tempo", "abonnement_eur_an": {"6": 160},
+                     "prix_kwh": {"bleu_hp": 0.16, "bleu_hc": 0.13, "blanc_hp": 0.19, "blanc_hc": 0.15,
+                                  "rouge_hp": 0.70, "rouge_hc": 0.16},
+                     "jours_tempo": {"bleu": 300, "blanc": 43, "rouge": 22},
+                     "source": "https://exemple.invalid/t", "date_prix": aujourdhui}
+    j1, j2 = (debut + dt.timedelta(days=3)).date().isoformat(), (debut + dt.timedelta(days=4)).date().isoformat()
+    resp = await hass.services.async_call(DOMAIN, "evaluer_offres", {
+        "offres": [unique, tempo_complet], "soutirage": soutirage, "puissance_kva": 6,
+        "couleurs_tempo": {j1: "Rouge", j2: "blanc"},
+    }, blocking=True, return_response=True)
+    noms = {l["nom"]: l for l in resp["classement"]}
+    assert set(noms) == {"Prix unique", "Tempo"} and resp["offres_ecartees"] == []
+    assert any("Aucun jour bleu mesuré" in r for r in noms["Tempo"]["remarques"])
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(DOMAIN, "evaluer_offres", {
+            "offres": [tempo_complet], "soutirage": soutirage, "puissance_kva": 6, "couleurs_tempo": {j1: "vert"},
+        }, blocking=True, return_response=True)
 
 
 # ------------------------------------------------------------------ batterie sans panneaux

@@ -171,7 +171,7 @@
       "fields": {
         "offres": {
           "name": "Offers",
-          "description": "List of offers; each offer gives: nom, fournisseur, formule (base or hphc), abonnement_eur_an (€ incl. tax per power in kVA), prix_kwh (base, or hp and hc, in € incl. tax), plages_hc (list of start and end), weekend_hc, source, date_prix."
+          "description": "List of offers; each offer gives: nom, fournisseur, formule (base or hphc), abonnement_eur_an (€ incl. tax per power in kVA), prix_kwh (base, or hp and hc, in € incl. tax), plages_hc (list of start and end), weekend_hc, source, date_prix ; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo optional."
         },
         "contrat_actuel": {
           "name": "Current contract",
@@ -208,6 +208,10 @@
         "recharge_deja_active": {
           "name": "Night charging already active",
           "description": "Turn on if the house already charges the battery off-peak: the measured grid import already reflects it."
+        },
+        "couleurs_tempo": {
+          "name": "Tempo colours",
+          "description": "Colour of each measured Tempo day (6 am to 6 am): date then bleu, blanc or rouge. Without it, each colour uses the average day."
         }
       }
     }

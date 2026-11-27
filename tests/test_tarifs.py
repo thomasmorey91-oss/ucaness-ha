@@ -218,3 +218,88 @@ def test_baisse_jamais_donnee_comme_sure_sans_annee_complete_ni_mesure_du_compte
 
 def test_analyser_puissance_sans_mesure():
     assert t.analyser_puissance([None, float("nan")], 6)["conseil"] == "inconnu"
+
+
+# --- Tempo ---------------------------------------------------------------------------------------
+PRIX_TEMPO = {"bleu_hp": 0.16, "bleu_hc": 0.13, "blanc_hp": 0.19, "blanc_hc": 0.15, "rouge_hp": 0.70, "rouge_hc": 0.16}
+TEMPO = t.Offre("Tempo", t.TEMPO, {6: 160.0}, PRIX_TEMPO, "Fournisseur T",
+                source="https://exemple.invalid/grille-t", date_prix=dt.date(2030, 1, 20))
+DEBUT_6H = LUNDI.replace(hour=6)
+
+
+def test_tempo_heures_creuses_22h_6h():
+    assert t.part_heures_creuses(LUNDI.replace(hour=22), TEMPO) == 1.0
+    assert t.part_heures_creuses(LUNDI.replace(hour=5), TEMPO) == 1.0
+    assert t.part_heures_creuses(LUNDI.replace(hour=6), TEMPO) == 0.0
+    assert t.part_heures_creuses(LUNDI.replace(hour=21), TEMPO) == 0.0
+
+
+def test_tempo_jour_de_6h_a_6h():
+    assert t.jour_tempo(LUNDI.replace(hour=5)) == dt.date(2030, 1, 13)
+    assert t.jour_tempo(LUNDI.replace(hour=6)) == dt.date(2030, 1, 14)
+
+
+def test_tempo_sans_couleurs_jour_moyen_et_annee_reconstituee():
+    # 1 kWh par heure : 16 kWh en heures pleines, 8 kWh en heures creuses par jour.
+    e = t.evaluer(TEMPO, _soutirage(7, debut=DEBUT_6H), 6, aujourdhui=JOUR)
+    attendu = 160 + 300 * (16 * 0.16 + 8 * 0.13) + 43 * (16 * 0.19 + 8 * 0.15) + 22 * (16 * 0.70 + 8 * 0.16)
+    assert e.cout_annuel_eur == pytest.approx(attendu)
+    assert any("Couleurs Tempo des jours mesurés inconnues" in r for r in e.remarques)
+    assert any("300 jours bleus, 43 blancs, 22 rouges" in r for r in e.remarques)
+
+
+def test_tempo_couleurs_connues_moyenne_par_couleur():
+    # Jours rouges plus gourmands (2 kWh/h) que les bleus (1 kWh/h) ; pas de jour blanc mesuré.
+    couleurs = {dt.date(2030, 1, 14) + dt.timedelta(days=i): ("rouge" if i in (1, 2) else "bleu") for i in range(5)}
+    conso = lambda d: 2.0 if couleurs.get(t.jour_tempo(d)) == "rouge" else 1.0
+    e = t.evaluer(TEMPO, _soutirage(5, conso, DEBUT_6H), 6, aujourdhui=JOUR, couleurs_tempo=couleurs)
+    moyen = (3 * 24 + 2 * 48) / 5 / 24                       # kWh par heure d'un jour moyen (tous jours)
+    attendu = (160 + 300 * (16 * 0.16 + 8 * 0.13) + 22 * (32 * 0.70 + 16 * 0.16)
+               + 43 * (16 * moyen * 0.19 + 8 * moyen * 0.15))
+    assert e.cout_annuel_eur == pytest.approx(attendu)
+    assert any("Aucun jour blanc mesuré" in r for r in e.remarques)
+    assert not any("sous-estimé" in r for r in e.remarques)
+    # Coût mesuré : chaque heure au prix de sa couleur.
+    mesure = 3 * (16 * 0.16 + 8 * 0.13) + 2 * (32 * 0.70 + 16 * 0.16)
+    assert e.cout_energie_mesure_eur == pytest.approx(mesure)
+
+
+def test_tempo_sans_jour_rouge_mesure_signale_la_sous_estimation():
+    couleurs = {dt.date(2030, 1, 14) + dt.timedelta(days=i): "bleu" for i in range(3)}
+    e = t.evaluer(TEMPO, _soutirage(3, debut=DEBUT_6H), 6, couleurs_tempo=couleurs)
+    assert any("rouge" in r and "sous-estimé" in r for r in e.remarques)
+
+
+def test_tempo_recharge_de_nuit_couleur_par_couleur():
+    bat = t.Batterie(10.0, 0.95)
+    e = t.evaluer(TEMPO, _soutirage(7, debut=DEBUT_6H), 6, batterie=bat)
+    r2 = 0.95 ** 2
+    deplace = min(16.0, 10.0 * 0.95)
+    attendu = sum(n * deplace * max(0.0, PRIX_TEMPO[f"{c}_hp"] - PRIX_TEMPO[f"{c}_hc"] / r2)
+                  for c, n in (("bleu", 300), ("blanc", 43), ("rouge", 22)))
+    assert e.gain_recharge_nuit_eur_an == pytest.approx(attendu)
+    # Bleu : 0,16 - 0,13 / 0,9025 = 0,016 € gagné par kWh, encore rentable ici.
+    assert attendu > 22 * deplace * (0.70 - 0.16 / r2)
+
+
+def test_tempo_jours_par_couleur_precises():
+    offre = t.Offre("Tempo", t.TEMPO, {6: 160.0}, PRIX_TEMPO, jours_tempo={"bleu": 301, "blanc": 43, "rouge": 22})
+    e = t.evaluer(offre, _soutirage(2, debut=DEBUT_6H), 6)
+    assert any("301 jours bleus" in r for r in e.remarques)
+    with pytest.raises(t.OffreInvalide):
+        t.evaluer(t.Offre("Tempo", t.TEMPO, {6: 160.0}, PRIX_TEMPO, jours_tempo={"bleu": 300, "blanc": 43}),
+                  _soutirage(2, debut=DEBUT_6H), 6)
+
+
+def test_tempo_incomplet_ecarte():
+    prix = dict(PRIX_TEMPO)
+    del prix["rouge_hp"]
+    with pytest.raises(t.OffreInvalide, match="rouge_hp"):
+        t.evaluer(t.Offre("Tempo", t.TEMPO, {6: 160.0}, prix), _soutirage(2), 6)
+
+
+def test_classer_avec_tempo():
+    res = t.classer([BASE, HPHC, TEMPO], _soutirage(7, debut=DEBUT_6H), 6, aujourdhui=JOUR,
+                    couleurs_tempo={dt.date(2030, 1, 15): "rouge"})
+    assert {l["nom"] for l in res["classement"]} == {"Prix unique", "Nuit", "Tempo"}
+    assert any("Tempo" in x for x in res["limites"])
