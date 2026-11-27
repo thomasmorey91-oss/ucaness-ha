@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.5.1`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.5.2`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -162,7 +162,7 @@ Conventions de signe de l'intégration : batterie positive en charge, réseau po
 
 ### `custom:ucaness-ucan-card` (0.5.1)
 
-Ucan, la batterie UHome avec un visage, et son conseil du moment (package `pilotage/packages/ucan_conseils.yaml`). L'écran du module du haut change d'expression : orange « à surveiller » si une alerte de `alert_entities` est en cours, « un conseil » si `sensor.ucan_conseil` en propose un, yeux fermés quand le soleil est couché (`sun.sun`), sourire sinon. Les barres des trois modules s'allument avec la charge (`soc`, `sensor.uhome_soc` par défaut : au-dessus de 0, 33 et 66 %). Le conseil s'affiche dans une bulle (constat, geste, gain, avertissement) avec trois boutons : « Je le fais », « Pas maintenant », « Ne plus proposer », envoyés à `script.ucan_conseil_reponse`. Options : `conseil`, `soc`, `script`, `alert_entities`, `compact: true` (petit avatar, pour une colonne de 300 px ou le téléphone).
+Ucan, la batterie UHome avec un visage, et son conseil du moment (package `pilotage/packages/ucan_conseils.yaml`). L'écran du module du haut change d'expression : orange « à surveiller » si une alerte de `alert_entities` est en cours, « un conseil » si `sensor.ucan_conseil` en propose un, yeux fermés quand le soleil est couché (`sun.sun`), sourire sinon. Les barres des trois modules s'allument avec la charge (`soc`, `sensor.uhome_soc` par défaut : au-dessus de 0, 33 et 66 %). Le conseil s'affiche dans une bulle (constat, geste, gain, avertissement) avec trois boutons : « Je le fais », « Pas maintenant », « Ne plus proposer », envoyés à `script.ucan_conseil_reponse`. Options : `conseil`, `soc`, `script`, `alert_entities`, `compact: true` (petit avatar, pour une colonne de 300 px ou le téléphone). Dans une colonne étroite, la bulle passe sous l'avatar (0.5.2).
 
 ### `custom:ucaness-note-card`
 

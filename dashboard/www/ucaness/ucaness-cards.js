@@ -21,6 +21,8 @@
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
  *
+ * 0.5.2 (27/11/2026) : carte Ucan dans une colonne étroite (300 px) : la bulle passe sous l'avatar.
+ *
  * 0.5.1 (27/11/2026) : carte Ucan (custom:ucaness-ucan-card), avatar et conseil du moment.
  *
  * 0.5.0 (27/11/2026) : style et animations.
@@ -36,7 +38,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.5.1';
+const UC_VERSION = '0.5.2';
 
 /* Dossier où se trouve ce fichier (en général /local/ucaness/). */
 const UC_BASE = (() => {
@@ -2423,10 +2425,10 @@ class UcanessUcanCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>${UC_BASE_CSS}
         :host { display: block; }
-        .w { display: flex; gap: 16px; align-items: flex-start; }
+        .w { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-start; }
         .av { flex: 0 0 auto; width: ${c.compact ? 64 : 150}px; height: ${c.compact ? 87 : 204}px; }
         .av svg { width: 100%; height: 100%; display: block; }
-        .b { flex: 1 1 auto; min-width: 0; padding: 14px 18px; border: 1px solid var(--uc-card-border); border-radius: 4px 14px 14px 14px; background: var(--uc-card-bg); box-shadow: var(--uc-card-shadow); display: flex; flex-direction: column; gap: 8px; }
+        .b { flex: 1 1 230px; min-width: 0; padding: 14px 18px; border: 1px solid var(--uc-card-border); border-radius: 4px 14px 14px 14px; background: var(--uc-card-bg); box-shadow: var(--uc-card-shadow); display: flex; flex-direction: column; gap: 8px; }
         p { margin: 0; }
         .k { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--uc-label); }
         .t { font: 400 ${c.compact ? 16 : 17}px/1.45 var(--uc-font); }
