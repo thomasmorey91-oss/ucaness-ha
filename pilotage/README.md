@@ -16,6 +16,7 @@ Les règles et les calculs sont décrits dans `REGLES.md`. Pour analyser l'insta
 | `packages/jarvis_alertes.yaml` | Détections de défaut (liaison cloud, défaut batterie, température, SOC figé, production basse, mode inattendu) et notifications |
 | `packages/jarvis_dynamique.yaml` | Facultatif. Tarif dynamique : choix de la stratégie, prix TTC (Nord Pool ou capteur personnalisé), plan du moteur intégré ou d'EMHASS, application des plages et du mode (`REGLES.md`, § 8) |
 | `packages/jarvis_secours.yaml` | Facultatif. Coupures du réseau : détection, alertes, suivi, bilan, risque de coupure, réserve de secours, bilan au redémarrage ; rien n'est écrit sur l'onduleur (`REGLES.md`, § 9) |
+| `packages/jarvis_meteo.yaml` | Facultatif. Température extérieure enregistrée (prévision selon la météo à venir) ; rien n'est écrit sur l'onduleur |
 | `tests/` | Tests du calcul (données inventées) et des scripts dans un vrai Home Assistant |
 
 ## Prérequis
@@ -84,9 +85,13 @@ Les listes de prix et de plans sont longues : pour alléger la base de données,
 ## Secours (facultatif)
 
 1. Copier `packages/jarvis_secours.yaml` et renommer `sensor.uhome_tension_reseau` et `sensor.uhome_etat`.
-2. Renseigner : « sortie de secours raccordée » (selon le câblage de l'installateur), puissance continue de la sortie de secours (fiche technique, `REGLES.md` § 9), capteur de vigilance Météo-France, et, si Enedis annonce une coupure, ses dates.
+2. Renseigner : « sortie de secours raccordée » (selon le câblage de l'installateur), puissance continue de la sortie de secours (fiche technique, `REGLES.md` § 9), et, si Enedis annonce une coupure, ses dates. Le capteur de vigilance de l'intégration Météo-France (`sensor.…_weather_alert`) est trouvé d'office ; le saisir seulement s'il y en a plusieurs. « Niveau de vigilance » : rouge par défaut, ou orange et rouge.
 3. Facultatif : « garder une réserve avant un risque de coupure » (avec la stratégie « moteur intégré ») et le SOC à garder (80 % par défaut).
 4. Pour être alerté pendant une coupure, Home Assistant, la box et le module Wi-Fi de l'onduleur doivent rester alimentés (sortie de secours ou UPS).
+
+## Météo (facultatif)
+
+`jarvis_meteo.yaml` enregistre la température extérieure (`sensor.jarvis_temperature_exterieure`, statistiques longues) à partir d'une entité `weather` : celle saisie dans « Météo : entité de prévision », sinon la première trouvée. Elle préparera la prévision de consommation selon la météo (degrés-jours), qui demande au moins 14 jours d'historique.
 
 ## Conseils d'Ucan (facultatif)
 

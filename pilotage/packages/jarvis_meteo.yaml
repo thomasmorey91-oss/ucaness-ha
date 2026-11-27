@@ -1,0 +1,37 @@
+# =============================================================================
+# Météo : température extérieure enregistrée (préparation de la prévision selon la météo)
+# -----------------------------------------------------------------------------
+# Optionnel. Rien n'est écrit sur l'onduleur ; aucun effet sur la recharge.
+# La température de l'entité météo (intégration Météo-France, Met.no…) devient un capteur avec
+# statistiques longues : la future prévision de consommation selon la météo (degrés-jours de
+# chauffage et de climatisation) a besoin d'au moins 14 jours d'historique.
+# Entité météo : celle saisie dans « Météo : entité de prévision », sinon la première `weather.…`.
+# =============================================================================
+
+input_text:
+  jarvis_meteo_entite:
+    name: "Météo : entité de prévision (weather.…, vide = la première trouvée)"
+    max: 100
+
+template:
+  - sensor:
+      - name: "Jarvis température extérieure"
+        unique_id: jarvis_temperature_exterieure
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer
+        state: >
+          {% set e = states('input_text.jarvis_meteo_entite') %}
+          {% if e in ['', 'unknown', 'unavailable'] %}{% set e = states.weather | map(attribute='entity_id') | first | default('') %}{% endif %}
+          {% set t = state_attr(e, 'temperature') if e else none %}
+          {{ t | float if t is number else none }}
+        availability: >
+          {% set e = states('input_text.jarvis_meteo_entite') %}
+          {% if e in ['', 'unknown', 'unavailable'] %}{% set e = states.weather | map(attribute='entity_id') | first | default('') %}{% endif %}
+          {{ e != '' and state_attr(e, 'temperature') is number }}
+        attributes:
+          source: >
+            {% set e = states('input_text.jarvis_meteo_entite') %}
+            {% if e in ['', 'unknown', 'unavailable'] %}{% set e = states.weather | map(attribute='entity_id') | first | default('') %}{% endif %}
+            {{ e if e else 'aucune' }}

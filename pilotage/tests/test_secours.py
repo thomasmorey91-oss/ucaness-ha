@@ -70,7 +70,7 @@ async def maison(hass, caplog):
     assert await async_setup_component(hass, "input_number", {"input_number": nombres})
     assert await async_setup_component(hass, "input_boolean", {"input_boolean": booleens})
     assert await async_setup_component(hass, "input_text", {"input_text": textes})
-    assert await async_setup_component(hass, "input_select", {"input_select": dyn["input_select"]})
+    assert await async_setup_component(hass, "input_select", {"input_select": {**dyn["input_select"], **sec["input_select"]}})
     assert await async_setup_component(hass, "input_datetime", {"input_datetime": sec["input_datetime"]})
     assert await async_setup_component(hass, "script", {"script": alertes["script"]})
     hass.states.async_set("binary_sensor.uhome_connexion_cloud", "on")
@@ -140,8 +140,37 @@ async def test_etat_hors_reseau_detecte(hass, maison):
     assert hass.states.get("binary_sensor.jarvis_coupure_reseau").state == "on"
 
 
+async def test_vigilance_orange_ignoree_par_defaut(hass, maison):
+    """Niveau par défaut « Rouge » : une vigilance orange n'est pas un risque de coupure."""
+    assert hass.states.get("input_select.jarvis_secours_niveau_vigilance").state == "Rouge"
+    hass.states.async_set("sensor.99_weather_alert", "Orange", {"Vent violent": "Orange", "Orages": "Jaune"})
+    await hass.async_block_till_done()
+    risque = hass.states.get("binary_sensor.jarvis_risque_de_coupure")
+    assert risque.state == "off" and risque.attributes["motif"] == "aucun"
+
+
+async def test_risque_vigilance_rouge(hass, maison):
+    hass.states.async_set("sensor.99_weather_alert", "Rouge", {"Vent violent": "Orange", "Orages": "Rouge"})
+    await hass.async_block_till_done()
+    risque = hass.states.get("binary_sensor.jarvis_risque_de_coupure")
+    assert risque.state == "on" and risque.attributes["motif"] == "Orages (rouge)"
+    assert risque.attributes["capteur_vigilance"] == "sensor.99_weather_alert"
+
+
+async def test_capteur_vigilance_trouve_d_office(hass, maison):
+    """Entrée vide : le premier capteur « …_weather_alert » est pris (nom long de l'intégration Météo-France)."""
+    await hass.services.async_call("input_text", "set_value", {"entity_id": "input_text.jarvis_secours_vigilance", "value": ""}, blocking=True)
+    hass.states.async_remove("sensor.99_weather_alert")
+    hass.states.async_set("sensor.meteo_france_alert_for_department_99_99_weather_alert", "Rouge", {"Neige-verglas": "Rouge"})
+    await hass.async_block_till_done()
+    risque = hass.states.get("binary_sensor.jarvis_risque_de_coupure")
+    assert risque.attributes["capteur_vigilance"] == "sensor.meteo_france_alert_for_department_99_99_weather_alert"
+    assert risque.state == "on" and risque.attributes["motif"] == "Neige-verglas (rouge)"
+
+
 async def test_risque_vigilance_orange(hass, maison):
     notes, _ = maison
+    await hass.services.async_call("input_select", "select_option", {"entity_id": "input_select.jarvis_secours_niveau_vigilance", "option": "Orange et rouge"}, blocking=True)
     hass.states.async_set("sensor.99_weather_alert", "Orange", {"Vent violent": "Orange", "Orages": "Jaune"})
     await hass.async_block_till_done()
     risque = hass.states.get("binary_sensor.jarvis_risque_de_coupure")
