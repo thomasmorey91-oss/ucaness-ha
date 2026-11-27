@@ -1,0 +1,657 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connessione al portale UCANESS",
+        "description": "Integrazione NON UFFICIALE. Sola lettura per impostazione predefinita: l'inverter viene comandato (modalità, fasce di ricarica) solo se l'opzione «Scrittura consentita» è attiva. L'«ID EMS» si trova nel portale, nel riquadro «Dettagli» del tuo impianto.",
+        "data": {
+          "email": "E-mail dell'account UCANESS",
+          "password": "Password UCANESS",
+          "device_code": "ID EMS del dispositivo"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Riconnessione a UCANESS",
+        "description": "La sessione è stata rifiutata. Inserisci di nuovo la password UCANESS.",
+        "data": {
+          "password": "Password UCANESS"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Credenziali rifiutate da UCANESS.",
+      "device_not_found": "Nessun dispositivo trovato con questo ID EMS.",
+      "cannot_connect": "Portale UCANESS non raggiungibile."
+    },
+    "abort": {
+      "already_configured": "Questo dispositivo è già configurato.",
+      "reauth_successful": "Riconnessione riuscita."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opzioni UCANESS",
+        "description": "L'integrazione include una chiave applicativa fornita da UCanpower: lascia vuoti entrambi i campi della chiave per usarla. Inserisci una chiave e un secret personali solo se UCanpower te li ha forniti; in tal caso hanno la precedenza. Per tornare alla chiave inclusa, svuota il campo della chiave. Lascia vuoto il secret per mantenere quello già salvato. «Scrittura consentita» permette a Home Assistant di cambiare la modalità (autoconsumo o arbitraggio orario) e le fasce di ricarica, nient'altro.",
+        "data": {
+          "scan_interval": "Intervallo di interrogazione del cloud (secondi, minimo 30)",
+          "app_key": "Chiave applicativa UCanpower personale (facoltativa)",
+          "app_secret": "Secret applicativo UCanpower personale (facoltativo)",
+          "write_enabled": "Scrittura consentita (solo modalità e fasce di ricarica)"
+        }
+      }
+    }
+  },
+  "services": {
+    "tester_api": {
+      "name": "Testa l'API UCanpower",
+      "description": "Controllo in sola lettura dell'API di terze parti firmata: ID del dispositivo, modello di inverter, modalità e fasce. Nulla viene inviato all'inverter.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Voce UCANESS da usare (facoltativa se c'è un solo dispositivo)."
+        }
+      }
+    },
+    "definir_plages_charge": {
+      "name": "Imposta le fasce di ricarica",
+      "description": "Programma fino a 3 fasce di ricarica della modalità arbitraggio orario (HHMM). Le altre fasce di ricarica e tutte le fasce di scarica vengono svuotate. Richiede «Scrittura consentita».",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Voce UCANESS da usare (facoltativa se c'è un solo dispositivo)."
+        },
+        "plages": {
+          "name": "Fasce",
+          "description": "Elenco di {debut, fin} in formato HHMM, per esempio da 2300 a 2359, poi da 0000 a 0130."
+        }
+      }
+    },
+    "definir_mode": {
+      "name": "Imposta la modalità",
+      "description": "Porta l'inverter in autoconsumo o in arbitraggio orario. La modalità Backup viene rifiutata. Richiede «Scrittura consentita».",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Voce UCANESS da usare (facoltativa se c'è un solo dispositivo)."
+        },
+        "mode": {
+          "name": "Modalità",
+          "description": "Autoconsumo o arbitraggio orario."
+        }
+      }
+    },
+    "optimiser_charge": {
+      "name": "Pianifica la ricarica (tariffa dinamica)",
+      "description": "Calcola, senza inviare nulla all'inverter, fino a 3 fasce di ricarica dalla rete che riducono al minimo il costo con un prezzo variabile, a partire da prezzi, consumo previsto e previsione solare.",
+      "fields": {
+        "prix": {
+          "name": "Prezzi",
+          "description": "Elenco di {debut, prix} (o {start, price}) in EUR/kWh IVA inclusa, all'ora o al quarto d'ora."
+        },
+        "conso": {
+          "name": "Consumo",
+          "description": "24 valori (kWh per ora del giorno) o elenco di {debut, kwh}."
+        },
+        "solaire": {
+          "name": "Previsione solare",
+          "description": "Elenco detailedHourly o detailedForecast di Solcast, oppure {debut, kwh}."
+        },
+        "capacite_kwh": {
+          "name": "Capacità della batteria",
+          "description": "Capacità nominale."
+        },
+        "plancher_pct": {
+          "name": "SOC minimo",
+          "description": "SOC sotto il quale l'inverter non scarica più."
+        },
+        "soc_pct": {
+          "name": "SOC attuale",
+          "description": "Carica attuale della batteria."
+        },
+        "rendement_pct": {
+          "name": "Rendimento",
+          "description": "Rendimento in un senso (carica o scarica)."
+        },
+        "puissance_charge_kw": {
+          "name": "Potenza di carica dalla rete",
+          "description": "Potenza realmente osservata durante una fascia di ricarica."
+        },
+        "prix_revente": {
+          "name": "Prezzo di vendita",
+          "description": "EUR/kWh pagati per l'energia immessa."
+        },
+        "marge_pct": {
+          "name": "Margine",
+          "description": "Maggiorazione del consumo previsto."
+        },
+        "charge_interdite": {
+          "name": "Ricarica vietata",
+          "description": "Vero quando la batteria è sotto 0 °C."
+        },
+        "reserve": {
+          "name": "Riserva di emergenza",
+          "description": "{debut, fin, soc_pct}: SOC minimo da mantenere tra due istanti (rischio di interruzione)."
+        },
+        "seuil_gain_eur": {
+          "name": "Guadagno minimo",
+          "description": "Sotto questo guadagno stimato non viene prevista alcuna fascia."
+        },
+        "valeur_stock_eur_kwh": {
+          "name": "Valore dell'energia accumulata",
+          "description": "EUR per kWh rimasto in batteria alla fine dell'orizzonte (predefinito: prezzo più basso / rendimento)."
+        },
+        "max_plages": {
+          "name": "Fasce al massimo",
+          "description": "Fasce di ricarica disponibili sull'inverter (3)."
+        }
+      }
+    },
+    "plages_depuis_plan": {
+      "name": "Fasce da un piano esterno",
+      "description": "Traduce il piano batteria di un altro motore (EMHASS: P_batt < 0 = carica, P_grid > 0 = prelievo) in al massimo 3 fasce di ricarica. Nulla viene inviato all'inverter.",
+      "fields": {
+        "plan": {
+          "name": "Piano",
+          "description": "Elenco di {debut, charge_reseau_kw} o elementi EMHASS {date, p_batt, p_grid} in W."
+        },
+        "seuil_kw": {
+          "name": "Soglia",
+          "description": "Potenza di carica dalla rete sotto la quale un intervallo viene ignorato."
+        },
+        "max_plages": {
+          "name": "Fasce al massimo",
+          "description": "Fasce di ricarica disponibili sull'inverter (3)."
+        }
+      }
+    },
+    "evaluer_offres": {
+      "name": "Valuta offerte di elettricità",
+      "description": "Solo calcolo: costo annuo stimato di ogni offerta sul prelievo misurato ora per ora (batteria dedotta), classifica per costo, parere sulla potenza impegnata. Formule «base» e «hphc». Nulla viene sottoscritto, nulla viene inviato all'inverter.",
+      "fields": {
+        "offres": {
+          "name": "Offerte",
+          "description": "Elenco di offerte; ogni offerta indica: nom, fournisseur, formule (base o hphc), abonnement_eur_an (€ IVA inclusa per potenza in kVA), prix_kwh (base, oppure hp e hc, in € IVA inclusa), plages_hc (elenco di inizio e fine), weekend_hc, source, date_prix; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo facoltativo."
+        },
+        "contrat_actuel": {
+          "name": "Contratto attuale",
+          "description": "Stessa forma di un'offerta: serve da riferimento per la differenza annua."
+        },
+        "soutirage": {
+          "name": "Prelievo",
+          "description": "Elenco di {debut, kwh}: energia prelevata dalla rete, un valore per ora."
+        },
+        "puissance_kva": {
+          "name": "Potenza impegnata",
+          "description": "Potenza del contratto, in kVA."
+        },
+        "jours_non_ouvres": {
+          "name": "Giorni festivi",
+          "description": "Date contate come fine settimana per le offerte «fine settimana fuori punta»."
+        },
+        "puissances_max_kva": {
+          "name": "Potenze massime",
+          "description": "Una potenza massima al giorno, in kVA, per il parere sulla potenza impegnata."
+        },
+        "mesure_fine": {
+          "name": "Massimi letti sul contatore",
+          "description": "Da attivare se le potenze massime provengono dal contatore (presa TIC) e non da una stima."
+        },
+        "capacite_utile_kwh": {
+          "name": "Capacità utile della batteria",
+          "description": "Capacità sopra il livello minimo. Se indicata, la ricarica notturna viene stimata per le offerte con fascia fuori punta (stima alta)."
+        },
+        "rendement_pct": {
+          "name": "Rendimento",
+          "description": "Rendimento della batteria in un senso (carica o scarica)."
+        },
+        "recharge_deja_active": {
+          "name": "Ricarica notturna già attiva",
+          "description": "Da attivare se la casa ricarica già la batteria fuori punta: il prelievo misurato ne tiene già conto."
+        },
+        "couleurs_tempo": {
+          "name": "Colori Tempo",
+          "description": "Colore di ogni giorno Tempo misurato (dalle 6 alle 6): data poi bleu, blanc o rouge (blu, bianco, rosso). Senza di esso, ogni colore prende il consumo di un giorno medio."
+        }
+      }
+    },
+    "simuler": {
+      "name": "Simula (e se…)",
+      "description": "Solo calcolo sulle misure della casa, nulla viene applicato. «contrat»: costo annuo stimato del contratto attuale e delle offerte di riferimento (tariffe regolamentate, incluso Tempo) o di quelle passate; «puissance»: la potenza impegnata è adeguata?",
+      "fields": {
+        "question": {
+          "name": "Domanda",
+          "description": "contrat (contratto) o puissance (potenza)."
+        },
+        "jours": {
+          "name": "Giorni di misura",
+          "description": "Numero di giorni di misure orarie da usare (30 per impostazione predefinita)."
+        },
+        "puissance_actuelle_kva": {
+          "name": "Potenza impegnata attuale",
+          "description": "In kVA."
+        },
+        "abonnement_actuel_eur_an": {
+          "name": "Quota fissa attuale",
+          "description": "Quota fissa annua IVA inclusa del contratto attuale, in €."
+        },
+        "offres": {
+          "name": "Offerte",
+          "description": "Facoltativo: offerte da confrontare, nel formato di «Valuta offerte di elettricità». Senza di esse: offerte di riferimento."
+        },
+        "soutirage": {
+          "name": "Prelievo dalla rete",
+          "description": "Contatore dell'energia prelevata dalla rete (kWh cumulati)."
+        },
+        "puissance_reseau": {
+          "name": "Potenza di rete",
+          "description": "Potenza prelevata dalla rete (W)."
+        }
+      }
+    }
+  },
+  "selector": {
+    "mode": {
+      "options": {
+        "autoconsommation": "Autoconsumo",
+        "arbitrage_horaire": "Arbitraggio orario"
+      }
+    },
+    "type_tarif": {
+      "options": {
+        "hphc": "Ore di punta / fuori punta",
+        "base": "Tariffa monoraria"
+      }
+    }
+  },
+  "issues": {
+    "etape_connexion": {
+      "title": "UCANESS: la batteria non risponde",
+      "description": "L'integrazione non riceve più misure da «{appareil}». Senza di esse non si può calcolare nulla.\n\nControlla la connessione a Internet dell'inverter, poi [apri l'integrazione]({lien})."
+    },
+    "etape_packages": {
+      "title": "UCANESS: installare la gestione",
+      "description": "«{appareil}» è connessa, ma la gestione non è ancora installata: sono i packages a decidere ogni sera la ricarica notturna.\n\n[Guida all'installazione della gestione]({lien}). La gestione parte sempre in simulazione: nulla viene inviato all'inverter."
+    },
+    "etape_entites": {
+      "title": "UCANESS: alcune misure non sono riconosciute dalla gestione",
+      "description": "La gestione legge la batteria con nomi precisi. Non trova: {entites}.\n\nRinomina le entità corrispondenti in [Impostazioni > Entità]({lien}) (campo «ID entità»). In una nuova installazione questi nomi vengono assegnati automaticamente."
+    },
+    "etape_batterie": {
+      "title": "UCANESS: indica la capacità della batteria",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "La tua batteria",
+            "description": "L'inverter segnala {modules} modulo/i batteria. Con moduli da 5,12 kWh fanno {proposition} kWh: conferma o correggi.\n\nIl livello minimo è quello sotto il quale la batteria non si scarica più (osserva il valore più basso raggiunto in una notte senza ricarica). La potenza di carica è quella che rilevi durante una ricarica dalla rete. Entrambi i valori potranno essere affinati in seguito.",
+            "data": {
+              "capacite": "Capacità della batteria",
+              "plancher": "Livello minimo",
+              "puissance_charge": "Potenza di carica dalla rete"
+            }
+          }
+        },
+        "error": {
+          "capacite_nulle": "Indica una capacità maggiore di 0."
+        },
+        "abort": {
+          "entree_absente": "Questa batteria non è più configurata."
+        }
+      }
+    },
+    "etape_contrat": {
+      "title": "UCANESS: indica il tuo contratto elettrico",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Il tuo contratto elettrico",
+            "description": "Queste informazioni si trovano sulla bolletta. Con un contratto senza fascia fuori punta, scegli «Tariffa monoraria» e lascia vuoti i campi della fascia fuori punta.",
+            "data": {
+              "type_tarif": "Tipo di contratto",
+              "prix_hp": "Prezzo del kWh nelle ore di punta (o prezzo unico)",
+              "prix_hc": "Prezzo del kWh nelle ore fuori punta",
+              "hc_debut": "Inizio delle ore fuori punta",
+              "hc_fin": "Fine delle ore fuori punta",
+              "hc_jours_non_ouvres": "Fine settimana e festivi interamente fuori punta",
+              "prix_injection": "Prezzo di vendita dell'eccedenza"
+            }
+          },
+          "bilan": {
+            "title": "Per te, ricaricare di notte conviene",
+            "description": "Ogni kWh ricaricato fuori punta e consumato nelle ore di punta fa risparmiare circa {gain} centesimi (rendimento della batteria calcolato al {rendement} % in ciascun senso).\n\nLa gestione ricaricherà di notte, quanto basta per arrivare al cambio con il sole. Conferma per salvare il contratto."
+          },
+          "bilan_non_rentable": {
+            "title": "Per te, ricaricare di notte non conviene",
+            "description": "Con questi prezzi, ogni kWh ricaricato fuori punta e consumato nelle ore di punta farebbe perdere circa {gain} centesimi (rendimento della batteria calcolato al {rendement} % in ciascun senso).\n\nLa gestione quindi non programmerà ricariche dalla rete; la batteria continuerà ad accumulare la tua produzione solare. Conferma per salvare il contratto."
+          },
+          "bilan_base": {
+            "title": "Contratto senza fascia fuori punta",
+            "description": "Con un prezzo unico, ricaricare la batteria dalla rete non porta nulla: la gestione non programmerà ricariche notturne. La batteria continuerà ad accumulare la tua produzione solare. Conferma per salvare il contratto."
+          }
+        },
+        "error": {
+          "prix_nul": "Indica un prezzo maggiore di 0."
+        },
+        "abort": {
+          "entree_absente": "Questa batteria non è più configurata."
+        }
+      }
+    },
+    "etape_jours_ouvres": {
+      "title": "UCANESS: aggiungere i giorni lavorativi",
+      "description": "La gestione distingue i giorni feriali dal fine settimana e dai festivi: il consumo e, secondo il contratto, le ore fuori punta non sono gli stessi.\n\n[Aggiungi l'integrazione Workday]({lien}) e scegli il tuo paese."
+    },
+    "etape_prevision_solaire": {
+      "title": "UCANESS: aggiungere la previsione solare",
+      "description": "Per ricaricare solo il necessario, la gestione ha bisogno della produzione prevista per oggi e domani. Senza previsione non viene programmata alcuna ricarica.\n\nInstalla l'integrazione Solcast PV Forecast dal Marketplace (contenuto della community, non verificato da Home Assistant), poi [configurala]({lien})."
+    },
+    "etape_notifications": {
+      "title": "UCANESS: scegli dove ricevere gli avvisi",
+      "description": "Facoltativo. Per essere avvisato di un guasto della batteria o di una programmazione non riuscita.\n\nCompila «Alertes : service de notification» in [Impostazioni > Aiutanti]({lien}), per esempio `mobile_app_mon_telephone`."
+    },
+    "etape_solaire": {
+      "title": "UCANESS: hai dei pannelli solari?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Pannelli solari",
+            "description": "L'inverter non ha ancora misurato alcuna produzione solare. Una batteria può funzionare con o senza pannelli.\n\nCon i pannelli, la batteria accumula prima la tua produzione e la gestione ricarica di notte solo il complemento. Senza pannelli, serve a comprare elettricità nelle ore più economiche per consumarla in quelle più care: tutto dipende allora dal tuo contratto, che l'assistente esamina al passo successivo.",
+            "data": {
+              "solaire": "A questo inverter sono collegati pannelli solari"
+            }
+          }
+        },
+        "abort": {
+          "entree_absente": "Questa batteria non è più configurata."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "solar_power": {
+        "name": "Potenza solare"
+      },
+      "pv1_power": {
+        "name": "Potenza MPPT 1"
+      },
+      "pv2_power": {
+        "name": "Potenza MPPT 2"
+      },
+      "battery_power": {
+        "name": "Potenza batteria (carica > 0)"
+      },
+      "load_power": {
+        "name": "Potenza casa"
+      },
+      "grid_power": {
+        "name": "Potenza di rete stimata (prelievo > 0)"
+      },
+      "inverter_power": {
+        "name": "Potenza inverter"
+      },
+      "soc": {
+        "name": "Carica batteria (SOC)"
+      },
+      "soh": {
+        "name": "Stato di salute batteria (SOH)"
+      },
+      "battery_voltage": {
+        "name": "Tensione batteria"
+      },
+      "battery_current": {
+        "name": "Corrente batteria"
+      },
+      "battery_temp": {
+        "name": "Temperatura batteria"
+      },
+      "cell_temp_max": {
+        "name": "Temperatura massima cella"
+      },
+      "cell_temp_min": {
+        "name": "Temperatura minima cella"
+      },
+      "cell_voltage_max": {
+        "name": "Tensione massima cella"
+      },
+      "cell_voltage_min": {
+        "name": "Tensione minima cella"
+      },
+      "battery_modules": {
+        "name": "Numero di moduli batteria"
+      },
+      "battery_alarm_code": {
+        "name": "Codice allarme batteria"
+      },
+      "battery_fault_code": {
+        "name": "Codice guasto batteria"
+      },
+      "battery_pack_alarm_raw": {
+        "name": "Codice allarme pacco (grezzo, da interpretare)"
+      },
+      "grid_voltage": {
+        "name": "Tensione di rete"
+      },
+      "grid_frequency": {
+        "name": "Frequenza di rete"
+      },
+      "solar_voltage": {
+        "name": "Tensione solare"
+      },
+      "inverter_temp": {
+        "name": "Temperatura inverter"
+      },
+      "ambient_temp": {
+        "name": "Temperatura ambiente inverter"
+      },
+      "pv_module_temp": {
+        "name": "Temperatura stadio FV"
+      },
+      "leakage_current_raw": {
+        "name": "Corrente di dispersione (grezza)"
+      },
+      "work_mode": {
+        "name": "Modalità di funzionamento"
+      },
+      "work_state": {
+        "name": "Stato di funzionamento"
+      },
+      "last_update": {
+        "name": "Ultima misura ricevuta"
+      },
+      "data_age": {
+        "name": "Età dei dati"
+      },
+      "energy_solar_today": {
+        "name": "Produzione solare oggi"
+      },
+      "energy_solar_total": {
+        "name": "Produzione solare totale"
+      },
+      "energy_grid_import_today": {
+        "name": "Prelievo dalla rete oggi"
+      },
+      "energy_grid_import_total": {
+        "name": "Prelievo dalla rete totale"
+      },
+      "energy_grid_export_today": {
+        "name": "Immissione in rete oggi"
+      },
+      "energy_grid_export_total": {
+        "name": "Immissione in rete totale"
+      },
+      "energy_load_today": {
+        "name": "Consumo casa oggi"
+      },
+      "energy_load_total": {
+        "name": "Consumo casa totale"
+      },
+      "energy_battery_charge_today": {
+        "name": "Carica batteria oggi"
+      },
+      "energy_battery_charge_total": {
+        "name": "Carica batteria totale"
+      },
+      "energy_battery_discharge_today": {
+        "name": "Scarica batteria oggi"
+      },
+      "energy_battery_discharge_total": {
+        "name": "Scarica batteria totale"
+      },
+      "setting_dod": {
+        "name": "Impostazione DOD in rete"
+      },
+      "setting_hysteresis": {
+        "name": "Impostazione isteresi"
+      },
+      "setting_charge_current": {
+        "name": "Impostazione corrente di carica"
+      },
+      "setting_discharge_power": {
+        "name": "Impostazione potenza di scarica"
+      },
+      "setting_export_power": {
+        "name": "Impostazione potenza di immissione"
+      },
+      "setting_charge1_start": {
+        "name": "Fascia di ricarica 1: inizio"
+      },
+      "setting_charge1_end": {
+        "name": "Fascia di ricarica 1: fine"
+      },
+      "event_count": {
+        "name": "Eventi registrati"
+      },
+      "installation": {
+        "name": "Installazione",
+        "state": {
+          "a_configurer": "Da configurare",
+          "en_simulation": "In simulazione",
+          "en_service": "In servizio",
+          "a_verifier": "Da verificare"
+        }
+      }
+    },
+    "binary_sensor": {
+      "cloud_connection": {
+        "name": "Connessione al cloud UCANESS"
+      },
+      "battery_fault": {
+        "name": "Guasto o allarme batteria"
+      },
+      "battery_temp_out_of_charge_range": {
+        "name": "Temperatura batteria fuori dall'intervallo di carica (0–50 °C)"
+      }
+    },
+    "number": {
+      "capacite": {
+        "name": "Batteria: capacità"
+      },
+      "plancher": {
+        "name": "Batteria: SOC minimo"
+      },
+      "rendement": {
+        "name": "Batteria: rendimento"
+      },
+      "puissance_charge": {
+        "name": "Batteria: potenza di carica"
+      },
+      "marge": {
+        "name": "Batteria: margine di sicurezza"
+      },
+      "conso_journaliere": {
+        "name": "Batteria: consumo giornaliero predefinito"
+      },
+      "prix_hp": {
+        "name": "Tariffa: prezzo ore di punta (o monoraria)"
+      },
+      "prix_hc": {
+        "name": "Tariffa: prezzo ore fuori punta"
+      },
+      "prix_injection": {
+        "name": "Tariffa: prezzo di vendita dell'eccedenza"
+      }
+    },
+    "switch": {
+      "solaire": {
+        "name": "Installazione: pannelli solari collegati"
+      },
+      "hc_jours_non_ouvres": {
+        "name": "Tariffa: fine settimana e festivi fuori punta"
+      }
+    },
+    "select": {
+      "type_tarif": {
+        "name": "Tariffa: tipo di contratto",
+        "state": {
+          "hphc": "Ore di punta / fuori punta",
+          "base": "Tariffa monoraria"
+        }
+      }
+    },
+    "time": {
+      "hc_debut": {
+        "name": "Tariffa: inizio delle ore fuori punta"
+      },
+      "hc_fin": {
+        "name": "Tariffa: fine delle ore fuori punta"
+      }
+    }
+  },
+  "exceptions": {
+    "appareil_introuvable": {
+      "message": "Dispositivo UCANESS non trovato o ambiguo (specificare config_entry_id)"
+    },
+    "ecriture_desactivee": {
+      "message": "Scrittura verso l'inverter disattivata (opzione «Scrittura consentita» dell'integrazione UCANESS)"
+    },
+    "consigne_refusee": {
+      "message": "Comando rifiutato dalla protezione: {detail}"
+    },
+    "plages_non_envoyees": {
+      "message": "Comando non inviato (fasce di ricarica {plages}): {detail}"
+    },
+    "mode_non_envoye": {
+      "message": "Comando non inviato (modalità {mode}): {detail}"
+    },
+    "plages_non_confirmees": {
+      "message": "Fasce di ricarica {plages}: comando inviato ma non confermato dall'inverter ({ecarts})"
+    },
+    "mode_non_confirme": {
+      "message": "Modalità {mode}: comando inviato ma non confermato dall'inverter ({ecarts})"
+    },
+    "plages_relecture_impossible": {
+      "message": "Fasce di ricarica {plages}: comando inviato ma non confermato dall'inverter (rilettura impossibile)"
+    },
+    "mode_relecture_impossible": {
+      "message": "Modalità {mode}: comando inviato ma non confermato dall'inverter (rilettura impossibile)"
+    },
+    "api_tierce": {
+      "message": "API di terze parti UCANESS: {detail}"
+    },
+    "donnees_refusees": {
+      "message": "Dati rifiutati: {detail}"
+    },
+    "puissance_actuelle_manquante": {
+      "message": "Indica la potenza impegnata attuale (puissance_actuelle_kva)."
+    },
+    "aucune_mesure_horaire": {
+      "message": "Nessuna misura oraria di {entite} negli ultimi {jours} giorni."
+    },
+    "reglage_inconnu": {
+      "message": "Impostazione rifiutata: impostazione sconosciuta ({reglage})"
+    },
+    "reglage_hors_bornes": {
+      "message": "Impostazione rifiutata: {reglage}: {valeur} fuori dall'intervallo da {mini} a {maxi}"
+    },
+    "reglage_choix_impossible": {
+      "message": "Impostazione rifiutata: {reglage}: {valeur} non è una scelta possibile"
+    },
+    "reglage_heure_invalide": {
+      "message": "Impostazione rifiutata: {reglage}: {valeur} non è un orario (HH:MM)"
+    },
+    "reglage_ni_vrai_ni_faux": {
+      "message": "Impostazione rifiutata: {reglage}: {valeur} non è né vero né falso"
+    }
+  }
+}

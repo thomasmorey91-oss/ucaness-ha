@@ -1,0 +1,657 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Conexión al portal UCANESS",
+        "description": "Integración NO OFICIAL. Solo lectura por defecto: el inversor solo se controla (modo, franjas de carga) si la opción «Escritura permitida» está activada. El «ID EMS» aparece en el portal, en el recuadro «Detalles» de tu instalación.",
+        "data": {
+          "email": "Correo de la cuenta UCANESS",
+          "password": "Contraseña de UCANESS",
+          "device_code": "ID EMS del dispositivo"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconexión a UCANESS",
+        "description": "La sesión ha sido rechazada. Vuelve a introducir la contraseña de UCANESS.",
+        "data": {
+          "password": "Contraseña de UCANESS"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Credenciales rechazadas por UCANESS.",
+      "device_not_found": "No se ha encontrado ningún dispositivo con este ID EMS.",
+      "cannot_connect": "No se puede acceder al portal UCANESS."
+    },
+    "abort": {
+      "already_configured": "Este dispositivo ya está configurado.",
+      "reauth_successful": "Reconexión correcta."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opciones de UCANESS",
+        "description": "La integración incluye una clave de aplicación proporcionada por UCanpower: deja vacíos los dos campos de clave para usarla. Rellena una clave y un secret personales solo si UCanpower te los ha dado; en ese caso tienen prioridad. Para volver a la clave incluida, vacía el campo de la clave. Deja vacío el secret para conservar el ya guardado. «Escritura permitida» permite a Home Assistant cambiar el modo (autoconsumo o arbitraje horario) y las franjas de carga, nada más.",
+        "data": {
+          "scan_interval": "Intervalo de consulta a la nube (segundos, mínimo 30)",
+          "app_key": "Clave de aplicación UCanpower personal (opcional)",
+          "app_secret": "Secret de aplicación UCanpower personal (opcional)",
+          "write_enabled": "Escritura permitida (solo modo y franjas de carga)"
+        }
+      }
+    }
+  },
+  "services": {
+    "tester_api": {
+      "name": "Probar la API de UCanpower",
+      "description": "Comprobación de solo lectura de la API de terceros firmada: ID del dispositivo, modelo de inversor, modo y franjas. No se envía nada al inversor.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Entrada UCANESS que se usará (opcional si solo hay un dispositivo)."
+        }
+      }
+    },
+    "definir_plages_charge": {
+      "name": "Definir las franjas de carga",
+      "description": "Programa hasta 3 franjas de carga del modo arbitraje horario (HHMM). Las demás franjas de carga y todas las de descarga se vacían. Requiere «Escritura permitida».",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Entrada UCANESS que se usará (opcional si solo hay un dispositivo)."
+        },
+        "plages": {
+          "name": "Franjas",
+          "description": "Lista de {debut, fin} en formato HHMM, por ejemplo de 2300 a 2359 y después de 0000 a 0130."
+        }
+      }
+    },
+    "definir_mode": {
+      "name": "Definir el modo",
+      "description": "Pone el inversor en autoconsumo o en arbitraje horario. El modo Backup se rechaza. Requiere «Escritura permitida».",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Entrada UCANESS que se usará (opcional si solo hay un dispositivo)."
+        },
+        "mode": {
+          "name": "Modo",
+          "description": "Autoconsumo o arbitraje horario."
+        }
+      }
+    },
+    "optimiser_charge": {
+      "name": "Planificar la carga (tarifa dinámica)",
+      "description": "Calcula, sin enviar nada al inversor, hasta 3 franjas de carga desde la red que minimizan el coste con un precio variable, a partir de los precios, el consumo previsto y la previsión solar.",
+      "fields": {
+        "prix": {
+          "name": "Precios",
+          "description": "Lista de {debut, prix} (o {start, price}) en EUR/kWh con impuestos, por hora o por cuarto de hora."
+        },
+        "conso": {
+          "name": "Consumo",
+          "description": "24 valores (kWh por hora del día) o lista de {debut, kwh}."
+        },
+        "solaire": {
+          "name": "Previsión solar",
+          "description": "Lista detailedHourly o detailedForecast de Solcast, o {debut, kwh}."
+        },
+        "capacite_kwh": {
+          "name": "Capacidad de la batería",
+          "description": "Capacidad nominal."
+        },
+        "plancher_pct": {
+          "name": "SOC mínimo",
+          "description": "SOC por debajo del cual el inversor deja de descargar."
+        },
+        "soc_pct": {
+          "name": "SOC actual",
+          "description": "Carga actual de la batería."
+        },
+        "rendement_pct": {
+          "name": "Rendimiento",
+          "description": "Rendimiento en un sentido (carga o descarga)."
+        },
+        "puissance_charge_kw": {
+          "name": "Potencia de carga desde la red",
+          "description": "Potencia observada realmente durante una franja de carga."
+        },
+        "prix_revente": {
+          "name": "Precio de venta",
+          "description": "EUR/kWh pagados por la energía vertida."
+        },
+        "marge_pct": {
+          "name": "Margen",
+          "description": "Incremento del consumo previsto."
+        },
+        "charge_interdite": {
+          "name": "Carga prohibida",
+          "description": "Verdadero cuando la batería está por debajo de 0 °C."
+        },
+        "reserve": {
+          "name": "Reserva de emergencia",
+          "description": "{debut, fin, soc_pct}: SOC mínimo que se debe mantener entre dos momentos (riesgo de corte)."
+        },
+        "seuil_gain_eur": {
+          "name": "Ganancia mínima",
+          "description": "Por debajo de esta ganancia estimada, no se prevé ninguna franja."
+        },
+        "valeur_stock_eur_kwh": {
+          "name": "Valor de la energía almacenada",
+          "description": "EUR por kWh que queda en la batería al final del horizonte (por defecto: precio más bajo / rendimiento)."
+        },
+        "max_plages": {
+          "name": "Franjas como máximo",
+          "description": "Franjas de carga disponibles en el inversor (3)."
+        }
+      }
+    },
+    "plages_depuis_plan": {
+      "name": "Franjas a partir de un plan externo",
+      "description": "Traduce el plan de batería de otro motor (EMHASS: P_batt < 0 = carga, P_grid > 0 = consumo de red) en como máximo 3 franjas de carga. No se envía nada al inversor.",
+      "fields": {
+        "plan": {
+          "name": "Plan",
+          "description": "Lista de {debut, charge_reseau_kw} o elementos EMHASS {date, p_batt, p_grid} en W."
+        },
+        "seuil_kw": {
+          "name": "Umbral",
+          "description": "Potencia de carga desde la red por debajo de la cual se ignora un intervalo."
+        },
+        "max_plages": {
+          "name": "Franjas como máximo",
+          "description": "Franjas de carga disponibles en el inversor (3)."
+        }
+      }
+    },
+    "evaluer_offres": {
+      "name": "Evaluar ofertas de electricidad",
+      "description": "Solo cálculo: coste anual estimado de cada oferta con el consumo de red medido hora a hora (batería descontada), clasificación por coste, opinión sobre la potencia contratada. Fórmulas «base» y «hphc». No se contrata nada ni se envía nada al inversor.",
+      "fields": {
+        "offres": {
+          "name": "Ofertas",
+          "description": "Lista de ofertas; cada oferta indica: nom, fournisseur, formule (base o hphc), abonnement_eur_an (€ con impuestos por potencia en kVA), prix_kwh (base, o hp y hc, en € con impuestos), plages_hc (lista de inicio y fin), weekend_hc, source, date_prix; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo opcional."
+        },
+        "contrat_actuel": {
+          "name": "Contrato actual",
+          "description": "Misma forma que una oferta: sirve de referencia para la diferencia anual."
+        },
+        "soutirage": {
+          "name": "Consumo de red",
+          "description": "Lista de {debut, kwh}: energía tomada de la red, un valor por hora."
+        },
+        "puissance_kva": {
+          "name": "Potencia contratada",
+          "description": "Potencia del contrato, en kVA."
+        },
+        "jours_non_ouvres": {
+          "name": "Días festivos",
+          "description": "Fechas que cuentan como fin de semana en las ofertas «fin de semana en horas valle»."
+        },
+        "puissances_max_kva": {
+          "name": "Potencias máximas",
+          "description": "Una potencia máxima por día, en kVA, para la opinión sobre la potencia contratada."
+        },
+        "mesure_fine": {
+          "name": "Máximos leídos en el contador",
+          "description": "Actívalo si las potencias máximas proceden del contador (toma TIC) y no de una estimación."
+        },
+        "capacite_utile_kwh": {
+          "name": "Capacidad útil de la batería",
+          "description": "Capacidad por encima del nivel mínimo. Si se indica, se estima la carga nocturna para las ofertas con horas valle (estimación alta)."
+        },
+        "rendement_pct": {
+          "name": "Rendimiento",
+          "description": "Rendimiento de la batería en un sentido (carga o descarga)."
+        },
+        "recharge_deja_active": {
+          "name": "Carga nocturna ya activa",
+          "description": "Actívalo si la casa ya carga la batería en horas valle: el consumo de red medido ya lo tiene en cuenta."
+        },
+        "couleurs_tempo": {
+          "name": "Colores Tempo",
+          "description": "Color de cada día Tempo medido (de 6 h a 6 h): fecha y luego bleu, blanc o rouge (azul, blanco, rojo). Sin él, cada color toma el consumo de un día medio."
+        }
+      }
+    },
+    "simuler": {
+      "name": "Simular (¿y si…?)",
+      "description": "Solo cálculo con las medidas de la casa, no se aplica nada. «contrat»: coste anual estimado del contrato actual y de las ofertas de referencia (tarifas reguladas, incluido Tempo) o de las indicadas; «puissance»: ¿es adecuada la potencia contratada?",
+      "fields": {
+        "question": {
+          "name": "Pregunta",
+          "description": "contrat (contrato) o puissance (potencia)."
+        },
+        "jours": {
+          "name": "Días de medida",
+          "description": "Número de días de medidas horarias que se usarán (30 por defecto)."
+        },
+        "puissance_actuelle_kva": {
+          "name": "Potencia contratada actual",
+          "description": "En kVA."
+        },
+        "abonnement_actuel_eur_an": {
+          "name": "Término fijo actual",
+          "description": "Término fijo anual con impuestos del contrato actual, en €."
+        },
+        "offres": {
+          "name": "Ofertas",
+          "description": "Opcional: ofertas que comparar, con el formato de «Evaluar ofertas de electricidad». Sin ellas: ofertas de referencia."
+        },
+        "soutirage": {
+          "name": "Consumo de red",
+          "description": "Contador de la energía tomada de la red (kWh acumulados)."
+        },
+        "puissance_reseau": {
+          "name": "Potencia de red",
+          "description": "Potencia tomada de la red (W)."
+        }
+      }
+    }
+  },
+  "selector": {
+    "mode": {
+      "options": {
+        "autoconsommation": "Autoconsumo",
+        "arbitrage_horaire": "Arbitraje horario"
+      }
+    },
+    "type_tarif": {
+      "options": {
+        "hphc": "Horas punta / horas valle",
+        "base": "Tarifa única"
+      }
+    }
+  },
+  "issues": {
+    "etape_connexion": {
+      "title": "UCANESS: la batería no responde",
+      "description": "La integración ya no recibe medidas de «{appareil}». Sin ellas no se puede calcular nada.\n\nComprueba la conexión a Internet del inversor y luego [abre la integración]({lien})."
+    },
+    "etape_packages": {
+      "title": "UCANESS: instalar el control",
+      "description": "«{appareil}» está conectada, pero el control aún no está instalado: son los packages los que deciden cada noche la carga nocturna.\n\n[Guía de instalación del control]({lien}). El control siempre empieza en simulación: no se envía nada al inversor."
+    },
+    "etape_entites": {
+      "title": "UCANESS: algunas medidas no las reconoce el control",
+      "description": "El control lee la batería con nombres concretos. No encuentra: {entites}.\n\nCambia el nombre de las entidades correspondientes en [Ajustes > Entidades]({lien}) (campo «ID de entidad»). En una instalación nueva, estos nombres se asignan automáticamente."
+    },
+    "etape_batterie": {
+      "title": "UCANESS: indica la capacidad de tu batería",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Tu batería",
+            "description": "El inversor indica {modules} módulo(s) de batería. Con módulos de 5,12 kWh, son {proposition} kWh: confirma o corrige.\n\nEl nivel mínimo es aquel por debajo del cual la batería deja de descargarse (observa el valor más bajo alcanzado una noche sin carga). La potencia de carga es la que observas durante una carga desde la red. Ambos valores podrán ajustarse más adelante.",
+            "data": {
+              "capacite": "Capacidad de la batería",
+              "plancher": "Nivel mínimo",
+              "puissance_charge": "Potencia de carga desde la red"
+            }
+          }
+        },
+        "error": {
+          "capacite_nulle": "Indica una capacidad mayor que 0."
+        },
+        "abort": {
+          "entree_absente": "Esta batería ya no está configurada."
+        }
+      }
+    },
+    "etape_contrat": {
+      "title": "UCANESS: indica tu contrato eléctrico",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Tu contrato eléctrico",
+            "description": "Estos datos aparecen en tu factura. Con un contrato sin horas valle, elige «Tarifa única» y deja vacíos los campos de horas valle.",
+            "data": {
+              "type_tarif": "Tipo de contrato",
+              "prix_hp": "Precio del kWh en horas punta (o precio único)",
+              "prix_hc": "Precio del kWh en horas valle",
+              "hc_debut": "Inicio de las horas valle",
+              "hc_fin": "Fin de las horas valle",
+              "hc_jours_non_ouvres": "Fines de semana y festivos enteramente en horas valle",
+              "prix_injection": "Precio de venta del excedente"
+            }
+          },
+          "bilan": {
+            "title": "En tu caso, cargar por la noche sale rentable",
+            "description": "Cada kWh cargado en horas valle y consumido en horas punta ahorra unos {gain} céntimos (rendimiento de la batería calculado al {rendement} % en cada sentido).\n\nEl control cargará por la noche, justo lo necesario para llegar al relevo del sol. Confirma para guardar tu contrato."
+          },
+          "bilan_non_rentable": {
+            "title": "En tu caso, cargar por la noche no sale rentable",
+            "description": "Con estos precios, cada kWh cargado en horas valle y consumido en horas punta haría perder unos {gain} céntimos (rendimiento de la batería calculado al {rendement} % en cada sentido).\n\nPor eso el control no programará cargas desde la red; tu batería seguirá almacenando tu producción solar. Confirma para guardar tu contrato."
+          },
+          "bilan_base": {
+            "title": "Contrato sin horas valle",
+            "description": "Con un precio único, cargar la batería desde la red no aporta nada: el control no programará cargas nocturnas. Tu batería seguirá almacenando tu producción solar. Confirma para guardar tu contrato."
+          }
+        },
+        "error": {
+          "prix_nul": "Indica un precio mayor que 0."
+        },
+        "abort": {
+          "entree_absente": "Esta batería ya no está configurada."
+        }
+      }
+    },
+    "etape_jours_ouvres": {
+      "title": "UCANESS: añadir los días laborables",
+      "description": "El control distingue los días laborables de los fines de semana y festivos: el consumo y, según el contrato, las horas valle no son los mismos.\n\n[Añade la integración Workday]({lien}) y elige tu país."
+    },
+    "etape_prevision_solaire": {
+      "title": "UCANESS: añadir la previsión solar",
+      "description": "Para cargar solo lo necesario, el control necesita la producción prevista para hoy y mañana. Sin previsión, no se programa ninguna carga.\n\nInstala la integración Solcast PV Forecast desde el Marketplace (contenido de la comunidad, no verificado por Home Assistant) y luego [configúrala]({lien})."
+    },
+    "etape_notifications": {
+      "title": "UCANESS: elige dónde recibir los avisos",
+      "description": "Opcional. Para recibir un aviso si la batería falla o si una programación no se realiza.\n\nRellena «Alertes : service de notification» en [Ajustes > Ayudantes]({lien}), por ejemplo `mobile_app_mon_telephone`."
+    },
+    "etape_solaire": {
+      "title": "UCANESS: ¿tienes placas solares?",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Placas solares",
+            "description": "El inversor aún no ha medido ninguna producción solar. Una batería puede funcionar con o sin placas.\n\nCon placas, la batería almacena primero tu producción y el control solo carga por la noche lo que falta. Sin placas, sirve para comprar electricidad en las horas más baratas y consumirla en las más caras: todo depende entonces de tu contrato, que el asistente revisa en el paso siguiente.",
+            "data": {
+              "solaire": "Hay placas solares conectadas a este inversor"
+            }
+          }
+        },
+        "abort": {
+          "entree_absente": "Esta batería ya no está configurada."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "solar_power": {
+        "name": "Potencia solar"
+      },
+      "pv1_power": {
+        "name": "Potencia MPPT 1"
+      },
+      "pv2_power": {
+        "name": "Potencia MPPT 2"
+      },
+      "battery_power": {
+        "name": "Potencia de la batería (carga > 0)"
+      },
+      "load_power": {
+        "name": "Potencia de la casa"
+      },
+      "grid_power": {
+        "name": "Potencia de red estimada (consumo > 0)"
+      },
+      "inverter_power": {
+        "name": "Potencia del inversor"
+      },
+      "soc": {
+        "name": "Carga de la batería (SOC)"
+      },
+      "soh": {
+        "name": "Estado de salud de la batería (SOH)"
+      },
+      "battery_voltage": {
+        "name": "Tensión de la batería"
+      },
+      "battery_current": {
+        "name": "Corriente de la batería"
+      },
+      "battery_temp": {
+        "name": "Temperatura de la batería"
+      },
+      "cell_temp_max": {
+        "name": "Temperatura máxima de celda"
+      },
+      "cell_temp_min": {
+        "name": "Temperatura mínima de celda"
+      },
+      "cell_voltage_max": {
+        "name": "Tensión máxima de celda"
+      },
+      "cell_voltage_min": {
+        "name": "Tensión mínima de celda"
+      },
+      "battery_modules": {
+        "name": "Número de módulos de batería"
+      },
+      "battery_alarm_code": {
+        "name": "Código de alarma de la batería"
+      },
+      "battery_fault_code": {
+        "name": "Código de fallo de la batería"
+      },
+      "battery_pack_alarm_raw": {
+        "name": "Código de alarma del paquete (bruto, por interpretar)"
+      },
+      "grid_voltage": {
+        "name": "Tensión de red"
+      },
+      "grid_frequency": {
+        "name": "Frecuencia de red"
+      },
+      "solar_voltage": {
+        "name": "Tensión solar"
+      },
+      "inverter_temp": {
+        "name": "Temperatura del inversor"
+      },
+      "ambient_temp": {
+        "name": "Temperatura ambiente del inversor"
+      },
+      "pv_module_temp": {
+        "name": "Temperatura de la etapa FV"
+      },
+      "leakage_current_raw": {
+        "name": "Corriente de fuga (bruta)"
+      },
+      "work_mode": {
+        "name": "Modo de funcionamiento"
+      },
+      "work_state": {
+        "name": "Estado de funcionamiento"
+      },
+      "last_update": {
+        "name": "Última medida recibida"
+      },
+      "data_age": {
+        "name": "Antigüedad de los datos"
+      },
+      "energy_solar_today": {
+        "name": "Producción solar hoy"
+      },
+      "energy_solar_total": {
+        "name": "Producción solar total"
+      },
+      "energy_grid_import_today": {
+        "name": "Consumo de red hoy"
+      },
+      "energy_grid_import_total": {
+        "name": "Consumo de red total"
+      },
+      "energy_grid_export_today": {
+        "name": "Vertido a la red hoy"
+      },
+      "energy_grid_export_total": {
+        "name": "Vertido a la red total"
+      },
+      "energy_load_today": {
+        "name": "Consumo de la casa hoy"
+      },
+      "energy_load_total": {
+        "name": "Consumo de la casa total"
+      },
+      "energy_battery_charge_today": {
+        "name": "Carga de la batería hoy"
+      },
+      "energy_battery_charge_total": {
+        "name": "Carga de la batería total"
+      },
+      "energy_battery_discharge_today": {
+        "name": "Descarga de la batería hoy"
+      },
+      "energy_battery_discharge_total": {
+        "name": "Descarga de la batería total"
+      },
+      "setting_dod": {
+        "name": "Ajuste DOD conectado a red"
+      },
+      "setting_hysteresis": {
+        "name": "Ajuste de histéresis"
+      },
+      "setting_charge_current": {
+        "name": "Ajuste de corriente de carga"
+      },
+      "setting_discharge_power": {
+        "name": "Ajuste de potencia de descarga"
+      },
+      "setting_export_power": {
+        "name": "Ajuste de potencia de vertido"
+      },
+      "setting_charge1_start": {
+        "name": "Franja de carga 1: inicio"
+      },
+      "setting_charge1_end": {
+        "name": "Franja de carga 1: fin"
+      },
+      "event_count": {
+        "name": "Eventos registrados"
+      },
+      "installation": {
+        "name": "Instalación",
+        "state": {
+          "a_configurer": "Por configurar",
+          "en_simulation": "En simulación",
+          "en_service": "En servicio",
+          "a_verifier": "Por revisar"
+        }
+      }
+    },
+    "binary_sensor": {
+      "cloud_connection": {
+        "name": "Conexión a la nube UCANESS"
+      },
+      "battery_fault": {
+        "name": "Fallo o alarma de la batería"
+      },
+      "battery_temp_out_of_charge_range": {
+        "name": "Temperatura de la batería fuera del rango de carga (0–50 °C)"
+      }
+    },
+    "number": {
+      "capacite": {
+        "name": "Batería: capacidad"
+      },
+      "plancher": {
+        "name": "Batería: SOC mínimo"
+      },
+      "rendement": {
+        "name": "Batería: rendimiento"
+      },
+      "puissance_charge": {
+        "name": "Batería: potencia de carga"
+      },
+      "marge": {
+        "name": "Batería: margen de seguridad"
+      },
+      "conso_journaliere": {
+        "name": "Batería: consumo diario por defecto"
+      },
+      "prix_hp": {
+        "name": "Tarifa: precio horas punta (o único)"
+      },
+      "prix_hc": {
+        "name": "Tarifa: precio horas valle"
+      },
+      "prix_injection": {
+        "name": "Tarifa: precio de venta del excedente"
+      }
+    },
+    "switch": {
+      "solaire": {
+        "name": "Instalación: placas solares conectadas"
+      },
+      "hc_jours_non_ouvres": {
+        "name": "Tarifa: fines de semana y festivos en horas valle"
+      }
+    },
+    "select": {
+      "type_tarif": {
+        "name": "Tarifa: tipo de contrato",
+        "state": {
+          "hphc": "Horas punta / horas valle",
+          "base": "Tarifa única"
+        }
+      }
+    },
+    "time": {
+      "hc_debut": {
+        "name": "Tarifa: inicio de las horas valle"
+      },
+      "hc_fin": {
+        "name": "Tarifa: fin de las horas valle"
+      }
+    }
+  },
+  "exceptions": {
+    "appareil_introuvable": {
+      "message": "Dispositivo UCANESS no encontrado o ambiguo (indica config_entry_id)"
+    },
+    "ecriture_desactivee": {
+      "message": "Escritura en el inversor desactivada (opción «Escritura permitida» de la integración UCANESS)"
+    },
+    "consigne_refusee": {
+      "message": "Orden rechazada por la protección: {detail}"
+    },
+    "plages_non_envoyees": {
+      "message": "Orden no enviada (franjas de carga {plages}): {detail}"
+    },
+    "mode_non_envoye": {
+      "message": "Orden no enviada (modo {mode}): {detail}"
+    },
+    "plages_non_confirmees": {
+      "message": "Franjas de carga {plages}: orden enviada pero no confirmada por el inversor ({ecarts})"
+    },
+    "mode_non_confirme": {
+      "message": "Modo {mode}: orden enviada pero no confirmada por el inversor ({ecarts})"
+    },
+    "plages_relecture_impossible": {
+      "message": "Franjas de carga {plages}: orden enviada pero no confirmada por el inversor (relectura imposible)"
+    },
+    "mode_relecture_impossible": {
+      "message": "Modo {mode}: orden enviada pero no confirmada por el inversor (relectura imposible)"
+    },
+    "api_tierce": {
+      "message": "API de terceros de UCANESS: {detail}"
+    },
+    "donnees_refusees": {
+      "message": "Datos rechazados: {detail}"
+    },
+    "puissance_actuelle_manquante": {
+      "message": "Indica la potencia contratada actual (puissance_actuelle_kva)."
+    },
+    "aucune_mesure_horaire": {
+      "message": "No hay medidas horarias de {entite} en los últimos {jours} días."
+    },
+    "reglage_inconnu": {
+      "message": "Ajuste rechazado: ajuste desconocido ({reglage})"
+    },
+    "reglage_hors_bornes": {
+      "message": "Ajuste rechazado: {reglage}: {valeur} fuera del rango de {mini} a {maxi}"
+    },
+    "reglage_choix_impossible": {
+      "message": "Ajuste rechazado: {reglage}: {valeur} no es una opción posible"
+    },
+    "reglage_heure_invalide": {
+      "message": "Ajuste rechazado: {reglage}: {valeur} no es una hora (HH:MM)"
+    },
+    "reglage_ni_vrai_ni_faux": {
+      "message": "Ajuste rechazado: {reglage}: {valeur} no es ni verdadero ni falso"
+    }
+  }
+}

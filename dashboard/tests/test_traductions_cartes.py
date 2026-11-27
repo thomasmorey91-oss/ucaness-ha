@@ -19,8 +19,8 @@ PARAMETRE = re.compile(r"\{(\w+)\}")
 LANGUES = [l for l in BLOC if l != "fr"]
 
 
-def test_quatre_langues():
-    assert sorted(BLOC) == ["de", "en", "fr", "zh-Hans"]
+def test_sept_langues():
+    assert sorted(BLOC) == ["de", "en", "es", "fr", "it", "pt", "zh-Hans"]
 
 
 @pytest.mark.parametrize("langue", LANGUES)

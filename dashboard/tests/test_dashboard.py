@@ -329,6 +329,9 @@ def test_carte_ucan_conseil_et_reponse(cartes):
     ("zh-Hans", ["我来做", "以后再说", "不再提示"]),
     ("zh-CN", ["我来做", "以后再说", "不再提示"]),
     ("de", ["Mache ich", "Nicht jetzt", "Nicht mehr vorschlagen"]),
+    ("it", ["Lo faccio", "Non ora", "Non proporlo più"]),
+    ("es", ["Lo hago", "Ahora no", "No volver a proponer"]),
+    ("pt", ["Vou fazer", "Agora não", "Não voltar a sugerir"]),
     ("fr", ["Je le fais", "Pas maintenant", "Ne plus proposer"]),
 ])
 def test_carte_ucan_traduite(cartes, langue, boutons):
@@ -567,7 +570,11 @@ def test_scene_flux_selon_l_etat(scene):
     ("en", ["Solar panels", "Battery: ", "charging", "Inverter: self-consumption"]),
     ("de", ["Solarmodule", "Batterie: ", "lädt", "Wechselrichter: Eigenverbrauch"]),
     ("zh-Hans", ["光伏板", "电池：", "充电中", "逆变器：自发自用"]),
-    ("es", ["Solar panels", "Battery: "]),          # langue sans traduction : anglais
+    ("it", ["Pannelli solari", "Batteria: ", "in carica", "Inverter: autoconsumo"]),
+    ("es", ["Placas solares", "Batería: ", "cargando", "Inversor: autoconsumo"]),
+    ("pt", ["Painéis solares", "Bateria: ", "a carregar", "Inversor: autoconsumo"]),
+    ("pt-BR", ["Painéis solares", "Bateria: "]),     # variante : langue de base
+    ("nl", ["Solar panels", "Battery: "]),          # langue sans traduction : anglais
 ])
 def test_scene_traduite(scene, langue, attendu):
     """Les textes des cartes suivent la langue du profil Home Assistant (les nombres aussi)."""

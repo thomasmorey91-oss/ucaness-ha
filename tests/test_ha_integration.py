@@ -341,6 +341,24 @@ async def test_textes_traduits_en_allemand(hass, fake_client, fast_readback):
     assert erreur.value.translation_placeholders["reglage"] == "Batterie: Kapazität"
 
 
+@pytest.mark.parametrize(("langue", "nom_soc", "id_dod", "nom_capacite"), [
+    ("it", "Carica batteria (SOC)", "sensor.maison_test_impostazione_dod_in_rete", "Batteria: capacità"),
+    ("es", "Carga de la batería (SOC)", "sensor.maison_test_ajuste_dod_conectado_a_red", "Batería: capacidad"),
+    ("pt", "Carga da bateria (SOC)", "sensor.maison_test_definicao_dod_ligado_a_rede", "Bateria: capacidade"),
+])
+async def test_textes_traduits_it_es_pt(hass, fake_client, fast_readback, langue, nom_soc, id_dod, nom_capacite):
+    """Italien, espagnol, portugais : noms traduits, identifiants tirés du nom dans la langue."""
+    hass.config.language = langue
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=False)
+    assert hass.states.get("sensor.uhome_soc").attributes["friendly_name"].endswith(nom_soc)
+    assert hass.states.get(id_dod) is not None
+    from custom_components.ucaness import reglages
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    with pytest.raises(ServiceValidationError) as erreur:
+        await reglages.async_definir(hass, entry, {"capacite": 99})
+    assert erreur.value.translation_placeholders["reglage"] == nom_capacite
+
+
 async def test_backup_mode_is_not_offered(hass, fake_client, fast_readback):
     await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
     with pytest.raises(Exception):
