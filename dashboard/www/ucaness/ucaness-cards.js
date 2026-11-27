@@ -21,6 +21,8 @@
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
  *
+ * 0.5.4 (27/11/2026) : bulle Ucan déplaçable (glisser, position gardée sur l'appareil, « Replacer »).
+ *
  * 0.5.3 (27/11/2026) : Ucan en bulle de discussion en bas à droite (floating: true).
  *
  * 0.5.2 (27/11/2026) : carte Ucan dans une colonne étroite (300 px) : la bulle passe sous l'avatar.
@@ -40,7 +42,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.5.3';
+const UC_VERSION = '0.5.4';
 
 /* Dossier où se trouve ce fichier (en général /local/ucaness/). */
 const UC_BASE = (() => {
@@ -2354,6 +2356,8 @@ class UcanessHoursCard extends HTMLElement {
  * Les barres des trois modules s'allument avec la charge (au-dessus de 0, 33 et 66 %).
  * Boutons : « Je le fais », « Pas maintenant », « Ne plus proposer » (réponse au script).
  */
+const UC_UCAN_POS = 'ucaness-ucan-position';
+
 function ucUcanSvg(humeur, charge) {
   const lum = humeur === 'alerte' ? '#F39C12' : '#00D1D6';
   const off = '#1B2230';
@@ -2418,6 +2422,64 @@ class UcanessUcanCard extends HTMLElement {
     window.addEventListener('keydown', this._echap);
   }
 
+  /* Position de la bulle : celle choisie par l'utilisateur sur cet appareil (glisser-déposer,
+     gardée dans le navigateur), sinon offset_bottom / offset_right. Toujours ramenée dans l'écran. */
+  _position() {
+    const c = this._config;
+    if (this._deplace === undefined) {
+      try { this._deplace = JSON.parse(window.localStorage.getItem(UC_UCAN_POS) || 'null'); } catch (e) { this._deplace = null; }
+    }
+    const p = this._deplace || { droite: Number(c.offset_right ?? 20), bas: Number(c.offset_bottom ?? 20) };
+    const w = window.innerWidth || 1280;
+    const h = window.innerHeight || 800;
+    return { droite: Math.min(Math.max(4, p.droite), Math.max(4, w - 68)), bas: Math.min(Math.max(4, p.bas), Math.max(4, h - 68)) };
+  }
+
+  /* Un appui ouvre ou ferme ; un glissement de plus de 6 px déplace la bulle (souris ou doigt). */
+  _glisser(fab) {
+    let depart = null;
+    fab.addEventListener('pointerdown', (e) => {
+      const p = this._position();
+      depart = { x: e.clientX, y: e.clientY, droite: p.droite, bas: p.bas, bouge: false };
+      try { fab.setPointerCapture(e.pointerId); } catch (err) { /* pointeur déjà relâché */ }
+    });
+    fab.addEventListener('pointermove', (e) => {
+      if (!depart) return;
+      const dx = e.clientX - depart.x;
+      const dy = e.clientY - depart.y;
+      if (!depart.bouge && Math.hypot(dx, dy) < 6) return;
+      depart.bouge = true;
+      this._enGlisse = true;
+      fab.classList.add('glisse');
+      const w = window.innerWidth || 1280;
+      const h = window.innerHeight || 800;
+      const droite = Math.min(Math.max(4, depart.droite - dx), w - 68);
+      const bas = Math.min(Math.max(4, depart.bas - dy), h - 68);
+      this._flot.style.setProperty('right', `${droite}px`, 'important');
+      this._flot.style.setProperty('bottom', `${bas}px`, 'important');
+      depart.fin = { droite, bas };
+    });
+    const fin = () => {
+      if (!depart) return;
+      const d = depart;
+      depart = null;
+      this._enGlisse = false;
+      if (d.bouge && d.fin) {
+        this._deplace = d.fin;
+        try { window.localStorage.setItem(UC_UCAN_POS, JSON.stringify(d.fin)); } catch (e) { /* stockage indisponible */ }
+        this._flot.style.removeProperty('right');
+        this._flot.style.removeProperty('bottom');
+      } else {
+        this._ouvert = !this._ouvert;
+      }
+      this._render();
+    };
+    fab.addEventListener('pointerup', fin);
+    fab.addEventListener('pointercancel', () => { depart = null; this._enGlisse = false; this._render(); });
+    // Clavier (Entrée, Espace) ou appel du programme : un « click » sans pointeur (detail 0).
+    fab.addEventListener('click', (e) => { if (e.detail === 0) { this._ouvert = !this._ouvert; this._render(); } });
+  }
+
   _etat() {
     const h = this._hass;
     const c = this._config;
@@ -2471,37 +2533,48 @@ class UcanessUcanCard extends HTMLElement {
         .q { border: 1px solid var(--uc-tab-border); background: transparent; color: #9CC9F5; }`;
     if (c.floating) {
       this.shadowRoot.innerHTML = '<style>:host { display: none; }</style>';
-      if (!this._flot) return;
-      const bas = Number(c.offset_bottom ?? 20);
-      const droite = Number(c.offset_right ?? 20);
+      if (!this._flot || this._enGlisse) return;
+      const pos = this._position();
+      const bas = pos.bas;
+      const droite = pos.droite;
+      const ouvrirDessous = bas > (window.innerHeight || 800) / 2;
       const attente = !!conseil || alertes.length > 0;
       const label = conseil ? 'Ucan : un conseil vous attend' : alertes.length ? 'Ucan : une alerte est en cours' : 'Ucan';
       const r = this._flot.shadowRoot;
       r.innerHTML = `
         <style>${UC_BASE_CSS}
-          :host { position: fixed; right: ${droite}px; bottom: ${bas}px; z-index: 9; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
-          .fab { position: relative; width: 64px; height: 64px; padding: 0; border-radius: 50%; border: 2px solid ${humeur === 'alerte' ? '#F39C12' : '#00D1D6'}; background: radial-gradient(circle at 50% 40%, #0D2A58 0%, #061B3D 70%); cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.5), 0 0 14px rgba(0,209,214,.35); }
+          :host { position: fixed; right: ${droite}px; bottom: ${bas}px; z-index: 9; display: flex; flex-direction: ${ouvrirDessous ? 'column-reverse' : 'column'}; align-items: flex-end; gap: 12px; }
+          .fab { position: relative; touch-action: none; width: 64px; height: 64px; padding: 0; border-radius: 50%; border: 2px solid ${humeur === 'alerte' ? '#F39C12' : '#00D1D6'}; background: radial-gradient(circle at 50% 40%, #0D2A58 0%, #061B3D 70%); cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.5), 0 0 14px rgba(0,209,214,.35); }
           .fab svg { position: absolute; left: 6px; top: 7px; width: 50px; height: 50px; }
           .pastille { position: absolute; top: -2px; right: -2px; width: 16px; height: 16px; border-radius: 50%; background: ${humeur === 'alerte' ? '#F39C12' : '#2ECC71'}; border: 2px solid #061B3D; }
           @keyframes ucan-appel { 0%, 100% { box-shadow: 0 6px 18px rgba(0,0,0,.5), 0 0 0 0 rgba(0,209,214,.55); } 50% { box-shadow: 0 6px 18px rgba(0,0,0,.5), 0 0 0 10px rgba(0,209,214,0); } }
           .fab.appel { animation: ucan-appel 2.4s ease-in-out infinite; }
-          .panneau { width: min(360px, calc(100vw - ${2 * droite}px)); max-height: calc(100vh - ${bas + 110}px); overflow: auto; box-sizing: border-box; border: 1px solid var(--uc-panel-border); border-radius: 14px; background: var(--uc-panel-bg); box-shadow: 0 10px 30px rgba(0,0,0,.55); }
+          .fab.glisse { cursor: grabbing; }
+          .panneau { width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - ${ouvrirDessous ? (window.innerHeight || 800) - bas + 30 : bas + 110}px); overflow: auto; box-sizing: border-box; border: 1px solid var(--uc-panel-border); border-radius: 14px; background: var(--uc-panel-bg); box-shadow: 0 10px 30px rgba(0,0,0,.55); }
           .tete { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; background: var(--uc-title-bg); border-bottom: 2px solid var(--uc-tab); border-radius: 14px 14px 0 0; }
           .tete .av { width: 30px; height: 41px; }
           .tete .av svg { width: 100%; height: 100%; display: block; }
           .tete h2 { margin: 0; font: 400 19px var(--uc-font); flex: 1; }
+          .replacer { min-height: 36px; padding: 0 10px; border: 1px solid var(--uc-tab-border); border-radius: 18px; background: transparent; color: #9CC9F5; font: 400 14px var(--uc-font); cursor: pointer; }
           .fermer { width: 44px; height: 44px; border: 0; background: transparent; color: var(--uc-text); cursor: pointer; border-radius: 22px; }
           .msg { margin: 14px; padding: 14px 16px; border: 1px solid var(--uc-card-border); border-radius: 4px 14px 14px 14px; background: var(--uc-card-bg); display: flex; flex-direction: column; gap: 8px; }
           ${cssBulle}
         </style>
         ${this._ouvert ? `<section class="panneau" role="dialog" aria-label="Ucan">
           <div class="tete"><div class="av">${ucUcanSvg(humeur, soc)}</div><h2>Ucan</h2>
+            ${this._deplace ? '<button type="button" class="replacer">Replacer</button>' : ''}
             <button type="button" class="fermer" aria-label="Fermer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
           <div class="msg">${this._corps(conseil, alertes)}</div></section>` : ''}
         <button type="button" class="fab uc-tap${attente && !this._ouvert && !UC_REDUCED && !UC_LIGHT ? ' appel' : ''}" aria-label="${label}" aria-expanded="${this._ouvert ? 'true' : 'false'}">
           ${ucUcanSvg(humeur, soc).replace('viewBox="0 0 220 300"', 'viewBox="30 4 160 118"')}${attente && !this._ouvert ? '<span class="pastille" aria-hidden="true"></span>' : ''}
         </button>`;
-      r.querySelector('.fab').addEventListener('click', () => { this._ouvert = !this._ouvert; this._render(); });
+      this._glisser(r.querySelector('.fab'));
+      const rp = r.querySelector('.replacer');
+      if (rp) rp.addEventListener('click', () => {
+        this._deplace = null;
+        try { window.localStorage.removeItem(UC_UCAN_POS); } catch (e) { /* stockage indisponible */ }
+        this._render();
+      });
       const f = r.querySelector('.fermer');
       if (f) f.addEventListener('click', () => { this._ouvert = false; this._render(); });
       this._boutons(r);
