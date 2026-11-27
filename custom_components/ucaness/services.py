@@ -111,6 +111,8 @@ OFFRE = vol.Schema(
         vol.Optional("weekend_hc", default=False): cv.boolean,
         vol.Optional("source", default=""): cv.string,
         vol.Optional("date_prix"): vol.Any(None, cv.date),
+        # Tempo : jours de chaque couleur dans l'année (300 bleus, 43 blancs, 22 rouges par défaut).
+        vol.Optional("jours_tempo"): vol.Any(None, vol.Schema({vol.In(tarifs.COULEURS): vol.All(vol.Coerce(int), vol.Range(min=0, max=366))})),
     }
 )
 OFFRES_SCHEMA = vol.Schema(
@@ -126,6 +128,8 @@ OFFRES_SCHEMA = vol.Schema(
         vol.Optional("capacite_utile_kwh"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=200))),
         vol.Optional("rendement_pct", default=95): vol.All(vol.Coerce(float), vol.Range(min=50, max=100)),
         vol.Optional("recharge_deja_active", default=False): cv.boolean,
+        # Tempo : couleur de chaque jour mesuré (jour de 6h à 6h) : {"2026-11-24": "blanc", …}.
+        vol.Optional("couleurs_tempo", default=dict): vol.Schema({cv.date: vol.All(cv.string, vol.Lower, vol.In(tarifs.COULEURS))}),
     }
 )
 MODE_SCHEMA = vol.Schema(
@@ -329,6 +333,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             abonnement_eur_an=dict(d["abonnement_eur_an"]), prix_kwh=dict(d["prix_kwh"]),
             plages_hc=tuple((hhmm(p["debut"]), hhmm(p["fin"])) for p in d["plages_hc"]),
             weekend_hc=d["weekend_hc"], source=d["source"], date_prix=d.get("date_prix"),
+            jours_tempo=dict(d["jours_tempo"]) if d.get("jours_tempo") else None,
         )
 
     async def evaluer_offres(call: ServiceCall) -> ServiceResponse:
@@ -356,6 +361,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 jours_non_ouvres=d["jours_non_ouvres"], aujourdhui=dt_util.now().date(),
                 batterie=tarifs.Batterie(d["capacite_utile_kwh"], d["rendement_pct"] / 100) if d.get("capacite_utile_kwh") else None,
                 recharge_deja_active=d["recharge_deja_active"],
+                couleurs_tempo=dict(d["couleurs_tempo"]),
             )
         )
         resultat["puissance"] = tarifs.analyser_puissance(

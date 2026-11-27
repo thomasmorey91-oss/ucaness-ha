@@ -155,3 +155,7 @@ evaluer_offres:
       default: false
       selector:
         boolean:
+    couleurs_tempo:
+      example: '{"2030-01-14": "blanc", "2030-01-15": "rouge"}'
+      selector:
+        object:

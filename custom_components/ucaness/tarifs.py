@@ -8,6 +8,13 @@ puissance souscrite convient.
 Ce que ce calcul fait :
 - formules « base » (prix unique) et « hphc » (heures pleines / heures creuses, plages au choix,
   week-end et jours fériés entièrement en heures creuses si l'offre le prévoit) ;
+- formule « tempo » : six prix (bleu, blanc, rouge × heures pleines, heures creuses), heures
+  creuses de 22h à 6h sauf autre plage précisée ; un jour Tempo va de 6h à 6h. L'année est
+  reconstituée avec le nombre de jours de chaque couleur (300 bleus, 43 blancs, 22 rouges sauf
+  autre nombre précisé) et la consommation moyenne d'un jour de chaque couleur mesurée ; une
+  couleur sans jour mesuré (ou des couleurs inconnues) prend la moyenne de tous les jours mesurés,
+  et c'est signalé. Les jours rouges tombant en hiver, une maison chauffée à l'électricité y
+  consomme plus que la moyenne : sans jour rouge mesuré, le coût est sous-estimé ;
 - abonnement selon la puissance souscrite ; tous les prix sont TTC.
 
 - recharge de nuit (si la batterie est décrite et que la maison ne recharge pas déjà la nuit) :
@@ -20,7 +27,9 @@ Ce que ce calcul fait :
 Ce qu'il ne fait pas (dit dans le résultat, jamais masqué) :
 - il ne rejoue pas le pilotage heure par heure : si la maison recharge déjà la nuit, le soutirage
   mesuré porte la marque des heures creuses du contrat actuel ;
-- il ne couvre ni Tempo (couleur du jour) ni les prix dynamiques ;
+- il ne couvre pas les prix dynamiques ;
+- pour Tempo, il ne déplace pas la consommation des jours rouges (lessives, chauffage) : seule la
+  batterie est comptée ;
 - il n'invente pas une année : avec peu de jours de mesure, l'estimation annuelle est une simple
   règle de trois, signalée comme telle (les saisons ne sont pas représentées).
 
@@ -32,8 +41,16 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, Iterable
 
-BASE, HPHC = "base", "hphc"
-FORMULES = (BASE, HPHC)
+BASE, HPHC, TEMPO = "base", "hphc", "tempo"
+FORMULES = (BASE, HPHC, TEMPO)
+
+# Tempo : couleurs, nombre de jours par an (règle publiée par RTE : 300 bleus, 43 blancs, 22 rouges)
+# et heures creuses de 22h à 6h ; un jour Tempo commence à 6h.
+BLEU, BLANC, ROUGE = "bleu", "blanc", "rouge"
+COULEURS = (BLEU, BLANC, ROUGE)
+JOURS_TEMPO = {BLEU: 300, BLANC: 43, ROUGE: 22}
+PLAGES_HC_TEMPO = (("22:00", "06:00"),)
+DEBUT_JOUR_TEMPO_H = 6
 
 # Fiabilité de l'estimation annuelle, selon le nombre de jours mesurés.
 FIABLE, INDICATIF, INSUFFISANT = "fiable", "indicatif", "insuffisant"
@@ -59,12 +76,14 @@ class Offre:
     nom: str
     formule: str                                   # « base » ou « hphc »
     abonnement_eur_an: dict[int, float]            # puissance souscrite (kVA) -> abonnement annuel TTC
-    prix_kwh: dict[str, float]                     # base : {"base": p} ; hphc : {"hp": p, "hc": p} (TTC)
+    prix_kwh: dict[str, float]                     # base : {"base": p} ; hphc : {"hp": p, "hc": p} ;
+                                                   # tempo : {"bleu_hp", "bleu_hc", "blanc_hp", …, "rouge_hc"} (TTC)
     fournisseur: str = ""
     plages_hc: tuple[tuple[str, str], ...] = ()    # (("22:30", "06:30"),) ; une plage peut passer minuit
     weekend_hc: bool = False                       # week-end et jours fériés entièrement en heures creuses
     source: str = ""                               # où le prix a été lu (adresse de la grille tarifaire)
     date_prix: date | None = None                  # date à laquelle le prix a été relevé
+    jours_tempo: dict[str, int] | None = None      # tempo : jours de chaque couleur par an (défaut JOURS_TEMPO)
 
 
 @dataclass
@@ -119,6 +138,13 @@ def _recouvrement(debut_min: int, fin_min: int, plage: tuple[int, int]) -> int:
 
 def part_heures_creuses(debut: datetime, offre: Offre, jours_non_ouvres: Iterable[date] = ()) -> float:
     """Part de l'heure qui commence à `debut` passée en heures creuses (0 à 1)."""
+    if offre.formule == TEMPO:
+        plages = [(_minutes(a), _minutes(b)) for a, b in (offre.plages_hc or PLAGES_HC_TEMPO)]
+        d = debut.hour * 60 + debut.minute
+        minutes = sum(_recouvrement(d, min(d + 60, 1440), p) for p in plages)
+        if d + 60 > 1440:
+            minutes += sum(_recouvrement(0, d + 60 - 1440, p) for p in plages)
+        return min(1.0, minutes / 60)
     if offre.formule != HPHC:
         return 0.0
     if offre.weekend_hc and (debut.weekday() >= 5 or debut.date() in set(jours_non_ouvres)):
@@ -139,7 +165,8 @@ def verifier(offre: Offre, puissance_kva: int) -> None:
         raise OffreInvalide(f"pas d'abonnement connu pour {puissance_kva} kVA")
     if not offre.abonnement_eur_an[puissance_kva] >= 0:
         raise OffreInvalide("abonnement illisible")
-    attendus = ("base",) if offre.formule == BASE else ("hp", "hc")
+    attendus = (("base",) if offre.formule == BASE else ("hp", "hc") if offre.formule == HPHC
+                else tuple(f"{c}_{p}" for c in COULEURS for p in ("hp", "hc")))
     for periode in attendus:
         prix = offre.prix_kwh.get(periode)
         if prix is None or not prix > 0:
@@ -148,6 +175,15 @@ def verifier(offre: Offre, puissance_kva: int) -> None:
         raise OffreInvalide("heures creuses non précisées")
     for a, b in offre.plages_hc:
         _minutes(a), _minutes(b)
+    if offre.formule == TEMPO and offre.jours_tempo is not None:
+        if set(offre.jours_tempo) != set(COULEURS) or any(not n >= 0 for n in offre.jours_tempo.values()) \
+                or sum(offre.jours_tempo.values()) not in (365, 366):
+            raise OffreInvalide("nombre de jours Tempo illisible (bleu, blanc, rouge ; 365 ou 366 au total)")
+
+
+def jour_tempo(debut: datetime) -> date:
+    """Jour Tempo de l'heure qui commence à `debut` (de 6h à 6h le lendemain)."""
+    return (debut - timedelta(hours=DEBUT_JOUR_TEMPO_H)).date()
 
 
 def fiabilite(jours: float) -> str:
@@ -163,12 +199,18 @@ def evaluer(
     aujourdhui: date | None = None,
     batterie: Batterie | None = None,
     recharge_deja_active: bool = False,
+    couleurs_tempo: dict[date, str] | None = None,
 ) -> Evaluation:
     """Coût annuel estimé de l'offre pour ce soutirage horaire [(début de l'heure, kWh), ...].
+
+    couleurs_tempo : couleur de chaque jour Tempo mesuré (jour de 6h à 6h), pour une offre Tempo.
 
     Le soutirage est celui mesuré (batterie déduite). Les heures sans mesure ne sont pas inventées :
     le nombre de jours couverts est déduit des heures présentes."""
     verifier(offre, puissance_kva)
+    if offre.formule == TEMPO:
+        return _evaluer_tempo(offre, soutirage, puissance_kva, aujourdhui=aujourdhui, batterie=batterie,
+                              recharge_deja_active=recharge_deja_active, couleurs=couleurs_tempo or {})
     non_ouvres = set(jours_non_ouvres)
     heures, kwh_total, kwh_hc, cout = 0, 0.0, 0.0, 0.0
     hp_par_jour: dict[date, float] = {}
@@ -220,6 +262,99 @@ def evaluer(
     )
 
 
+def _remarques_communes(offre: Offre, jours: float, aujourdhui: date | None) -> tuple[str, list[str]]:
+    niveau = fiabilite(jours)
+    remarques = []
+    if niveau == INSUFFISANT:
+        remarques.append(f"Seulement {jours:.0f} jour(s) de mesure : estimation annuelle à ne pas suivre telle quelle.")
+    elif niveau == INDICATIF:
+        remarques.append(f"{jours:.0f} jours de mesure : les saisons ne sont pas toutes représentées.")
+    if offre.date_prix is None:
+        remarques.append("Date du prix inconnue : grille à vérifier chez le fournisseur.")
+    elif aujourdhui is not None and (aujourdhui - offre.date_prix) > timedelta(days=JOURS_GRILLE_PERIMEE):
+        remarques.append(f"Prix relevé le {offre.date_prix.isoformat()} : à revérifier.")
+    if not offre.source:
+        remarques.append("Source du prix non indiquée.")
+    return niveau, remarques
+
+
+def _evaluer_tempo(
+    offre: Offre,
+    soutirage: Iterable[tuple[datetime, float]],
+    puissance_kva: int,
+    *,
+    aujourdhui: date | None,
+    batterie: Batterie | None,
+    recharge_deja_active: bool,
+    couleurs: dict[date, str],
+) -> Evaluation:
+    """Tempo : consommation moyenne d'un jour (heures pleines, heures creuses) par couleur mesurée,
+    multipliée par le nombre de jours de chaque couleur dans l'année."""
+    prix = offre.prix_kwh
+    heures, kwh_total, kwh_hc, cout = 0, 0.0, 0.0, 0.0
+    par_jour: dict[date, list[float]] = {}            # jour Tempo -> [kWh HP, kWh HC, heures]
+    for debut, kwh in soutirage:
+        if kwh is None or kwh != kwh or kwh < 0:
+            continue
+        heures += 1
+        kwh_total += kwh
+        part = part_heures_creuses(debut, offre)
+        kwh_hc += kwh * part
+        j = jour_tempo(debut)
+        c = couleurs.get(j, BLEU)
+        cout += kwh * (part * prix[f"{c}_hc"] + (1 - part) * prix[f"{c}_hp"])
+        v = par_jour.setdefault(j, [0.0, 0.0, 0])
+        v[0] += kwh * (1 - part)
+        v[1] += kwh * part
+        v[2] += 1
+    if heures == 0:
+        raise OffreInvalide("aucune mesure de soutirage")
+    jours = heures / 24
+    niveau, remarques = _remarques_communes(offre, jours, aujourdhui)
+    # Jours complets seulement pour les moyennes par couleur (au moins 20 heures mesurées).
+    complets = {j: v for j, v in par_jour.items() if v[2] >= 20}
+    if not complets:
+        complets = par_jour
+    def moyenne(js):
+        n = len(js)
+        return (sum(complets[j][0] for j in js) / n, sum(complets[j][1] for j in js) / n) if n else None
+    tous = moyenne(list(complets))
+    connus = {j for j in complets if couleurs.get(j) in COULEURS}
+    if not connus:
+        remarques.append("Couleurs Tempo des jours mesurés inconnues : chaque couleur prend la consommation moyenne de tous les jours mesurés.")
+    nb = offre.jours_tempo or JOURS_TEMPO
+    moyennes, sans_mesure = {}, []
+    for c in COULEURS:
+        m = moyenne([j for j in connus if couleurs[j] == c])
+        if m is None:
+            m = tous
+            if connus:
+                sans_mesure.append(c)
+        moyennes[c] = m
+    if sans_mesure:
+        remarques.append(f"Aucun jour {', '.join(sans_mesure)} mesuré : consommation moyenne de tous les jours mesurés utilisée"
+                         + (" (jours rouges en hiver : coût probablement sous-estimé)." if ROUGE in sans_mesure else "."))
+    cout_an = sum(nb[c] * (moyennes[c][0] * prix[f"{c}_hp"] + moyennes[c][1] * prix[f"{c}_hc"]) for c in COULEURS)
+    gain_an = 0.0
+    if batterie is not None and not recharge_deja_active:
+        r = batterie.rendement
+        if not (0 < r <= 1) or not batterie.capacite_utile_kwh > 0:
+            remarques.append("Batterie mal décrite : recharge de nuit non estimée.")
+        else:
+            for c in COULEURS:
+                ecart = prix[f"{c}_hp"] - prix[f"{c}_hc"] / (r * r)
+                if ecart > 0:
+                    gain_an += nb[c] * min(moyennes[c][0], batterie.capacite_utile_kwh * r) * ecart
+            remarques.append("Recharge de nuit comprise, couleur par couleur : estimation haute (batterie supposée vide en début d'heures creuses).")
+    remarques.append(f"Année reconstituée : {nb[BLEU]} jours bleus, {nb[BLANC]} blancs, {nb[ROUGE]} rouges.")
+    return Evaluation(
+        offre=offre, puissance_kva=puissance_kva, jours_mesures=jours, kwh_mesures=kwh_total,
+        kwh_hc_mesures=kwh_hc, cout_energie_mesure_eur=cout,
+        cout_annuel_eur=offre.abonnement_eur_an[puissance_kva] + cout_an,
+        fiabilite=niveau, remarques=remarques, gain_recharge_nuit_eur_an=gain_an,
+    )
+
+
 def classer(
     offres: Iterable[Offre],
     soutirage: Iterable[tuple[datetime, float]],
@@ -230,12 +365,14 @@ def classer(
     aujourdhui: date | None = None,
     batterie: Batterie | None = None,
     recharge_deja_active: bool = False,
+    couleurs_tempo: dict[date, str] | None = None,
 ) -> dict[str, Any]:
     """Meilleure offre pour cette maison : offres rangées par coût annuel estimé (seul critère),
     écart avec le contrat actuel."""
     mesures = list(soutirage)
     communs = {"jours_non_ouvres": list(jours_non_ouvres), "aujourdhui": aujourdhui,
-               "batterie": batterie, "recharge_deja_active": recharge_deja_active}
+               "batterie": batterie, "recharge_deja_active": recharge_deja_active,
+               "couleurs_tempo": couleurs_tempo}
     evaluees, ecartees = [], []
     for offre in offres:
         try:
@@ -275,7 +412,7 @@ def classer(
         "fiabilite": evaluees[0].fiabilite if evaluees else (actuel.fiabilite if actuel else None),
         "limites": [
             "Recharge de nuit estimée simplement, jour par jour : le pilotage n'est pas rejoué heure par heure.",
-            "Tempo et prix dynamiques non pris en charge.",
+            "Tempo : année reconstituée par couleur ; la consommation des jours rouges n'est pas déplacée. Prix dynamiques non pris en charge.",
             "Estimation à vérifier sur la grille du fournisseur avant toute souscription.",
         ],
     }

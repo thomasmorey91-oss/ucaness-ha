@@ -171,7 +171,7 @@
       "fields": {
         "offres": {
           "name": "Offres",
-          "description": "Liste d'offres ; chaque offre donne : nom, fournisseur, formule (base ou hphc), abonnement_eur_an (€ TTC par puissance en kVA), prix_kwh (base, ou hp et hc, en € TTC), plages_hc (liste de début et fin), weekend_hc, source, date_prix."
+          "description": "Liste d'offres ; chaque offre donne : nom, fournisseur, formule (base ou hphc), abonnement_eur_an (€ TTC par puissance en kVA), prix_kwh (base, ou hp et hc, en € TTC), plages_hc (liste de début et fin), weekend_hc, source, date_prix ; Tempo : formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo facultatif."
         },
         "contrat_actuel": {
           "name": "Contrat actuel",
@@ -208,6 +208,10 @@
         "recharge_deja_active": {
           "name": "Recharge de nuit déjà en service",
           "description": "À activer si la maison recharge déjà la batterie en heures creuses : le soutirage mesuré en tient déjà compte."
+        },
+        "couleurs_tempo": {
+          "name": "Couleurs Tempo",
+          "description": "Couleur de chaque jour Tempo mesuré (de 6h à 6h) : date puis bleu, blanc ou rouge. Sans elle, chaque couleur prend la consommation d'un jour moyen."
         }
       }
     }
