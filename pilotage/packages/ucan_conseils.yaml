@@ -24,7 +24,8 @@
 #     renseigner « Ucan : puissance du lave-linge » et « Ucan : énergie du lave-linge » (identifiants
 #     des capteurs, en W et en kWh cumulés). Vides : conseil inactif.
 #   - « veilles » : le talon de nuit (plus petite puissance moyenne horaire de la maison entre 2h et
-#     5h) a monté d'au moins 20 % et 30 W sur les 7 dernières nuits par rapport aux 7 d'avant, ou
+#     5h ; le plus bas des 7 nuits, pour écarter le chauffage d'une nuit froide) a monté d'au moins
+#     20 % et 30 W sur les 7 dernières nuits par rapport aux 7 d'avant, ou
 #     dépasse « Ucan : talon de nuit au-delà duquel conseiller » (0 = désactivé) de 30 W.
 #     Gain : l'écart × 8 760 h × prix moyen HP/HC, par an.
 # Entités lues : sensor.jarvis_gain_reel_du_jour (jarvis_batterie.yaml), input_number.jarvis_prix_hp
@@ -222,11 +223,13 @@ template:
             {% set recentes = dates[-7:] %}
             {% set anciennes = dates[:-7][-7:] %}
             {% if recentes | count >= 5 %}
-              {% set ns2 = namespace(r=0, a=0) %}
-              {% for d in recentes %}{% set ns2.r = ns2.r + talons[d] %}{% endfor %}
-              {% for d in anciennes %}{% set ns2.a = ns2.a + talons[d] %}{% endfor %}
-              {% set rec = ns2.r / recentes | count %}
-              {% set anc = (ns2.a / anciennes | count) if anciennes | count >= 5 else none %}
+              {# Le plus bas des 7 talons : une veille est là toutes les nuits, le chauffage d'une nuit
+                 froide ou un appareil lancé une nuit ne comptent pas. #}
+              {% set ns2 = namespace(r=[], a=[]) %}
+              {% for d in recentes %}{% set ns2.r = ns2.r + [talons[d]] %}{% endfor %}
+              {% for d in anciennes %}{% set ns2.a = ns2.a + [talons[d]] %}{% endfor %}
+              {% set rec = ns2.r | min %}
+              {% set anc = (ns2.a | min) if anciennes | count >= 5 else none %}
               {% set seuil = states('input_number.ucan_talon_seuil') | float(0) %}
               {% set ref = anc if (anc is number and rec >= 1.2 * anc and rec - anc >= 30) else (seuil if (seuil > 0 and rec - seuil >= 30) else none) %}
               {% if ref is number %}

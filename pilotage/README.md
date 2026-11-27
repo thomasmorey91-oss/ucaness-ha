@@ -96,7 +96,7 @@ Les listes de prix et de plans sont longues : pour alléger la base de données,
 |---|---|---|
 | Machines | La veille, un jour ouvré, achats en heures pleines au-dessus de « Ucan : achats en heures pleines à partir desquels conseiller » (3 kWh si 0) | Ces kWh au prix des heures creuses (borne haute) |
 | Lavage | La veille, un cycle du lave-linge a pris au moins 1,5 fois l'énergie d'un cycle ordinaire de la maison (médiane des cycles précédents, 5 au moins) et 0,4 kWh de plus | L'écart au prix des heures pleines, par cycle |
-| Veilles | Talon de nuit (plus petite puissance moyenne horaire de la maison entre 2h et 5h) des 7 dernières nuits supérieur d'au moins 20 % et 30 W à celui des 7 d'avant, ou à « Ucan : talon de nuit au-delà duquel conseiller » (désactivé si 0) | L'écart sur une année, au prix moyen HP/HC |
+| Veilles | Talon de nuit (plus petite puissance moyenne horaire de la maison entre 2h et 5h ; le plus bas des 7 nuits) des 7 dernières nuits supérieur d'au moins 20 % et 30 W à celui des 7 d'avant, ou à « Ucan : talon de nuit au-delà duquel conseiller » (désactivé si 0) | L'écart sur une année, au prix moyen HP/HC |
 
 Un conseil n'est proposé que si son gain atteint « Ucan : gain minimal d'un conseil » (0,20 € si 0). Le conseil « lavage » demande une prise mesurée : indiquer les identifiants de ses capteurs dans « Ucan : puissance du lave-linge » (W) et « Ucan : énergie du lave-linge » (kWh cumulés). Chaque cycle (début au-dessus de 20 W, fin après 10 min sous 20 W) est noté dans « Ucan cycles du lave-linge ».
 

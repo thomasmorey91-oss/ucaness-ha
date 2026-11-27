@@ -174,6 +174,7 @@ async def test_lavage_ordinaire_ou_trop_peu_de_cycles(hass, freezer):
     ([140] * 7, [120] * 7, 0, "aucun"),            # +20 W seulement
     ([180] * 7, [], 0, "aucun"),                   # pas de nuits de référence
     ([180] * 7, [], 120, "veilles"),               # seuil fixé
+    ([180] * 6 + [130], [120] * 7, 0, "aucun"),    # une nuit basse : pas de veille permanente
 ])
 async def test_veilles(hass, freezer, recentes, anciennes, seuil, attendu):
     await _maison(hass, freezer, hp=1.0, stats=talons(recentes, anciennes))
