@@ -319,6 +319,15 @@ async def test_textes_traduits_en_anglais(hass, fake_client, fast_readback):
     assert erreur.value.translation_placeholders["reglage"] == "Battery: capacity"
 
 
+async def test_textes_traduits_en_chinois(hass, fake_client, fast_readback):
+    """Home Assistant en chinois simplifié : noms en chinois, identifiants tirés de l'anglais."""
+    hass.config.language = "zh-Hans"
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=False)
+    assert hass.states.get("sensor.uhome_soc").attributes["friendly_name"].endswith("电池电量（SOC）")
+    assert hass.states.get("sensor.maison_test_on_grid_dod_setting") is not None
+    assert hass.states.get("select.ucaness_type_tarif") is not None
+
+
 async def test_backup_mode_is_not_offered(hass, fake_client, fast_readback):
     await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
     with pytest.raises(Exception):
