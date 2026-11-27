@@ -113,6 +113,22 @@ def test_generateur_maison_exemple():
     assert pos["inverter"]["y"] > pos["solar"]["y"] and pos["battery"]["y"] > pos["inverter"]["y"]
 
 
+def test_generateur_style_soir():
+    """Style « soir » : même maison, mêmes panneaux, reflets et lumières en plus ; le style par défaut ne change pas."""
+    gen = load_generator()
+    import json
+    desc = json.loads((DASH_DIR / "tools" / "maison-exemple-soir.json").read_text(encoding="utf-8"))
+    cv = gen.render(desc)
+    svg, _ = cv.svg()
+    ET.fromstring(svg)
+    assert len(cv.panels) == 12
+    for attendu in ('id="uc-wet"', 'id="uc-spill"', 'filter="url(#uc-lueur)"', 'filter="url(#uc-flou2)"', "#22E0F0"):
+        assert attendu in svg, attendu
+    assert (DASH_DIR / "www" / "ucaness" / "maison-exemple-soir.svg").read_text(encoding="utf-8") == svg, "relancer tools/maison_iso.py sur maison-exemple-soir.json"
+    clair, _ = gen.render(json.loads(EXAMPLE_JSON.read_text(encoding="utf-8"))).svg()
+    assert "uc-wet" not in clair and gen.render(desc, "").svg()[0].count("uc-flou") == 0
+
+
 def test_svg_exemple_a_jour():
     gen = load_generator()
     import json

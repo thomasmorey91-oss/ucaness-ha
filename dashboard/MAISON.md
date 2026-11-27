@@ -29,6 +29,8 @@ python maison_iso.py ma-maison.json ma-maison.svg
 
 Le script affiche ensuite les positions conseillées des boules, à recopier dans la carte (§ 3).
 
+**Style « soir » (0.8.0).** `python maison_iso.py ma-maison.json ma-maison.svg --style soir` (ou `"style": "soir"` dans la description) dessine la même maison à la tombée du jour : murs sombres, fenêtres éclairées (`eclairee: true`) qui jettent leur lumière sur le sol, sol mouillé où se reflètent les façades, liseré lumineux cyan au pied des murs, bassin éclairé, pylône en treillis. Deux ajouts facultatifs dans la description : `"lampes": [[x, y], …]` pour des lampes de jardin, et `"sapin"` en quatrième valeur d'un arbre (`[x, y, rayon, "sapin"]`) pour un conifère. Exemple : `tools/maison-exemple-soir.json`, à voir avec la scène vivante dans `tests/scene.html?vivant=1&maison=soir&ambiance=nuit`.
+
 Repère : l'axe X va vers la façade visible à **droite**, l'axe Y vers la façade visible à **gauche**, Z vers le haut. Les volumes sont dessinés dans l'ordre de la liste, du fond vers l'avant et du bas vers le haut (un étage se décrit comme un volume posé sur le rez-de-chaussée, avec `z: [3, 6]` par exemple).
 
 | Clé | Contenu |

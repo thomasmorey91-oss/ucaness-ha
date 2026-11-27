@@ -1,0 +1,200 @@
+{
+  "_commentaire": "Même maison d'exemple, à la tombée du jour (style « soir ») : fenêtres éclairées, lampes de jardin, sapins.",
+  "echelle": 15,
+  "sol": {
+    "x": [
+      -6,
+      24
+    ],
+    "y": [
+      -3,
+      18
+    ]
+  },
+  "piscine": {
+    "x": [
+      -3.5,
+      4.5
+    ],
+    "y": [
+      12.5,
+      15.5
+    ]
+  },
+  "arbres": [
+    [
+      -5,
+      1,
+      1.9,
+      "sapin"
+    ],
+    [
+      -4.6,
+      6,
+      2.1
+    ],
+    [
+      -2,
+      -1.8,
+      1.7,
+      "sapin"
+    ],
+    [
+      -5.2,
+      10.5,
+      1.6,
+      "sapin"
+    ]
+  ],
+  "volumes": [
+    {
+      "nom": "maison",
+      "x": [
+        0,
+        12
+      ],
+      "y": [
+        0,
+        9
+      ],
+      "z": [
+        0,
+        5.8
+      ],
+      "toit": {
+        "type": "4pans",
+        "hauteur": 2.2,
+        "debord": 0.4
+      },
+      "fenetres": [
+        {
+          "face": "gauche",
+          "de": 1.0,
+          "a": 4.6,
+          "bas": 0.0,
+          "haut": 2.3,
+          "eclairee": true
+        },
+        {
+          "face": "gauche",
+          "de": 6.0,
+          "a": 7.2,
+          "bas": 0.0,
+          "haut": 2.2,
+          "eclairee": true
+        },
+        {
+          "face": "gauche",
+          "de": 8.6,
+          "a": 10.6,
+          "bas": 0.9,
+          "haut": 2.2,
+          "eclairee": false
+        },
+        {
+          "face": "gauche",
+          "de": 1.2,
+          "a": 3.0,
+          "bas": 3.4,
+          "haut": 4.8,
+          "eclairee": false
+        },
+        {
+          "face": "gauche",
+          "de": 5.4,
+          "a": 7.2,
+          "bas": 3.4,
+          "haut": 4.8,
+          "eclairee": true
+        },
+        {
+          "face": "gauche",
+          "de": 8.8,
+          "a": 10.6,
+          "bas": 3.4,
+          "haut": 4.8,
+          "eclairee": true
+        },
+        {
+          "face": "droite",
+          "de": 1.6,
+          "a": 3.2,
+          "bas": 3.4,
+          "haut": 4.8,
+          "eclairee": true
+        }
+      ],
+      "panneaux": [
+        {
+          "pan": "gauche",
+          "colonnes": 6,
+          "rangees": 2
+        }
+      ]
+    },
+    {
+      "nom": "garage",
+      "x": [
+        12,
+        17
+      ],
+      "y": [
+        3,
+        9
+      ],
+      "z": [
+        0,
+        3.0
+      ],
+      "toit": {
+        "type": "plat",
+        "acrotere": 0.25
+      },
+      "portes_garage": [
+        {
+          "face": "droite",
+          "de": 0.8,
+          "a": 5.2,
+          "haut": 2.4
+        }
+      ],
+      "fenetres": [
+        {
+          "face": "gauche",
+          "de": 1.6,
+          "a": 3.4,
+          "bas": 1.2,
+          "haut": 2.3,
+          "eclairee": true
+        }
+      ]
+    }
+  ],
+  "poteau": [
+    21,
+    1
+  ],
+  "style": "soir",
+  "lampes": [
+    [
+      -1,
+      11
+    ],
+    [
+      6,
+      11.5
+    ],
+    [
+      13,
+      11
+    ],
+    [
+      19,
+      7
+    ],
+    [
+      19,
+      12
+    ]
+  ]
+}

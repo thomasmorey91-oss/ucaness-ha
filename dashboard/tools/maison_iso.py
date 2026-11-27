@@ -2,7 +2,11 @@
 """Dessine une maison en perspective isométrique (SVG) dans le style du tableau de bord UCANESS.
 
 Usage :
-    python maison_iso.py description.json maison.svg
+    python maison_iso.py description.json maison.svg [--style soir]
+
+Style « soir » (ou "style": "soir" dans la description) : murs sombres, fenêtres chaudes qui éclairent le sol,
+sol mouillé avec reflets, liserés lumineux, bassin éclairé, pylône en treillis ; "lampes": [[x, y], ...] pour des
+lampes de jardin, et ["sapin"] en 4e valeur d'un arbre pour un conifère.
 
 La description (JSON) liste des volumes posés sur une grille en mètres :
   - axe X : vers la façade visible à DROITE,
@@ -43,15 +47,42 @@ DEFS = """<defs>
 </defs>"""
 
 
+# Style « soir » (0.8.0) : murs anthracite, fenêtres chaudes qui éclairent le sol, sol mouillé avec reflets,
+# liserés lumineux cyan, bassin éclairé, lampes de jardin. Mêmes identifiants de dégradés, autres couleurs.
+SOIR = {
+    "#7A869F": "#565F78", "#58637D": "#2C3348",      # mur de face
+    "#525D78": "#3A4258", "#3B4560": "#1C2233",      # mur de côté
+    "#4A546C": "#2E3548", "#363F56": "#1B2030",      # toit, pan de face
+    "#3A4359": "#262C3E", "#262E42": "#141826",      # toit, pan de côté
+    "#2C3449": "#1A1F2E", "#3A4459": "#262C3D",      # toit, pan arrière
+    "#F3D48F": "#FFF3C4", "#C08A3E": "#FFB03A",      # vitre éclairée
+    "#36598E": "#27508C", "#121F3E": "#060D1E",      # vitre éteinte
+    "#5FD0F2": "#8AF6FF", "#1E74B6": "#0AA3C8",      # eau
+    "#3C5F6E": "#2F6B5A", "#1B2E3E": "#0B1F22",      # arbre
+}
+DEFS_SOIR = """<linearGradient id="uc-wet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16294D"/><stop offset=".55" stop-color="#0A1630"/><stop offset="1" stop-color="#050C1C" stop-opacity=".2"/></linearGradient>
+<linearGradient id="uc-spill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFC25A" stop-opacity=".55"/><stop offset="1" stop-color="#FFC25A" stop-opacity="0"/></linearGradient>
+<radialGradient id="uc-halo"><stop offset="0" stop-color="#FFE2A0" stop-opacity=".9"/><stop offset=".35" stop-color="#FFB84A" stop-opacity=".35"/><stop offset="1" stop-color="#FFB84A" stop-opacity="0"/></radialGradient>
+<filter id="uc-flou" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.2"/></filter>
+<filter id="uc-flou2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6"/></filter>
+<filter id="uc-lueur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>"""
+
+
 @dataclass
 class Canvas:
     scale: float = 15.0
     shapes: list = field(default_factory=list)
     pts: list = field(default_factory=list)
     panels: list = field(default_factory=list)   # centres des panneaux (coordonnées écran)
+    style: str = ""
+    kz: float = 1.0                              # −0,55 pendant le dessin des reflets (hauteurs retournées et tassées)
 
     def P(self, x, y, z):
-        return ((x - y) * C30 * self.scale, (x + y) * 0.5 * self.scale - z * self.scale)
+        return ((x - y) * C30 * self.scale, (x + y) * 0.5 * self.scale - z * self.kz * self.scale)
+
+    def raw(self, svg):
+        self.shapes.append(svg)
 
     def poly(self, pts3, fill, stroke="#9AA6BE", sw=0.6, so=0.35, op=None):
         pts = [self.P(*p) for p in pts3]
@@ -77,8 +108,13 @@ class Canvas:
         maxy = max(p[1] for p in self.pts) + 6
         w, h = maxx - minx, maxy - miny
         body = "".join(self.shapes)
+        defs = DEFS
+        if self.style == "soir":
+            for avant, apres in SOIR.items():
+                defs = defs.replace(avant, apres)
+            defs = defs.replace("</defs>", DEFS_SOIR)
         svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{minx:.0f} {miny:.0f} {w:.0f} {h:.0f}" '
-               f'width="{w:.0f}" height="{h:.0f}">{DEFS}{body}</svg>')
+               f'width="{w:.0f}" height="{h:.0f}">{defs}{body}</svg>')
         return svg, (minx, miny, w, h)
 
 
@@ -294,32 +330,157 @@ def draw_pergola(cv, pg):
             pv(cv, (xa, y0, zt + .3), (xa + pw * .96, y0, zt + .3), (xa + pw * .96, y1 - .2, zt + .05), (xa, y1 - .2, zt + .05))
 
 
-def render(desc: dict):
-    cv = Canvas(scale=desc.get("echelle", 15.0))
+def _fenetres_eclairees(desc):
+    for vol in desc.get("volumes", []):
+        if vol.get("pergola"):
+            continue
+        for f in vol.get("fenetres", []):
+            if f.get("eclairee"):
+                yield vol, f
+
+
+def _soir_avant(cv, desc, sol):
+    """Sous la maison : sol mouillé, dallage, reflets des façades, lumière des fenêtres au sol."""
+    (sx0, sx1), (sy0, sy1) = sol["x"], sol["y"]
+    cv.poly([(sx0, sy0, 0), (sx1, sy0, 0), (sx1, sy1, 0), (sx0, sy1, 0)], "url(#uc-wet)", stroke="#22E0F0", sw=0.8, so=.35)
+    pas = 3.0
+    x = math.ceil(sx0 / pas) * pas
+    while x < sx1:
+        cv.line((x, sy0, 0), (x, sy1, 0), "#3B6EA8", 0.5, .16)
+        x += pas
+    y = math.ceil(sy0 / pas) * pas
+    while y < sy1:
+        cv.line((sx0, y, 0), (sx1, y, 0), "#3B6EA8", 0.5, .16)
+        y += pas
+    # Reflets : les façades redessinées tête en bas, tassées, floues et à demi effacées.
+    cv.raw('<g opacity=".34" filter="url(#uc-flou2)">')
+    cv.kz = -0.55
+    for vol in desc.get("volumes", []):
+        if not vol.get("pergola"):
+            draw_walls(cv, vol)
+    cv.kz = 1.0
+    cv.raw("</g>")
+    # Lumière des fenêtres éclairées sur le sol, devant la façade.
+    cv.raw('<g filter="url(#uc-flou)" style="mix-blend-mode: screen">')
+    for vol, f in _fenetres_eclairees(desc):
+        x0, x1 = vol["x"]
+        y0, y1 = vol["y"]
+        portee = 1.6 + 1.1 * (f["haut"] - f["bas"]) + 0.5 * f["bas"]
+        if f["face"] == "gauche":
+            cv.poly([(x0 + f["de"], y1, 0), (x0 + f["a"], y1, 0), (x0 + f["a"] + .7, y1 + portee, 0), (x0 + f["de"] - .7, y1 + portee, 0)], "url(#uc-spill)", so=0)
+        else:
+            cv.poly([(x1, y0 + f["de"], 0), (x1, y0 + f["a"], 0), (x1 + portee, y0 + f["a"] + .7, 0), (x1 + portee, y0 + f["de"] - .7, 0)], "url(#uc-spill)", so=0)
+    cv.raw("</g>")
+
+
+def _soir_apres(cv, desc):
+    """Par-dessus la maison : halo des fenêtres, liserés lumineux des façades, lampes de jardin."""
+    cv.raw('<g filter="url(#uc-flou)" style="mix-blend-mode: screen" opacity=".85">')
+    for vol, f in _fenetres_eclairees(desc):
+        face_rect(cv, vol, f["face"], f["de"], f["a"], f["bas"], f["haut"], "#FFC25A", eps=.06, so=0)
+    cv.raw("</g>")
+    cv.raw('<g filter="url(#uc-lueur)">')
+    for x, y in desc.get("lampes", []):
+        cv.line((x, y, 0), (x, y, .9), "#C9D1E0", 1.6, .9)
+        cv.line((x, y, .9), (x, y, 1.15), "#FFE9B0", 2.6, 1)
+    cv.raw("</g>")
+    for x, y in desc.get("lampes", []):
+        cx, cy = cv.P(x, y, 0.3)
+        r = 2.2 * cv.scale
+        cv.raw(f'<ellipse cx="{cx:.1f}" cy="{cy:.1f}" rx="{r:.1f}" ry="{r * .55:.1f}" fill="url(#uc-halo)" style="mix-blend-mode: screen"></ellipse>')
+
+
+def _lisere(cv, vol):
+    """Liseré lumineux au pied des deux façades visibles et sur l'arête entre elles. Dessiné juste après son
+    volume : un volume placé devant le recouvre."""
+    x0, x1 = vol["x"]
+    y0, y1 = vol["y"]
+    z0, z1 = vol["z"]
+    if z0 > 0:                        # un étage posé sur un autre volume : pas de liseré au pied
+        return
+    e = .06
+    cv.raw('<g filter="url(#uc-lueur)">')
+    cv.line((x0, y1 + e, .05), (x1 + e, y1 + e, .05), "#22E0F0", 1.3, .95)
+    cv.line((x1 + e, y0, .05), (x1 + e, y1 + e, .05), "#22E0F0", 1.3, .95)
+    cv.line((x1 + e, y1 + e, .05), (x1 + e, y1 + e, z1), "#22E0F0", 1.0, .7)
+    cv.raw("</g>")
+
+
+def _sapin(cv, x, y, r):
+    cv.line((x, y, 0), (x, y, 1.0), "#2A2F3A", 2.4, .95)
+    for k, (base, haut, larg) in enumerate(((0.8, 3.0, 1.0), (2.2, 4.4, .78), (3.6, 5.8, .52))):
+        (gx, gy), (dx, dy), (tx, ty) = cv.P(x - r * larg * .7, y + r * larg * .7, base), cv.P(x + r * larg * .7, y - r * larg * .7, base), cv.P(x, y, haut)
+        cv.pts.extend([(gx, gy), (dx, dy), (tx, ty)])
+        cv.raw(f'<polygon points="{gx:.1f},{gy:.1f} {dx:.1f},{dy:.1f} {tx:.1f},{ty:.1f}" fill="url(#uc-tree)" stroke="#4FA08A" stroke-width=".6" stroke-opacity=".5"></polygon>')
+
+
+def _pylone(cv, x, y):
+    """Pylône en treillis : deux montants qui se resserrent, croisillons, deux bras."""
+    h, b, t = 9.4, .95, .22
+    n = 6
+    niveaux = [(h * k / n, b + (t - b) * k / n) for k in range(n + 1)]
+    for (za, la), (zb, lb) in zip(niveaux, niveaux[1:]):
+        cv.line((x - la, y, za), (x - lb, y, zb), "#AEB9CC", 1.5, .95)
+        cv.line((x + la, y, za), (x + lb, y, zb), "#AEB9CC", 1.5, .95)
+        cv.line((x - la, y, za), (x + lb, y, zb), "#8794AC", .8, .8)
+        cv.line((x + la, y, za), (x - lb, y, zb), "#8794AC", .8, .8)
+        cv.line((x - lb, y, zb), (x + lb, y, zb), "#8794AC", .8, .8)
+    for z, l in ((7.6, 1.5), (8.7, 1.1)):
+        cv.line((x - l, y, z), (x + l, y, z), "#AEB9CC", 1.5, .95)
+        for sx in (-l, l):
+            cv.line((x + sx, y, z), (x + sx, y, z - .35), "#7FD3FF", 1.4, .9)
+
+
+def render(desc: dict, style: str | None = None):
+    style = style if style is not None else desc.get("style", "")
+    soir = style == "soir"
+    cv = Canvas(scale=desc.get("echelle", 15.0), style=style)
     sol = desc.get("sol", {"x": [-6, 24], "y": [-3, 20]})
     (sx0, sx1), (sy0, sy1) = sol["x"], sol["y"]
-    cv.poly([(sx0, sy0, 0), (sx1, sy0, 0), (sx1, sy1, 0), (sx0, sy1, 0)], "url(#uc-ground)", stroke="#2A5C9A", so=.25)
+    if soir:
+        _soir_avant(cv, desc, sol)
+    else:
+        cv.poly([(sx0, sy0, 0), (sx1, sy0, 0), (sx1, sy1, 0), (sx0, sy1, 0)], "url(#uc-ground)", stroke="#2A5C9A", so=.25)
     pool = desc.get("piscine")
     if pool:
         (px0, px1), (py0, py1) = pool["x"], pool["y"]
-        cv.poly([(px0 - .5, py0 - .5, .02), (px1 + .5, py0 - .5, .02), (px1 + .5, py1 + .5, .02), (px0 - .5, py1 + .5, .02)], "#B7C2D6", stroke="#D6DDEA", so=.5)
+        cv.poly([(px0 - .5, py0 - .5, .02), (px1 + .5, py0 - .5, .02), (px1 + .5, py1 + .5, .02), (px0 - .5, py1 + .5, .02)], "#7C8AA6" if soir else "#B7C2D6", stroke="#D6DDEA", so=.5)
+        if soir:
+            cv.raw('<g filter="url(#uc-lueur)">')
         cv.poly([(px0, py0, .03), (px1, py0, .03), (px1, py1, .03), (px0, py1, .03)], "url(#uc-water)", stroke="#86D8F5", so=.5)
+        if soir:
+            cv.raw("</g>")
+            for k in (1, 2, 3):   # reflets de l'eau
+                yy = py0 + (py1 - py0) * k / 4
+                cv.line((px0 + .5, yy, .04), (px1 - .5, yy + .25, .04), "#E6FDFF", .7, .45)
     for t in desc.get("arbres", []):
-        x, y, r = t
+        x, y, r = t[:3]
+        if soir and (len(t) > 3 and t[3] == "sapin"):
+            _sapin(cv, x, y, r)
+            continue
         cv.line((x, y, 0), (x, y, 1.7), "#3A4660", 2.2, .9)
         cv.circle((x, y, 3.4), r, "url(#uc-tree)")
+        if soir:   # feuillage en relief : un second volume plus clair, décalé vers la lumière
+            cv.circle((x + r * .25, y + r * .25, 3.4 + r * .3), r * .62, "url(#uc-tree)")
     for item in desc.get("volumes", []):
         if item.get("pergola"):
             draw_pergola(cv, item["pergola"])
             continue
         draw_walls(cv, item)
+        if soir:
+            _lisere(cv, item)
         draw_roof(cv, item)
     pole = desc.get("poteau")
     if pole:
         x, y = pole
-        cv.line((x, y, 0), (x, y, 8.6), "#9AA6BE", 2.2, .85)
-        cv.line((x - .8, y, 8.1), (x + .8, y, 8.1), "#9AA6BE", 1.6, .85)
-        cv.line((x - .8, y, 7.5), (x + .8, y, 7.5), "#9AA6BE", 1.2, .7)
+        if soir:
+            _pylone(cv, x, y)
+        else:
+            cv.line((x, y, 0), (x, y, 8.6), "#9AA6BE", 2.2, .85)
+            cv.line((x - .8, y, 8.1), (x + .8, y, 8.1), "#9AA6BE", 1.6, .85)
+            cv.line((x - .8, y, 7.5), (x + .8, y, 7.5), "#9AA6BE", 1.2, .7)
+    if soir:
+        _soir_apres(cv, desc)
     return cv
 
 
@@ -351,12 +512,17 @@ def suggest_positions(cv: Canvas, box, aspect=1.45, area=(0.0, 6.5, 100.0)):
 
 
 def main(argv):
+    style = None
+    if "--style" in argv:
+        i = argv.index("--style")
+        style = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
     if len(argv) < 3:
         print(__doc__)
         return 2
     with open(argv[1], encoding="utf-8") as f:
         desc = json.load(f)
-    cv = render(desc)
+    cv = render(desc, style)
     svg, box = cv.svg()
     with open(argv[2], "w", encoding="utf-8") as f:
         f.write(svg)

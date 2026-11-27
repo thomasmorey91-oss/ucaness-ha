@@ -70,7 +70,7 @@
   });
   // Vue 3D de la maison d'exemple : mêmes positions que dashboards/ucaness-home-assistant.yaml.
   window.scene = {
-    type: 'custom:ucaness-flow-card', scene: '3d', image: '../www/ucaness/maison-exemple.svg',
+    type: 'custom:ucaness-flow-card', scene: '3d', image: new URLSearchParams(location.search).get('maison') === 'soir' ? '../www/ucaness/maison-exemple-soir.svg' : '../www/ucaness/maison-exemple.svg',
     vivant: new URLSearchParams(location.search).get('vivant') === '1', calibration: new URLSearchParams(location.search).get('cal') === '1',
     ucan: { x: 1.5, y: 22, w: 6 }, lights: [[[31.6, 40.5], [38.6, 46.5], [38.6, 56], [31.6, 49.5]], [[40, 39.5], [43.6, 42.5], [43.6, 47.5], [40, 44.5]]],
     mode_entity: 'sensor.uhome_mode', battery_path: '/batterie',
