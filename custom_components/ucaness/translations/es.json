@@ -43,7 +43,7 @@
       },
       "vehicule_marque": {
         "title": "Su vehículo: marca",
-        "description": "Elija la marca de su coche eléctrico. Datos del catálogo libre OpenEV Data: compruebe los valores propuestos en el paso siguiente.",
+        "description": "Los modelos marcados con ★ son los más vendidos en su país ({source}). Si no, elija la marca. Datos del catálogo libre OpenEV Data: compruebe los valores propuestos en el paso siguiente.",
         "data": {
           "marque": "Marca"
         }
@@ -347,8 +347,10 @@
     "gabarit": {
       "options": {
         "citadine": "Urbano",
+        "compacte": "Compacto",
         "berline": "Berlina",
         "suv": "SUV",
+        "grand_suv": "SUV grande",
         "utilitaire": "Furgoneta"
       }
     },

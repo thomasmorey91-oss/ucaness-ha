@@ -483,6 +483,30 @@ async def test_vehicule_choisi_dans_le_catalogue_puis_plan_a_blanc(hass, fake_cl
     assert "vehicule" not in entry.options
 
 
+async def test_vehicule_meilleures_ventes_du_pays_en_tete(hass, fake_client):
+    hass.config.country = "FR"
+    entry = await _entry_with_options(hass)
+    init = {"scan_interval": 60, "app_key": "", "app_secret": "", "write_enabled": False, "configurer_vehicule": True}
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], init)
+    options = flow["data_schema"].schema["marque"].config["options"]
+    assert options[0] == {"value": "top:0", "label": "★ Tesla Model Y"} and len([o for o in options if o["value"].startswith("top:")]) == 10
+    assert "Avere-France" in flow["description_placeholders"]["source"]
+    # Modèle du catalogue : seules ses versions sont proposées.
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"marque": "top:0"})
+    assert flow["step_id"] == "vehicule_modele"
+    assert all(o["label"].startswith("Model Y") for o in flow["data_schema"].schema["modele"].config["options"])
+    hass.config_entries.options.async_abort(flow["flow_id"])
+    # Modèle récent absent du catalogue : on passe directement aux caractéristiques, nom et silhouette proposés.
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], init)
+    twingo = next(o["value"] for o in flow["data_schema"].schema["marque"].config["options"] if "Twingo" in o["label"])
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"marque": twingo})
+    assert flow["step_id"] == "vehicule_details"
+    defauts = {str(k): k.default() for k in flow["data_schema"].schema if hasattr(k, "default") and callable(k.default)}
+    assert defauts["nom"] == "Renault Twingo E-Tech" and defauts["gabarit"] == "citadine"
+
+
 async def test_mode_confirmed_by_inverter_state_when_cloud_does_not_store_it(hass, fake_client, fast_readback):
     await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
     client = FakeClient.instances[-1]

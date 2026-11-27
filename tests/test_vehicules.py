@@ -49,6 +49,22 @@ def test_marques_et_modeles():
     assert str(une[0].annee) in une[0].libelle
 
 
+@pytest.mark.parametrize("pays", ["FR", "DE", "IT", "ES", "PT"])
+def test_meilleures_ventes_par_pays(pays):
+    cat = v.charger_catalogue()
+    ventes = v.meilleures_ventes(cat, pays)
+    assert len(ventes) == 10
+    assert all(m.gabarit in v.GABARITS for m in ventes)
+    # Un modèle annoncé dans le catalogue doit y être trouvé (sinon la fiche a changé de nom).
+    meta = json.loads(v.MEILLEURES_VENTES.read_text(encoding="utf-8"))["pays"][pays]["modeles"]
+    assert [m["nom"] for m in meta if m["marque"] and not next(x for x in ventes if x.nom == m["nom"]).versions] == []
+    assert v.source_ventes(pays)
+
+
+def test_meilleures_ventes_autre_pays():
+    assert v.meilleures_ventes(v.charger_catalogue(), "US") == [] and v.source_ventes(None) is None
+
+
 # ------------------------------------------------------------------ énergie
 
 

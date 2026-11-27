@@ -43,7 +43,7 @@
       },
       "vehicule_marque": {
         "title": "您的车辆：品牌",
-        "description": "选择您的电动汽车品牌。数据来自开放目录 OpenEV Data：请在下一步核对建议值。",
+        "description": "标有 ★ 的车型是您所在国家最畅销的车型（{source}）。否则请选择品牌。数据来自开放目录 OpenEV Data：请在下一步核对建议值。",
         "data": {
           "marque": "品牌"
         }
@@ -347,8 +347,10 @@
     "gabarit": {
       "options": {
         "citadine": "小型车",
+        "compacte": "紧凑型车",
         "berline": "轿车",
         "suv": "SUV",
+        "grand_suv": "大型 SUV",
         "utilitaire": "厢式车"
       }
     },

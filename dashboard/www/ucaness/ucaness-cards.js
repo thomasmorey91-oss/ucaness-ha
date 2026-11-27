@@ -225,7 +225,8 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_envoi": "Enregistrement…",
   "veh_erreur": "Échec : {e}",
   "carte_vehicle_nom": "UCANESS : véhicule",
-  "carte_vehicle_desc": "Votre voiture électrique, sa charge et le plan de recharge."
+  "carte_vehicle_desc": "Votre voiture électrique, sa charge et le plan de recharge.",
+  "veh_photo_ajouter": "Ajouter la photo de ma voiture"
  },
  "en": {
   "meteo": "Weather: {etat}",
@@ -399,7 +400,8 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_envoi": "Saving…",
   "veh_erreur": "Failed: {e}",
   "carte_vehicle_nom": "UCANESS: vehicle",
-  "carte_vehicle_desc": "Your electric car, its charge and the charging plan."
+  "carte_vehicle_desc": "Your electric car, its charge and the charging plan.",
+  "veh_photo_ajouter": "Add a photo of my car"
  },
  "zh-Hans": {
   "meteo": "天气：{etat}",
@@ -573,7 +575,8 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_envoi": "正在保存…",
   "veh_erreur": "失败：{e}",
   "carte_vehicle_nom": "UCANESS：车辆",
-  "carte_vehicle_desc": "您的电动汽车、电量和充电计划。"
+  "carte_vehicle_desc": "您的电动汽车、电量和充电计划。",
+  "veh_photo_ajouter": "添加我的汽车照片"
  },
  "de": {
   "meteo": "Wetter: {etat}",
@@ -747,7 +750,8 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_envoi": "Wird gespeichert…",
   "veh_erreur": "Fehlgeschlagen: {e}",
   "carte_vehicle_nom": "UCANESS: Fahrzeug",
-  "carte_vehicle_desc": "Ihr Elektroauto, sein Ladestand und der Ladeplan."
+  "carte_vehicle_desc": "Ihr Elektroauto, sein Ladestand und der Ladeplan.",
+  "veh_photo_ajouter": "Foto meines Autos hinzufügen"
  },
  "it": {
   "meteo": "Meteo: {etat}",
@@ -921,7 +925,8 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_envoi": "Salvataggio…",
   "veh_erreur": "Errore: {e}",
   "carte_vehicle_nom": "UCANESS: veicolo",
-  "carte_vehicle_desc": "La tua auto elettrica, la sua carica e il piano di ricarica."
+  "carte_vehicle_desc": "La tua auto elettrica, la sua carica e il piano di ricarica.",
+  "veh_photo_ajouter": "Aggiungi la foto della mia auto"
  },
  "es": {
   "meteo": "Tiempo: {etat}",
@@ -1095,7 +1100,8 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_envoi": "Guardando…",
   "veh_erreur": "Error: {e}",
   "carte_vehicle_nom": "UCANESS: vehículo",
-  "carte_vehicle_desc": "Su coche eléctrico, su carga y el plan de carga."
+  "carte_vehicle_desc": "Su coche eléctrico, su carga y el plan de carga.",
+  "veh_photo_ajouter": "Añadir la foto de mi coche"
  },
  "pt": {
   "meteo": "Meteorologia: {etat}",
@@ -1269,7 +1275,8 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_envoi": "A guardar…",
   "veh_erreur": "Falha: {e}",
   "carte_vehicle_nom": "UCANESS: veículo",
-  "carte_vehicle_desc": "O seu carro elétrico, a sua carga e o plano de carregamento."
+  "carte_vehicle_desc": "O seu carro elétrico, a sua carga e o plano de carregamento.",
+  "veh_photo_ajouter": "Adicionar a foto do meu carro"
  }
 }/* I18N-FIN */;
 let UC_LANG_VUE = null;   // dernière langue vue, pour les appels sans hass (configuration, sélecteur de cartes)
@@ -3912,7 +3919,7 @@ class UcanessUcanCard extends HTMLElement {
 
 /*
  * custom:ucaness-vehicle-card : la voiture de la maison (Options UCANESS > « Configurer votre véhicule »).
- * Silhouette dessinée (citadine, berline, SUV, utilitaire) à la couleur choisie, ou photo de la voiture
+ * Silhouette dessinée (citadine, compacte, berline, SUV, grand SUV, utilitaire) à la couleur choisie, ou photo de la voiture
  * détourée dans ce navigateur ; état de charge et objectif ; plan de recharge (calcul seul, rien n'est
  * envoyé à la borne).
  * Options : entity (sensor.ucaness_vehicule), charger_entity (état de la borne, facultatif), title.
@@ -3923,15 +3930,54 @@ class UcanessUcanCard extends HTMLElement {
  * automatiquement ; sinon, détourage simple d'un fond uni, avec une tolérance réglable.
  */
 
+/* Gabarits dessinés de profil, avant à gauche, sol à y = 140 (viewBox 400 × 160).
+ * body : carrosserie avec les passages de roue ; glass : vitres ; door : lignes d'ouvrants ;
+ * wheels : centres x, r : rayon du pneu, wy : hauteur du centre ; lights : phare avant, feu arrière. */
 const UC_GABARITS = {
-  citadine: { body: 'M30,100 L30,80 Q32,68 48,64 L92,58 Q112,34 150,30 L208,30 Q228,32 244,56 L268,64 Q288,70 290,86 L290,100 Z',
-    glass: 'M104,60 Q120,40 152,38 L204,38 Q220,40 234,58 Z', pillar: [166, 38, 22], wheels: [82, 238], r: 19, front: [34, 72], rear: [284, 70] },
-  berline: { body: 'M14,98 L14,82 Q16,72 34,68 L96,60 Q124,38 160,34 L214,34 Q240,36 258,58 L290,64 Q306,68 306,84 L306,98 Z',
-    glass: 'M108,60 Q130,42 162,40 L210,40 Q232,42 248,58 Z', pillar: [182, 40, 20], wheels: [80, 252], r: 19, front: [18, 74], rear: [300, 70] },
-  suv: { body: 'M18,100 L18,74 Q20,62 38,58 L88,52 Q104,26 136,24 L240,24 Q262,26 276,50 L292,56 Q304,62 304,78 L304,100 Z',
-    glass: 'M100,52 Q114,32 138,30 L236,30 Q254,32 266,50 Z', pillar: [184, 30, 22], wheels: [84, 250], r: 22, front: [22, 64], rear: [298, 62] },
-  utilitaire: { body: 'M14,100 L14,70 Q16,58 30,54 L56,48 Q72,18 100,16 L292,16 Q304,16 306,28 L306,100 Z',
-    glass: 'M64,48 Q78,24 100,22 L128,22 L128,48 Z', pillar: null, wheels: [76, 258], r: 20, front: [18, 62], rear: [300, 40] },
+  citadine: {
+    body: 'M48,124 L48,98 Q50,85 66,81 L124,72 Q150,44 182,40 L286,38 Q314,40 328,62 L342,82 Q350,92 350,104 L350,124 L323,124 A31,31 0 0 0 261,124 L141,124 A31,31 0 0 0 79,124 Z',
+    glass: ['M132,74 Q154,50 182,46 L236,46 L236,75 Z', 'M242,75 L242,46 L286,45 Q308,47 320,66 L324,75 Z'],
+    door: 'M128,77 L130,121 M239,47 L239,121 M330,78 L332,121',
+    handles: [[214, 84], [304, 84]], mirror: [134, 70], wheels: [110, 292], r: 25, wy: 120,
+    head: 'M52,90 Q58,84 76,82 L80,87 Q64,91 52,95 Z', tail: 'M342,78 L349,88 L349,98 L342,95 Z', sill: [141, 261, 112],
+  },
+  berline: {
+    body: 'M26,124 L26,97 Q28,86 46,82 L118,71 Q150,42 192,37 L262,37 Q302,40 324,66 L360,71 Q372,75 372,92 L372,124 L333,124 A31,31 0 0 0 271,124 L133,124 A31,31 0 0 0 71,124 Z',
+    glass: ['M128,73 Q154,49 192,44 L244,44 L244,73 Z', 'M250,73 L250,44 L262,44 Q294,47 314,70 L316,73 Z'],
+    door: 'M122,76 L124,121 M247,45 L247,121 M318,74 L322,121',
+    handles: [[222, 82], [296, 82]], mirror: [128, 68], wheels: [102, 302], r: 25, wy: 120,
+    head: 'M30,90 Q38,84 58,81 L62,86 Q44,90 30,94 Z', tail: 'M362,72 L371,78 L371,88 L360,84 Z', sill: [133, 271, 112],
+  },
+  compacte: {
+    body: 'M36,124 L36,98 Q38,86 54,82 L112,74 Q140,44 174,40 L294,38 Q322,40 338,62 L354,84 Q362,94 362,106 L362,124 L333,124 A31,31 0 0 0 271,124 L131,124 A31,31 0 0 0 69,124 Z',
+    glass: ['M122,76 Q146,50 176,46 L238,46 L238,76 Z', 'M244,76 L244,46 L294,45 Q318,47 332,68 L336,76 Z'],
+    door: 'M118,79 L120,121 M241,47 L241,121 M342,80 L344,121',
+    handles: [[220, 86], [318, 86]], mirror: [124, 72], wheels: [100, 302], r: 25, wy: 120,
+    head: 'M40,92 Q48,86 66,83 L70,88 Q52,92 40,96 Z', tail: 'M354,82 L361,92 L361,102 L354,99 Z', sill: [131, 271, 112],
+  },
+  suv: {
+    body: 'M32,124 L32,86 Q34,73 52,69 L110,62 Q134,32 168,28 L318,28 Q340,30 352,50 L362,64 Q368,72 368,88 L368,124 L332,124 A35,35 0 0 0 262,124 L140,124 A35,35 0 0 0 70,124 Z',
+    glass: ['M120,64 Q140,38 168,34 L228,34 L228,64 Z', 'M234,64 L234,34 L314,34 Q334,36 344,54 L348,64 Z'],
+    door: 'M116,67 L118,121 M231,35 L231,121 M350,66 L354,121',
+    handles: [[208, 74], [300, 74]], mirror: [122, 60], wheels: [105, 297], r: 28, wy: 120,
+    head: 'M36,80 Q44,72 66,69 L70,75 Q50,79 36,84 Z', tail: 'M360,58 L367,68 L367,80 L359,76 Z', sill: [140, 262, 110],
+    rails: 'M172,23 L314,23 M180,23 L180,28 M306,23 L306,28', cladding: true,
+  },
+  grand_suv: {
+    body: 'M18,124 L18,84 Q20,70 40,66 L100,58 Q122,26 156,22 L340,22 Q360,24 368,42 L376,60 Q382,70 382,88 L382,124 L350,124 A36,36 0 0 0 278,124 L130,124 A36,36 0 0 0 58,124 Z',
+    glass: ['M110,60 Q130,32 156,28 L216,28 L216,60 Z', 'M222,60 L222,28 L296,28 L296,60 Z', 'M302,60 L302,28 L338,28 Q356,30 364,48 L368,60 Z'],
+    door: 'M106,63 L108,121 M219,29 L219,121 M299,29 L299,112 M370,62 L374,121',
+    handles: [[200, 70], [284, 70]], mirror: [112, 56], wheels: [94, 314], r: 28, wy: 120,
+    head: 'M22,78 Q30,70 52,67 L56,73 Q36,77 22,82 Z', tail: 'M374,54 L381,64 L381,78 L373,74 Z', sill: [130, 278, 108],
+    rails: 'M160,18 L336,18 M168,18 L168,22 M328,18 L328,22', cladding: true,
+  },
+  utilitaire: {
+    body: 'M24,124 L24,89 Q26,76 44,72 L84,66 Q102,34 128,26 L362,23 Q376,23 376,36 L376,124 L346,124 A33,33 0 0 0 280,124 L125,124 A33,33 0 0 0 59,124 Z',
+    glass: ['M92,66 Q108,40 128,32 L154,31 L154,66 Z'],
+    door: 'M88,69 L90,121 M158,30 L158,121 M262,24 L262,121 M160,66 L260,66',
+    handles: [[146, 76], [250, 76]], mirror: [92, 62], wheels: [92, 313], r: 26, wy: 120,
+    head: 'M28,82 Q36,75 56,72 L60,78 Q42,82 28,86 Z', tail: 'M368,40 L375,40 L375,72 L368,72 Z', sill: [125, 280, 112],
+  },
 };
 
 /** Couleur « #rrggbb » mélangée avec du blanc (t > 0) ou du noir (t < 0). */
@@ -3942,38 +3988,58 @@ function ucMix(hex, t) {
   return '#' + c.map((v) => Math.round(v + (o - v) * k).toString(16).padStart(2, '0')).join('');
 }
 
-/** Silhouette de profil, volumes en dégradé (style de la maison en direct), avant à gauche. */
+/** Silhouette de profil en volume (dégradés, reflets, ombre portée), avant à gauche. */
 function ucCarSvg(gabarit, couleur, label) {
   const g = UC_GABARITS[gabarit] || UC_GABARITS.citadine;
   const base = /^#[0-9a-f]{6}$/i.test(couleur || '') ? couleur : '#4a90d9';
   const id = 'uccar' + Math.random().toString(36).slice(2, 8);
-  const wheel = (x) => `
-    <g transform="translate(${x} 100)">
-      <circle r="${g.r}" fill="#081426" stroke="#1D3E66" stroke-width="2"/>
-      <circle r="${(g.r * 0.55).toFixed(1)}" fill="url(#${id}r)"/>
-      <circle r="${(g.r * 0.18).toFixed(1)}" fill="#0B1B33"/>
+  const sombre = ucMix(base, -0.6);
+  const rayons = [0, 72, 144, 216, 288];
+  const roue = (x) => `
+    <g transform="translate(${x} ${g.wy})">
+      <circle r="${g.r}" fill="#0B0F17"/>
+      <circle r="${g.r - 1.5}" fill="none" stroke="#1E2633" stroke-width="2"/>
+      <circle r="${(g.r * 0.66).toFixed(1)}" fill="url(#${id}j)"/>
+      ${rayons.map((a) => `<rect x="-2.2" y="${(-g.r * 0.64).toFixed(1)}" width="4.4" height="${(g.r * 0.5).toFixed(1)}" rx="2" fill="#1B2433" opacity=".55" transform="rotate(${a})"/>`).join('')}
+      <circle r="${(g.r * 0.2).toFixed(1)}" fill="#C9D3E0" stroke="#5E6B7E"/>
     </g>`;
-  return `<svg viewBox="0 0 320 130" role="img" aria-label="${esc(label || '')}">
+  return `<svg viewBox="0 0 400 160" role="img" aria-label="${esc(label || '')}">
     <defs>
       <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="${ucMix(base, 0.45)}"/><stop offset=".45" stop-color="${base}"/><stop offset="1" stop-color="${ucMix(base, -0.55)}"/>
+        <stop offset="0" stop-color="${ucMix(base, 0.5)}"/><stop offset=".3" stop-color="${ucMix(base, 0.12)}"/>
+        <stop offset=".62" stop-color="${base}"/><stop offset="1" stop-color="${ucMix(base, -0.5)}"/>
       </linearGradient>
-      <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#2A6FB0"/><stop offset=".55" stop-color="#0B2C55"/><stop offset="1" stop-color="#06203F"/>
+      <linearGradient id="${id}h" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".35" stop-color="#fff" stop-opacity=".28"/>
+        <stop offset=".6" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
       </linearGradient>
-      <radialGradient id="${id}r"><stop offset="0" stop-color="#CFE6FF"/><stop offset="1" stop-color="#5E7FA6"/></radialGradient>
-      <radialGradient id="${id}s"><stop offset="0" stop-color="#00D1D6" stop-opacity=".45"/><stop offset="1" stop-color="#00D1D6" stop-opacity="0"/></radialGradient>
+      <linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#5D8FC4"/><stop offset=".45" stop-color="#18406E"/><stop offset="1" stop-color="#0A1F3D"/>
+      </linearGradient>
+      <radialGradient id="${id}j" cx=".4" cy=".35"><stop offset="0" stop-color="#F2F6FB"/><stop offset=".7" stop-color="#9AA8BA"/><stop offset="1" stop-color="#55637A"/></radialGradient>
+      <radialGradient id="${id}s"><stop offset="0" stop-color="#000" stop-opacity=".65"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${id}c"><stop offset="0" stop-color="#00D1D6" stop-opacity=".35"/><stop offset="1" stop-color="#00D1D6" stop-opacity="0"/></radialGradient>
+      <clipPath id="${id}k"><path d="${g.body}"/></clipPath>
     </defs>
-    <ellipse cx="160" cy="120" rx="150" ry="9" fill="url(#${id}s)"/>
-    <ellipse cx="160" cy="119" rx="128" ry="5" fill="#000" opacity=".45"/>
-    <path d="${g.body}" fill="url(#${id}b)" stroke="${ucMix(base, -0.65)}" stroke-width="1.5" stroke-linejoin="round"/>
-    <path d="${g.glass}" fill="url(#${id}g)" stroke="#7FD3FF" stroke-opacity=".35" stroke-width="1"/>
-    ${g.pillar ? `<rect x="${g.pillar[0]}" y="${g.pillar[1]}" width="5" height="${g.pillar[2]}" fill="${ucMix(base, -0.2)}"/>` : ''}
-    <path d="${g.body}" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="1" transform="translate(0 4) scale(1 .96)"/>
-    <rect x="${g.front[0] - 4}" y="${g.front[1]}" width="12" height="4" rx="2" fill="#7FF3F5"/>
-    <rect x="${g.rear[0] - 6}" y="${g.rear[1]}" width="8" height="5" rx="2" fill="#E0403A"/>
-    ${g.wheels.map((x) => `<circle cx="${x}" cy="100" r="${g.r + 5}" fill="${ucMix(base, -0.75)}"/>`).join('')}
-    ${g.wheels.map(wheel).join('')}
+    <ellipse cx="200" cy="146" rx="190" ry="11" fill="url(#${id}c)"/>
+    <ellipse cx="200" cy="144" rx="168" ry="6" fill="url(#${id}s)"/>
+    ${g.wheels.map((x) => `<circle cx="${x}" cy="${g.wy}" r="${g.r + 6}" fill="#05080F"/>`).join('')}
+    <path d="${g.body}" fill="url(#${id}b)"/>
+    <g clip-path="url(#${id}k)">
+      <rect x="0" y="0" width="400" height="80" fill="url(#${id}h)"/>
+      <rect x="0" y="${g.sill[2]}" width="400" height="20" fill="${sombre}" opacity=".55"/>
+    </g>
+    <path d="${g.body}" fill="none" stroke="${sombre}" stroke-width="1.4" stroke-linejoin="round"/>
+    ${g.rails ? `<path d="${g.rails}" stroke="#2A2F38" stroke-width="3.5" stroke-linecap="round"/>` : ''}
+    ${g.glass.map((d) => `<path d="${d}" fill="url(#${id}g)" stroke="#0A1626" stroke-width="1.2"/>`).join('')}
+    ${g.glass.map((d) => `<path d="${d}" fill="#fff" opacity=".08" clip-path="url(#${id}k)"/>`).join('')}
+    <path d="${g.door}" fill="none" stroke="${sombre}" stroke-width="1.1" opacity=".8"/>
+    ${g.handles.map(([x, y]) => `<rect x="${x - 7}" y="${y}" width="14" height="3.4" rx="1.7" fill="${ucMix(base, -0.35)}"/>`).join('')}
+    <path d="M${g.mirror[0]},${g.mirror[1]} q-8,-1 -10,6 q6,2 12,1 z" fill="${ucMix(base, -0.25)}" stroke="${sombre}" stroke-width=".8"/>
+    <path d="${g.head}" fill="#E8FBFF" stroke="#7FF3F5" stroke-width="1"/>
+    <path d="${g.tail}" fill="#D8322C" stroke="#7A1010" stroke-width=".8"/>
+    ${g.cladding ? g.wheels.map((x) => `<path d="M${x - g.r - 7},${g.wy - 3} A${g.r + 7},${g.r + 7} 0 0 1 ${x + g.r + 7},${g.wy - 3}" fill="none" stroke="#1F242C" stroke-width="5"/>`).join('') : ''}
+    ${g.wheels.map(roue).join('')}
   </svg>`;
 }
 
@@ -4141,8 +4207,9 @@ class UcanessVehicleCard extends HTMLElement {
         </div>
         <div class="actions">
           ${soc === null ? `<label class="saisie">${esc(ucT(hass, 'veh_saisir_soc'))} <input id="soc" type="number" min="0" max="100" step="1" inputmode="numeric"></label>` : ''}
+          ${a.image ? '' : `<button type="button" class="uc-key btn photo1" id="photo">${esc(ucT(hass, 'veh_photo_ajouter'))}</button>`}
           <button type="button" class="uc-key btn" id="plan">${esc(ucT(hass, 'veh_planifier'))}</button>
-          <button type="button" class="uc-key btn ghost" id="photo">${esc(ucT(hass, 'veh_photo'))}</button>
+          ${a.image ? `<button type="button" class="uc-key btn ghost" id="photo">${esc(ucT(hass, 'veh_photo'))}</button>` : ''}
           ${a.image ? `<button type="button" class="uc-key btn ghost" id="dessin">${esc(ucT(hass, 'veh_dessin'))}</button>` : ''}
           <input id="fichier" type="file" accept="image/*" hidden>
         </div>
@@ -4274,7 +4341,7 @@ const UC_VEHICLE_CSS = `
   .chip.on { border-color: #00D1D6; color: #7FF3F5; }
   .muted { color: var(--uc-muted); font-size: 13px; margin: 0; }
   .car { cursor: pointer; display: flex; justify-content: center; }
-  .car svg { width: min(360px, 100%); height: auto; overflow: visible; }
+  .car svg { width: min(420px, 100%); height: auto; overflow: visible; }
   .car .photo { max-width: min(360px, 100%); max-height: 170px; object-fit: contain; filter: drop-shadow(0 10px 10px rgba(0,0,0,.5)) drop-shadow(0 0 10px rgba(0,209,214,.25)); }
   .car.charging svg, .car.charging .photo { animation: ucVeh 2.4s ease-in-out infinite; }
   @keyframes ucVeh { 50% { filter: drop-shadow(0 0 12px rgba(0,209,214,.7)); } }
@@ -4285,6 +4352,7 @@ const UC_VEHICLE_CSS = `
   .v { font: 700 22px var(--uc-font); color: var(--uc-value); }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .btn { padding: 8px 14px; border: 1px solid #2AB7E2; border-radius: 10px; background: linear-gradient(180deg, #154B84, #0B2C55); color: #fff; font: inherit; font-size: 14px; cursor: pointer; }
+  .btn.photo1 { border-color: var(--uc-orange); background: linear-gradient(180deg, #8A5A12, #5A3A0B); }
   .btn.ghost { background: transparent; border-color: var(--uc-tab-border); color: #CFE6FF; }
   .btn:disabled { opacity: .5; cursor: default; }
   .saisie { font-size: 13px; color: var(--uc-muted); }

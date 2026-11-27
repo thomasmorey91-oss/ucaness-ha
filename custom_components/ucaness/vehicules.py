@@ -19,7 +19,8 @@ from pathlib import Path
 from typing import Iterable
 
 CATALOGUE = Path(__file__).parent / "donnees" / "vehicules.json"
-GABARITS = ("citadine", "berline", "suv", "utilitaire")
+MEILLEURES_VENTES = Path(__file__).parent / "donnees" / "meilleures_ventes.json"
+GABARITS = ("citadine", "compacte", "berline", "suv", "grand_suv", "utilitaire")
 RENDEMENT_CHARGE = 0.90         # pertes entre la prise et la batterie de la voiture (charge AC)
 
 
@@ -63,6 +64,34 @@ def de_la_marque(catalogue: Iterable[Vehicule], marque: str) -> list[Vehicule]:
 
 def par_id(catalogue: Iterable[Vehicule], ident: str) -> Vehicule | None:
     return next((v for v in catalogue if v.id == ident), None)
+
+
+@dataclass(frozen=True)
+class MeilleureVente:
+    """Modèle parmi les plus vendus du pays. `versions` : ses fiches du catalogue (vide : hors catalogue)."""
+    nom: str
+    gabarit: str
+    versions: tuple[Vehicule, ...]
+
+
+@lru_cache(maxsize=1)
+def _ventes(chemin: Path = MEILLEURES_VENTES) -> dict:
+    return json.loads(chemin.read_text(encoding="utf-8"))["pays"]
+
+
+def meilleures_ventes(catalogue: Iterable[Vehicule], pays: str | None) -> list[MeilleureVente]:
+    """Modèles les plus vendus du pays (FR, DE, IT, ES, PT), dans l'ordre ; liste vide pour un autre pays."""
+    cat = tuple(catalogue)
+    out = []
+    for m in (_ventes().get((pays or "").upper()) or {}).get("modeles", []):
+        versions = tuple(v for v in de_la_marque(cat, m["marque"]) if v.modele == m["modele"]) if m["marque"] else ()
+        out.append(MeilleureVente(m["nom"], m["gabarit"], versions))
+    return out
+
+
+def source_ventes(pays: str | None) -> str | None:
+    p = _ventes().get((pays or "").upper())
+    return f"{p['source']}, {p['periode']}" if p else None
 
 
 # ------------------------------------------------------------------ énergie et état de charge
@@ -219,7 +248,7 @@ def creneaux_horaires(maintenant: datetime, depart: datetime, prix_de: callable,
 
 
 __all__ = [
-    "CATALOGUE", "GABARITS", "Creneau", "Plage", "PlanRecharge", "Vehicule", "charger_catalogue", "creneaux_horaires",
-    "de_la_marque", "energie_a_prendre_kwh", "estimer_soc", "marques", "par_id", "plan_recharge", "prix_heure",
+    "CATALOGUE", "GABARITS", "MEILLEURES_VENTES", "Creneau", "MeilleureVente", "Plage", "PlanRecharge", "Vehicule", "charger_catalogue", "creneaux_horaires",
+    "de_la_marque", "energie_a_prendre_kwh", "estimer_soc", "marques", "meilleures_ventes", "par_id", "source_ventes", "plan_recharge", "prix_heure",
     "puissance_recharge_kw",
 ]

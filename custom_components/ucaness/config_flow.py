@@ -160,7 +160,11 @@ class UcanessOptionsFlow(config_entries.OptionsFlow):
         return await self.hass.async_add_executor_job(vehicules.charger_catalogue)
 
     async def async_step_vehicule_marque(self, user_input: dict[str, Any] | None = None):
-        """Marque du véhicule (catalogue OpenEV Data), « hors catalogue » ou retrait du véhicule."""
+        """Les modèles les plus vendus du pays d'abord, puis les marques du catalogue (OpenEV Data),
+        « hors catalogue » ou retrait du véhicule."""
+        cat = await self._catalogue()
+        ventes = await self.hass.async_add_executor_job(vehicules.meilleures_ventes, cat, self.hass.config.country)
+        self._preset = {}
         if user_input is not None:
             choix = user_input["marque"]
             if choix == "retirer":
@@ -169,25 +173,35 @@ class UcanessOptionsFlow(config_entries.OptionsFlow):
             if choix == "autre":
                 self._modele = None
                 return await self.async_step_vehicule_details()
-            self._marque = choix
+            if choix.startswith("top:"):
+                vente = ventes[int(choix[4:])]
+                self._preset = {"nom": vente.nom, "gabarit": vente.gabarit}
+                if not vente.versions:            # modèle récent, absent du catalogue : valeurs à saisir
+                    self._modele = None
+                    return await self.async_step_vehicule_details()
+                self._marque, self._versions = vente.versions[0].marque, vente.versions
+                return await self.async_step_vehicule_modele()
+            self._marque, self._versions = choix, None
             return await self.async_step_vehicule_modele()
-        cat = await self._catalogue()
         actuel = self._data.get(CONF_VEHICULE) or {}
-        options = [{"value": m, "label": m} for m in vehicules.marques(cat)]
+        options = [{"value": f"top:{i}", "label": f"★ {m.nom}"} for i, m in enumerate(ventes)]
+        options += [{"value": m, "label": m} for m in vehicules.marques(cat)]
         options.append({"value": "autre", "label": "—"})
         if actuel:
             options.append({"value": "retirer", "label": "×"})
         schema = vol.Schema({vol.Required("marque", default=actuel.get("marque") or vol.UNDEFINED): SelectSelector(
             SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN, translation_key="marque_vehicule")
         )})
-        return self.async_show_form(step_id="vehicule_marque", data_schema=schema)
+        source = await self.hass.async_add_executor_job(vehicules.source_ventes, self.hass.config.country)
+        return self.async_show_form(step_id="vehicule_marque", data_schema=schema,
+                                    description_placeholders={"source": source or "—"})
 
     async def async_step_vehicule_modele(self, user_input: dict[str, Any] | None = None):
         cat = await self._catalogue()
         if user_input is not None:
             self._modele = vehicules.par_id(cat, user_input["modele"])
             return await self.async_step_vehicule_details()
-        liste = vehicules.de_la_marque(cat, self._marque)
+        liste = list(getattr(self, "_versions", None) or vehicules.de_la_marque(cat, self._marque))
         actuel = (self._data.get(CONF_VEHICULE) or {}).get("id")
         schema = vol.Schema({vol.Required("modele", default=actuel if any(v.id == actuel for v in liste) else vol.UNDEFINED): SelectSelector(
             SelectSelectorConfig(options=[{"value": v.id, "label": f"{v.modele} {v.version} ({v.annee}) · {v.capacite_kwh:g} kWh".replace("  ", " ")} for v in liste],
@@ -200,12 +214,13 @@ class UcanessOptionsFlow(config_entries.OptionsFlow):
         """Valeurs proposées par le catalogue, à confirmer ou corriger (la fiche peut se tromper)."""
         actuel = self._data.get(CONF_VEHICULE) or {}
         v = self._modele
+        preset = getattr(self, "_preset", None) or {}
         if user_input is not None:
             cfg = {
                 "id": v.id if v else None,
                 "marque": v.marque if v else None,
                 "modele": v.modele if v else None,
-                "nom": (user_input.get("nom") or "").strip() or (v.libelle if v else "Véhicule"),
+                "nom": (user_input.get("nom") or "").strip() or preset.get("nom") or (v.libelle if v else "Véhicule"),
                 "gabarit": user_input["gabarit"],
                 "couleur": couleur_hex(user_input.get("couleur")),
                 "capacite_kwh": float(user_input["capacite_kwh"]),
@@ -223,8 +238,8 @@ class UcanessOptionsFlow(config_entries.OptionsFlow):
             return meme.get(cle) if meme.get(cle) is not None else cat
         nombre = lambda mini, maxi, pas, unite: NumberSelector(NumberSelectorConfig(min=mini, max=maxi, step=pas, unit_of_measurement=unite, mode=NumberSelectorMode.BOX))
         schema = vol.Schema({
-            vol.Optional("nom", default=defaut("nom", v.libelle if v else "")): str,
-            vol.Required("gabarit", default=defaut("gabarit", v.gabarit if v else "citadine")): SelectSelector(
+            vol.Optional("nom", default=defaut("nom", preset.get("nom") or (v.libelle if v else ""))): str,
+            vol.Required("gabarit", default=defaut("gabarit", preset.get("gabarit") or (v.gabarit if v else "citadine"))): SelectSelector(
                 SelectSelectorConfig(options=list(vehicules.GABARITS), translation_key="gabarit")),
             vol.Required("couleur", default=couleur_rgb(actuel.get("couleur") or DEFAUTS_VEHICULE["couleur"])): ColorRGBSelector(),
             vol.Required("capacite_kwh", default=defaut("capacite_kwh", v.capacite_kwh if v else 50.0)): nombre(5, 250, 0.1, "kWh"),
@@ -238,4 +253,4 @@ class UcanessOptionsFlow(config_entries.OptionsFlow):
                 EntitySelectorConfig(domain="sensor", device_class="battery")),
         })
         return self.async_show_form(step_id="vehicule_details", data_schema=schema,
-                                    description_placeholders={"vehicule": v.libelle if v else "—"})
+                                    description_placeholders={"vehicule": v.libelle if v else preset.get("nom") or "—"})

@@ -43,7 +43,7 @@
       },
       "vehicule_marque": {
         "title": "Ihr Fahrzeug: Marke",
-        "description": "Wählen Sie die Marke Ihres Elektroautos. Daten aus dem freien Katalog OpenEV Data: Prüfen Sie die vorgeschlagenen Werte im nächsten Schritt.",
+        "description": "Mit ★ markierte Modelle sind die meistverkauften in Ihrem Land ({source}). Andernfalls wählen Sie die Marke. Daten aus dem freien Katalog OpenEV Data: Prüfen Sie die vorgeschlagenen Werte im nächsten Schritt.",
         "data": {
           "marque": "Marke"
         }
@@ -347,8 +347,10 @@
     "gabarit": {
       "options": {
         "citadine": "Kleinwagen",
+        "compacte": "Kompaktwagen",
         "berline": "Limousine",
         "suv": "SUV",
+        "grand_suv": "Großer SUV",
         "utilitaire": "Transporter"
       }
     },

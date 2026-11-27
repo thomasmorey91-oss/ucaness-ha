@@ -29,16 +29,16 @@ def fusion(bas: dict, haut: dict) -> dict:
 
 
 def gabarit(rec: dict) -> str:
-    """Forme du dessin : citadine, berline, suv ou utilitaire."""
+    """Forme du dessin : citadine, compacte, berline, suv, grand_suv ou utilitaire."""
     style = ((rec.get("body") or {}).get("style") or "").lower()
     type_ = (rec.get("vehicle_type") or "").lower()
     longueur = (rec.get("dimensions") or {}).get("length_mm") or 0
     if type_ in ("van", "pickup") or style in ("van", "pickup", "minivan", "mpv"):
         return "utilitaire"
     if type_ == "suv" or "suv" in style or style == "crossover":
-        return "suv"
-    if style in ("hatchback", "quadricycle") and (not longueur or longueur < 4200):
-        return "citadine"
+        return "grand_suv" if longueur >= 4800 else "suv"
+    if style in ("hatchback", "quadricycle"):
+        return "citadine" if not longueur or longueur < 4100 else "compacte"
     if longueur and longueur < 4000:
         return "citadine"
     return "berline"

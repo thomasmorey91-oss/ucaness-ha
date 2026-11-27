@@ -43,7 +43,7 @@
       },
       "vehicule_marque": {
         "title": "Your vehicle: make",
-        "description": "Choose the make of your electric car. Data from the open OpenEV Data catalogue: check the suggested values in the next step.",
+        "description": "Models marked ★ are the best sellers in your country ({source}). Otherwise, choose the make. Data from the open OpenEV Data catalogue: check the suggested values in the next step.",
         "data": {
           "marque": "Make"
         }
@@ -347,8 +347,10 @@
     "gabarit": {
       "options": {
         "citadine": "City car",
+        "compacte": "Compact",
         "berline": "Sedan",
         "suv": "SUV",
+        "grand_suv": "Large SUV",
         "utilitaire": "Van"
       }
     },
