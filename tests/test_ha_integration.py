@@ -328,6 +328,19 @@ async def test_textes_traduits_en_chinois(hass, fake_client, fast_readback):
     assert hass.states.get("select.ucaness_type_tarif") is not None
 
 
+async def test_textes_traduits_en_allemand(hass, fake_client, fast_readback):
+    """Home Assistant en allemand : noms en allemand, identifiants tirés de l'allemand (langue à identifiants natifs)."""
+    hass.config.language = "de"
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=False)
+    assert hass.states.get("sensor.uhome_soc").attributes["friendly_name"].endswith("Batterieladestand (SOC)")
+    assert hass.states.get("sensor.maison_test_einstellung_dod_am_netz") is not None
+    from custom_components.ucaness import reglages
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    with pytest.raises(ServiceValidationError) as erreur:
+        await reglages.async_definir(hass, entry, {"capacite": 99})
+    assert erreur.value.translation_placeholders["reglage"] == "Batterie: Kapazität"
+
+
 async def test_backup_mode_is_not_offered(hass, fake_client, fast_readback):
     await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
     with pytest.raises(Exception):
