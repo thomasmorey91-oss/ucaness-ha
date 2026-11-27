@@ -171,7 +171,7 @@
       "fields": {
         "offres": {
           "name": "Offerte",
-          "description": "Elenco di offerte; ogni offerta indica: nom, fournisseur, formule (base o hphc), abonnement_eur_an (€ IVA inclusa per potenza in kVA), prix_kwh (base, oppure hp e hc, in € IVA inclusa), plages_hc (elenco di inizio e fine), weekend_hc, source, date_prix; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo facoltativo."
+          "description": "Elenco di offerte; ogni offerta indica: nom, fournisseur, formule (base o hphc), abonnement_eur_an (€ IVA inclusa per potenza in kVA), prix_kwh (base, oppure hp e hc, in € IVA inclusa), plages_hc (elenco di inizio e fine), weekend_hc, source, date_prix; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo facoltativo. Altri paesi: formule plages, structure (es_2.0td, it_f1f2f3, it_f1f23, pt_bi_diario, pt_tri_diario), un prezzo per livello in prix_kwh, taxes_comprises (falso per prezzi senza imposte)."
         },
         "contrat_actuel": {
           "name": "Contratto attuale",
@@ -217,7 +217,7 @@
     },
     "simuler": {
       "name": "Simula (e se…)",
-      "description": "Solo calcolo sulle misure della casa, nulla viene applicato. «contrat»: costo annuo stimato del contratto attuale e delle offerte di riferimento (tariffe regolamentate, incluso Tempo) o di quelle passate; «puissance»: la potenza impegnata è adeguata?",
+      "description": "Solo calcolo sulle misure della casa, nulla viene applicato. «contrat»: costo annuo stimato del contratto attuale e delle offerte di riferimento (tariffe regolamentate, incluso Tempo) o di quelle passate; «puissance»: la potenza impegnata è adeguata? Offerte di riferimento secondo il paese impostato in Home Assistant: Francia (tariffe regolamentate EDF), Portogallo (tariffe regolamentate ERSE); Spagna e Italia: passa le tue offerte.",
       "fields": {
         "question": {
           "name": "Domanda",

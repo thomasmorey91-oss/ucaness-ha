@@ -171,7 +171,7 @@
       "fields": {
         "offres": {
           "name": "套餐",
-          "description": "套餐列表；每个套餐包含：nom、fournisseur、formule（base 或 hphc）、abonnement_eur_an（按功率 kVA 的含税年费，€）、prix_kwh（base，或 hp 和 hc，含税 €）、plages_hc（开始和结束列表）、weekend_hc、source、date_prix；Tempo：formule tempo，prix_kwh 为 bleu_hp、bleu_hc、blanc_hp、blanc_hc、rouge_hp、rouge_hc，jours_tempo 可选。"
+          "description": "套餐列表；每个套餐包含：nom、fournisseur、formule（base 或 hphc）、abonnement_eur_an（按功率 kVA 的含税年费，€）、prix_kwh（base，或 hp 和 hc，含税 €）、plages_hc（开始和结束列表）、weekend_hc、source、date_prix；Tempo：formule tempo，prix_kwh 为 bleu_hp、bleu_hc、blanc_hp、blanc_hc、rouge_hp、rouge_hc，jours_tempo 可选。 其他国家：formule 为 plages，structure（es_2.0td、it_f1f2f3、it_f1f23、pt_bi_diario、pt_tri_diario），prix_kwh 中每个级别一个价格，taxes_comprises（不含税价格时为 false）。"
         },
         "contrat_actuel": {
           "name": "当前合同",
@@ -217,7 +217,7 @@
     },
     "simuler": {
       "name": "模拟（如果……）",
-      "description": "仅根据家中测量数据进行计算，不会应用任何更改。“contrat”：估算当前合同和参考套餐（受管制电价，包括 Tempo）或所传入套餐的年费用；“puissance”：签约功率是否合适。",
+      "description": "仅根据家中测量数据进行计算，不会应用任何更改。“contrat”：估算当前合同和参考套餐（受管制电价，包括 Tempo）或所传入套餐的年费用；“puissance”：签约功率是否合适。 参考套餐取决于 Home Assistant 中设置的国家：法国（EDF 受管制电价）、葡萄牙（ERSE 受管制电价）；西班牙和意大利：请传入自己的套餐。",
       "fields": {
         "question": {
           "name": "问题",

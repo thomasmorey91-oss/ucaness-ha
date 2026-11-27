@@ -171,7 +171,7 @@
       "fields": {
         "offres": {
           "name": "Offres",
-          "description": "Liste d'offres ; chaque offre donne : nom, fournisseur, formule (base ou hphc), abonnement_eur_an (€ TTC par puissance en kVA), prix_kwh (base, ou hp et hc, en € TTC), plages_hc (liste de début et fin), weekend_hc, source, date_prix ; Tempo : formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo facultatif."
+          "description": "Liste d'offres ; chaque offre donne : nom, fournisseur, formule (base ou hphc), abonnement_eur_an (€ TTC par puissance en kVA), prix_kwh (base, ou hp et hc, en € TTC), plages_hc (liste de début et fin), weekend_hc, source, date_prix ; Tempo : formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo facultatif. Autres pays : formule plages, structure (es_2.0td, it_f1f2f3, it_f1f23, pt_bi_diario, pt_tri_diario), un prix par niveau dans prix_kwh, taxes_comprises (faux pour des prix hors taxes)."
         },
         "contrat_actuel": {
           "name": "Contrat actuel",
@@ -217,7 +217,7 @@
     },
     "simuler": {
       "name": "Simuler (et si…)",
-      "description": "Calcul seul sur les mesures de la maison, rien n'est appliqué. « contrat » : coût annuel estimé du contrat actuel et des offres de référence (tarifs réglementés, dont Tempo) ou passées ; « puissance » : la puissance souscrite convient-elle.",
+      "description": "Calcul seul sur les mesures de la maison, rien n'est appliqué. « contrat » : coût annuel estimé du contrat actuel et des offres de référence (tarifs réglementés, dont Tempo) ou passées ; « puissance » : la puissance souscrite convient-elle. Offres de référence selon le pays réglé dans Home Assistant : France (tarifs réglementés d'EDF), Portugal (tarifs réglementés de l'ERSE) ; Espagne et Italie : passer ses offres.",
       "fields": {
         "question": {
           "name": "Question",

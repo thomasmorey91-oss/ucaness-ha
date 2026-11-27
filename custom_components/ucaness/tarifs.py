@@ -15,7 +15,13 @@ Ce que ce calcul fait :
   couleur sans jour mesuré (ou des couleurs inconnues) prend la moyenne de tous les jours mesurés,
   et c'est signalé. Les jours rouges tombant en hiver, une maison chauffée à l'électricité y
   consomme plus que la moyenne : sans jour rouge mesuré, le coût est sous-estimé ;
-- abonnement selon la puissance souscrite ; tous les prix sont TTC.
+- abonnement selon la puissance souscrite ; tous les prix sont TTC, sauf offre marquée
+  `taxes_comprises=False` (dit dans le résultat) ;
+- formule « plages » (autres pays) : plusieurs niveaux de prix (pointe, plein, creux…), chacun sur
+  des plages horaires qui dépendent du type de jour (ouvré, samedi, dimanche et férié) et, au
+  besoin, de l'heure légale (été, hiver). Exemples : 2.0TD en Espagne, tranches F1, F2, F3 en
+  Italie, bi- et tri-horaire au Portugal (catalogue.py). Le temps qu'aucune règle ne couvre prend
+  le niveau par défaut.
 
 - recharge de nuit (si la batterie est décrite et que la maison ne recharge pas déjà la nuit) :
   pour une offre à heures creuses, estimation de ce que la batterie déplacerait des heures
@@ -37,12 +43,19 @@ Une donnée absente ne donne jamais un prix : l'offre est écartée, avec la rai
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from typing import Any, Iterable
 
-BASE, HPHC, TEMPO = "base", "hphc", "tempo"
-FORMULES = (BASE, HPHC, TEMPO)
+BASE, HPHC, TEMPO, PLAGES = "base", "hphc", "tempo", "plages"
+FORMULES = (BASE, HPHC, TEMPO, PLAGES)
+
+# Formule « plages » : types de jour et heure légale.
+OUVRE, SAMEDI, DIMANCHE_FERIE = "ouvre", "samedi", "dimanche_ferie"
+TYPES_JOUR = (OUVRE, SAMEDI, DIMANCHE_FERIE)
+TOUS_LES_JOURS = TYPES_JOUR
+ETE, HIVER = "ete", "hiver"
 
 # Tempo : couleurs, nombre de jours par an (règle publiée par RTE : 300 bleus, 43 blancs, 22 rouges)
 # et heures creuses de 22h à 6h ; un jour Tempo commence à 6h.
@@ -72,10 +85,21 @@ class OffreInvalide(ValueError):
 
 
 @dataclass(frozen=True)
+class Regle:
+    """Formule « plages » : de `debut` à `fin` (« HH:MM », peut passer minuit), ces jours-là, le
+    prix est celui du niveau `niveau`. `heure_legale` : « ete », « hiver » ou None (toute l'année)."""
+    niveau: str
+    debut: str
+    fin: str
+    jours: tuple[str, ...] = TOUS_LES_JOURS
+    heure_legale: str | None = None
+
+
+@dataclass(frozen=True)
 class Offre:
     nom: str
-    formule: str                                   # « base » ou « hphc »
-    abonnement_eur_an: dict[int, float]            # puissance souscrite (kVA) -> abonnement annuel TTC
+    formule: str                                   # « base », « hphc », « tempo » ou « plages »
+    abonnement_eur_an: dict[float, float]          # puissance souscrite (kVA) -> abonnement annuel TTC
     prix_kwh: dict[str, float]                     # base : {"base": p} ; hphc : {"hp": p, "hc": p} ;
                                                    # tempo : {"bleu_hp", "bleu_hc", "blanc_hp", …, "rouge_hc"} (TTC)
     fournisseur: str = ""
@@ -84,12 +108,17 @@ class Offre:
     source: str = ""                               # où le prix a été lu (adresse de la grille tarifaire)
     date_prix: date | None = None                  # date à laquelle le prix a été relevé
     jours_tempo: dict[str, int] | None = None      # tempo : jours de chaque couleur par an (défaut JOURS_TEMPO)
+    regles: tuple[Regle, ...] = ()                 # plages : règles par niveau de prix
+    niveau_defaut: str = ""                        # plages : niveau du temps qu'aucune règle ne couvre
+    structure: str = ""                            # plages : nom de la grille horaire (catalogue.STRUCTURES)
+    taxes_comprises: bool = True                   # faux : prix hors TVA et taxes (dit dans le résultat)
+    valable_jusqu_au: date | None = None           # au-delà, grille horaire ou prix à revoir (dit dans le résultat)
 
 
 @dataclass
 class Evaluation:
     offre: Offre
-    puissance_kva: int
+    puissance_kva: float
     jours_mesures: float
     kwh_mesures: float
     kwh_hc_mesures: float
@@ -157,7 +186,68 @@ def part_heures_creuses(debut: datetime, offre: Offre, jours_non_ouvres: Iterabl
     return min(1.0, minutes / 60)
 
 
-def verifier(offre: Offre, puissance_kva: int) -> None:
+def type_jour(jour: date, jours_non_ouvres: Iterable[date] = ()) -> str:
+    """Type de jour pour la formule « plages » : dimanche ou férié, samedi, ou jour ouvré."""
+    if jour.weekday() == 6 or jour in set(jours_non_ouvres):
+        return DIMANCHE_FERIE
+    return SAMEDI if jour.weekday() == 5 else OUVRE
+
+
+def _heure_legale(debut: datetime) -> str:
+    if debut.tzinfo is None or debut.dst() is None:
+        raise OffreInvalide("heure sans fuseau horaire : heure légale d'été ou d'hiver inconnue")
+    return ETE if debut.dst() else HIVER
+
+
+def repartition_niveaux(debut: datetime, offre: Offre, jours_non_ouvres: Iterable[date] = ()) -> dict[str, float]:
+    """Formule « plages » : part de l'heure qui commence à `debut` passée dans chaque niveau (somme 1)."""
+    tj = type_jour(debut.date(), jours_non_ouvres)
+    legale = _heure_legale(debut) if any(r.heure_legale for r in offre.regles) else None
+    d = debut.hour * 60 + debut.minute
+    parts: dict[str, float] = {}
+    couvert = 0
+    for r in offre.regles:
+        if tj not in r.jours or (r.heure_legale is not None and r.heure_legale != legale):
+            continue
+        plage = (_minutes(r.debut), _minutes(r.fin))
+        minutes = _recouvrement(d, min(d + 60, 1440), plage)
+        if minutes:
+            parts[r.niveau] = parts.get(r.niveau, 0.0) + minutes / 60
+            couvert += minutes
+    if couvert < 60:
+        parts[offre.niveau_defaut] = parts.get(offre.niveau_defaut, 0.0) + (60 - couvert) / 60
+    return parts
+
+
+def _verifier_regles(offre: Offre) -> None:
+    """Règles lisibles, niveaux tous chiffrés, aucune minute couverte deux fois."""
+    if not offre.regles or not offre.niveau_defaut:
+        raise OffreInvalide("grille horaire non précisée (règles et niveau par défaut)")
+    for r in offre.regles:
+        if any(j not in TYPES_JOUR for j in r.jours) or r.heure_legale not in (None, ETE, HIVER):
+            raise OffreInvalide(f"règle illisible : {r}")
+    for tj in TYPES_JOUR:
+        for legale in (ETE, HIVER):
+            occupe = [0] * 1440
+            for r in offre.regles:
+                if tj in r.jours and r.heure_legale in (None, legale):
+                    a, b = _minutes(r.debut), _minutes(r.fin)
+                    for m in (range(a, b) if a < b else list(range(a, 1440)) + list(range(0, b))):
+                        occupe[m] += 1
+            if max(occupe) > 1:
+                raise OffreInvalide(f"plages qui se chevauchent ({tj}, heure d'{legale})")
+
+
+def niveaux(offre: Offre) -> tuple[str, ...]:
+    """Niveaux de prix d'une offre « plages » (dans l'ordre des règles, niveau par défaut en dernier)."""
+    vus = []
+    for n in [r.niveau for r in offre.regles] + [offre.niveau_defaut]:
+        if n not in vus:
+            vus.append(n)
+    return tuple(vus)
+
+
+def verifier(offre: Offre, puissance_kva: float) -> None:
     """OffreInvalide si la grille ne permet pas de calculer un prix pour cette puissance."""
     if offre.formule not in FORMULES:
         raise OffreInvalide(f"formule non prise en charge : {offre.formule}")
@@ -165,7 +255,10 @@ def verifier(offre: Offre, puissance_kva: int) -> None:
         raise OffreInvalide(f"pas d'abonnement connu pour {puissance_kva} kVA")
     if not offre.abonnement_eur_an[puissance_kva] >= 0:
         raise OffreInvalide("abonnement illisible")
+    if offre.formule == PLAGES:
+        _verifier_regles(offre)
     attendus = (("base",) if offre.formule == BASE else ("hp", "hc") if offre.formule == HPHC
+                else niveaux(offre) if offre.formule == PLAGES
                 else tuple(f"{c}_{p}" for c in COULEURS for p in ("hp", "hc")))
     for periode in attendus:
         prix = offre.prix_kwh.get(periode)
@@ -193,7 +286,7 @@ def fiabilite(jours: float) -> str:
 def evaluer(
     offre: Offre,
     soutirage: Iterable[tuple[datetime, float]],
-    puissance_kva: int,
+    puissance_kva: float,
     *,
     jours_non_ouvres: Iterable[date] = (),
     aujourdhui: date | None = None,
@@ -211,6 +304,9 @@ def evaluer(
     if offre.formule == TEMPO:
         return _evaluer_tempo(offre, soutirage, puissance_kva, aujourdhui=aujourdhui, batterie=batterie,
                               recharge_deja_active=recharge_deja_active, couleurs=couleurs_tempo or {})
+    if offre.formule == PLAGES:
+        return _evaluer_plages(offre, soutirage, puissance_kva, jours_non_ouvres=jours_non_ouvres,
+                               aujourdhui=aujourdhui, batterie=batterie, recharge_deja_active=recharge_deja_active)
     non_ouvres = set(jours_non_ouvres)
     heures, kwh_total, kwh_hc, cout = 0, 0.0, 0.0, 0.0
     hp_par_jour: dict[date, float] = {}
@@ -241,6 +337,7 @@ def evaluer(
         remarques.append(f"Prix relevé le {offre.date_prix.isoformat()} : à revérifier.")
     if not offre.source:
         remarques.append("Source du prix non indiquée.")
+    remarques.extend(_remarques_offre(offre, aujourdhui))
     # Recharge de nuit : énergie des heures pleines que la batterie pourrait fournir chaque jour,
     # rechargée en heures creuses (pertes comptées dans les deux sens).
     gain_mesure = 0.0
@@ -275,7 +372,73 @@ def _remarques_communes(offre: Offre, jours: float, aujourdhui: date | None) -> 
         remarques.append(f"Prix relevé le {offre.date_prix.isoformat()} : à revérifier.")
     if not offre.source:
         remarques.append("Source du prix non indiquée.")
+    remarques.extend(_remarques_offre(offre, aujourdhui))
     return niveau, remarques
+
+
+def _remarques_offre(offre: Offre, aujourdhui: date | None) -> list[str]:
+    out = []
+    if not offre.taxes_comprises:
+        out.append("Prix hors TVA et taxes : comparer seulement avec des prix hors taxes.")
+    if offre.valable_jusqu_au is not None and aujourdhui is not None and aujourdhui > offre.valable_jusqu_au:
+        out.append(f"Grille valable jusqu'au {offre.valable_jusqu_au.isoformat()} : à revoir.")
+    return out
+
+
+def _evaluer_plages(
+    offre: Offre,
+    soutirage: Iterable[tuple[datetime, float]],
+    puissance_kva: float,
+    *,
+    jours_non_ouvres: Iterable[date],
+    aujourdhui: date | None,
+    batterie: Batterie | None,
+    recharge_deja_active: bool,
+) -> Evaluation:
+    """Formule « plages » : chaque heure est répartie entre les niveaux de prix de la grille."""
+    prix = offre.prix_kwh
+    non_ouvres = set(jours_non_ouvres)
+    p_min = min(prix[n] for n in niveaux(offre))
+    creux = {n for n in niveaux(offre) if prix[n] == p_min}
+    heures, kwh_total, kwh_creux, cout = 0, 0.0, 0.0, 0.0
+    cher_par_jour: dict[date, list[float]] = {}         # jour -> [kWh hors niveau le moins cher, coût de ces kWh]
+    for debut, kwh in soutirage:
+        if kwh is None or kwh != kwh or kwh < 0:
+            continue
+        heures += 1
+        kwh_total += kwh
+        for n, part in repartition_niveaux(debut, offre, non_ouvres).items():
+            cout += kwh * part * prix[n]
+            if n in creux:
+                kwh_creux += kwh * part
+            else:
+                v = cher_par_jour.setdefault(debut.date(), [0.0, 0.0])
+                v[0] += kwh * part
+                v[1] += kwh * part * prix[n]
+    if heures == 0:
+        raise OffreInvalide("aucune mesure de soutirage")
+    jours = heures / 24
+    niveau, remarques = _remarques_communes(offre, jours, aujourdhui)
+    # Recharge dans le niveau le moins cher : énergie des niveaux plus chers que la batterie
+    # pourrait fournir chaque jour (pertes comptées dans les deux sens).
+    gain_mesure = 0.0
+    if batterie is not None and not recharge_deja_active and len(niveaux(offre)) > 1:
+        r = batterie.rendement
+        if not (0 < r <= 1) or not batterie.capacite_utile_kwh > 0:
+            remarques.append("Batterie mal décrite : recharge réseau non estimée.")
+        else:
+            for kwh_cher, cout_cher in cher_par_jour.values():
+                if kwh_cher > 0:
+                    ecart = cout_cher / kwh_cher - p_min / (r * r)
+                    if ecart > 0:
+                        gain_mesure += min(kwh_cher, batterie.capacite_utile_kwh * r) * ecart
+            remarques.append("Recharge réseau dans le niveau le moins cher comprise : estimation haute (batterie supposée vide au début de ce niveau).")
+    return Evaluation(
+        offre=offre, puissance_kva=puissance_kva, jours_mesures=jours, kwh_mesures=kwh_total,
+        kwh_hc_mesures=kwh_creux, cout_energie_mesure_eur=cout,
+        cout_annuel_eur=offre.abonnement_eur_an[puissance_kva] + cout * 365 / jours,
+        fiabilite=niveau, remarques=remarques, gain_recharge_nuit_eur_an=gain_mesure * 365 / jours,
+    )
 
 
 def _evaluer_tempo(
@@ -358,7 +521,7 @@ def _evaluer_tempo(
 def classer(
     offres: Iterable[Offre],
     soutirage: Iterable[tuple[datetime, float]],
-    puissance_kva: int,
+    puissance_kva: float,
     *,
     contrat_actuel: Offre | None = None,
     jours_non_ouvres: Iterable[date] = (),
@@ -418,7 +581,7 @@ def classer(
     }
 
 
-def a_la_puissance(offre: Offre, puissance_kva: int) -> tuple[Offre, int]:
+def a_la_puissance(offre: Offre, puissance_kva: float) -> tuple[Offre, float]:
     """L'offre ramenée à la puissance demandée : son abonnement à la plus petite puissance publiée
     qui la couvre (ou à la plus grande), sous la clé demandée, pour la comparer aux autres.
     Renvoie aussi la puissance réellement retenue."""
@@ -432,10 +595,11 @@ def a_la_puissance(offre: Offre, puissance_kva: int) -> tuple[Offre, int]:
 
 def analyser_puissance(
     puissances_max_kva: Iterable[float],
-    souscrite_kva: int,
+    souscrite_kva: float,
     *,
     marge: float = 0.10,
     mesure_fine: bool = False,
+    paliers: tuple[float, ...] | None = PALIERS_KVA,
 ) -> dict[str, Any]:
     """La puissance souscrite convient-elle ? À partir des puissances maximales relevées (une par
     jour, en kVA).
@@ -448,7 +612,10 @@ def analyser_puissance(
         return {"conseil": "inconnu", "raison": "Aucune puissance maximale mesurée.", "jours_mesures": 0}
     pointe = max(valeurs)
     besoin = pointe * (1 + marge)
-    recommande = next((p for p in PALIERS_KVA if p >= besoin), PALIERS_KVA[-1])
+    if paliers:
+        recommande = next((p for p in paliers if p >= besoin), paliers[-1])
+    else:                                               # paliers du pays inconnus : besoin arrondi au dixième
+        recommande = math.ceil(besoin * 10) / 10
     jours = len(valeurs)
     niveau = fiabilite(jours)
     if recommande > souscrite_kva:
@@ -457,7 +624,7 @@ def analyser_puissance(
         conseil = "baisser"
     else:
         conseil = "garder"
-    remarques = []
+    remarques = [] if paliers else ["Puissances souscrites possibles dans ce pays non connues : puissance recommandée arrondie au dixième, à rapprocher des paliers du fournisseur."]
     if conseil == "baisser":
         if niveau != FIABLE:
             remarques.append(f"{jours} jour(s) de mesure : attendre une année complète, hiver compris, avant de baisser l'abonnement.")

@@ -171,7 +171,7 @@
       "fields": {
         "offres": {
           "name": "Offers",
-          "description": "List of offers; each offer gives: nom, fournisseur, formule (base or hphc), abonnement_eur_an (€ incl. tax per power in kVA), prix_kwh (base, or hp and hc, in € incl. tax), plages_hc (list of start and end), weekend_hc, source, date_prix ; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo optional."
+          "description": "List of offers; each offer gives: nom, fournisseur, formule (base or hphc), abonnement_eur_an (€ incl. tax per power in kVA), prix_kwh (base, or hp and hc, in € incl. tax), plages_hc (list of start and end), weekend_hc, source, date_prix ; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo optional. Other countries: formule plages, structure (es_2.0td, it_f1f2f3, it_f1f23, pt_bi_diario, pt_tri_diario), one price per level in prix_kwh, taxes_comprises (false for prices excluding taxes)."
         },
         "contrat_actuel": {
           "name": "Current contract",
@@ -217,7 +217,7 @@
     },
     "simuler": {
       "name": "Simulate (what if…)",
-      "description": "Calculation only on the home's measurements, nothing is applied. \"contrat\": estimated yearly cost of the current contract and of the reference offers (regulated tariffs, including Tempo) or given offers; \"puissance\": is the subscribed power right.",
+      "description": "Calculation only on the home's measurements, nothing is applied. \"contrat\": estimated yearly cost of the current contract and of the reference offers (regulated tariffs, including Tempo) or given offers; \"puissance\": is the subscribed power right. Reference offers depend on the country set in Home Assistant: France (EDF regulated tariffs), Portugal (ERSE regulated tariffs); Spain and Italy: pass your own offers.",
       "fields": {
         "question": {
           "name": "Question",
