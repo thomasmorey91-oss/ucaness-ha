@@ -1,6 +1,6 @@
 # Intégration Home Assistant « UCANESS » (UCanpower UHome)
 
-Version 0.5.3, 27/11/2026. Testée sur un onduleur UHome 6K.
+Version 0.5.4, 27/11/2026. Testée sur un onduleur UHome 6K.
 
 > **Non officielle.** Les mesures sont lues par l'API du portail UCANESS (oss.ucaness.com), qui n'est pas documentée. Le pilotage passe par l'API tierce documentée d'UCanpower (chemins `/api/v1`, clé d'application).
 > **Lecture seule par défaut.** L'onduleur n'est piloté que si l'option « Écriture autorisée » est activée, et seulement sur deux points : le mode (autoconsommation ou arbitrage horaire) et les plages de charge. Tout autre réglage (DOD, hystérésis, courant, protections réseau, type de batterie, retour usine, commandes) est refusé par le client avant d'atteindre le réseau (§ 6 et § 8).
@@ -20,7 +20,7 @@ Version 0.5.3, 27/11/2026. Testée sur un onduleur UHome 6K.
 | Assistant d'installation (0.4) | état de l'installation et étape suivante (`sensor.ucaness_installation`) |
 | Réglages du pilotage (0.4) | 9 nombres, 2 heures, 2 interrupteurs et 1 liste (capacité, plancher, contrat, panneaux solaires…) |
 
-**Langues (0.5.0 à 0.5.3).** Les écrans de l'intégration (connexion, options, assistant d'installation, actions), les noms des entités et les messages d'erreur suivent la langue de votre profil Home Assistant : français, anglais, chinois simplifié (0.5.1) ou allemand (0.5.2 ; tutoiement depuis la 0.5.3, comme le reste de Home Assistant). Toute autre langue s'affiche en anglais. Les cartes du tableau de bord sont traduites dans les mêmes langues depuis leur version 0.6.0 (`dashboard/README.md`). Restent en français pour l'instant : les textes calculés par le moteur (explications, conseils, résultats des actions `evaluer_offres` et `simuler`) et le pilotage (packages YAML).
+**Langues (0.5.0 à 0.5.4).** Les écrans de l'intégration (connexion, options, assistant d'installation, actions), les noms des entités et les messages d'erreur suivent la langue de votre profil Home Assistant : français, anglais, chinois simplifié (0.5.1), allemand (0.5.2 ; tutoiement depuis la 0.5.3, comme le reste de Home Assistant), italien, espagnol ou portugais du Portugal (0.5.4). Toute autre langue s'affiche en anglais. Les cartes du tableau de bord sont traduites dans les mêmes langues (0.6.0, puis 0.6.1 pour l'italien, l'espagnol et le portugais) (`dashboard/README.md`). Restent en français pour l'instant : les textes calculés par le moteur (explications, conseils, résultats des actions `evaluer_offres` et `simuler`) et le pilotage (packages YAML).
 - Le français est la langue de référence (`translations/fr.json`) ; `tests/test_traductions.py` vérifie que chaque langue a les mêmes clés et les mêmes paramètres.
 - Identifiants : en français, les entités gardent les identifiants d'avant (`sensor.uhome_production_solaire_totale`…). Dans une autre langue, les entités qui n'ont pas d'identifiant fixe prennent un identifiant tiré de leur nom dans cette langue (allemand, anglais…) ou, pour le chinois, du nom anglais (règle de Home Assistant). Les entités lues par le pilotage et le tableau de bord ont un identifiant fixe, quelle que soit la langue.
 - `select.ucaness_type_tarif` a désormais pour état `hphc` ou `base` (affichés « Heures pleines / heures creuses » et « Base ») ; l'entrée du package `input_select.jarvis_type_tarif` garde ses textes.

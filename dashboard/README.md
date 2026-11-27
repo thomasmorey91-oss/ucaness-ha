@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.6.0`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.6.1`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -189,9 +189,9 @@ Pour l'utiliser, remplacer `type: markdown` par `type: custom:ucaness-note-card`
 
 Options : `soc_entity`, `power_entity`, `floor_entity` ou `floor` (%), `capacity_entity` ou `capacity` (kWh). Par défaut, les entrées des packages de pilotage. L'anneau est en dégradé : cyan en charge, orange en décharge, vert au repos, avec un halo qui bat d'autant plus vite que la puissance est forte.
 
-### Langues (0.6.0)
+### Langues (0.6.0 et 0.6.1)
 
-Les textes des cartes (libellés, états, bulles, messages d'Ucan, simulateur « Et si… », textes lus par les lecteurs d'écran, erreurs de configuration, noms dans le sélecteur de cartes) suivent la langue du profil Home Assistant : français, anglais, chinois simplifié ou allemand ; toute autre langue s'affiche en anglais. Les nombres et les heures suivent aussi la langue.
+Les textes des cartes (libellés, états, bulles, messages d'Ucan, simulateur « Et si… », textes lus par les lecteurs d'écran, erreurs de configuration, noms dans le sélecteur de cartes) suivent la langue du profil Home Assistant : français, anglais, chinois simplifié, allemand, italien, espagnol ou portugais (0.6.1) ; une variante (portugais du Brésil, chinois traditionnel…) prend la langue de base, et toute autre langue s'affiche en anglais. Les nombres et les heures suivent aussi la langue.
 - Restent tels quels : les textes que vous écrivez dans la configuration (titres, `label`, `ok_text`, `mode_names`…), ceux calculés par Home Assistant (modèles Jinja, conseils et explications du pilotage, journal), encore en français. Le tableau de bord d'exemple (`dashboards/ucaness-home-assistant.yaml`) est rédigé en français.
 - Les libellés par défaut de la maison en direct (« Solaire », « Réseau », « Onduleur », « Maison ») sont traduits ; un `label` saisi dans la configuration est gardé.
 - Dictionnaire `UC_I18N` en tête de `ucaness-cards.js`, français en référence ; `tests/test_traductions_cartes.py` vérifie que chaque langue a les mêmes clés et les mêmes paramètres, et que chaque clé utilisée existe.
