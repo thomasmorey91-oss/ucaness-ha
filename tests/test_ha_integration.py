@@ -4,6 +4,7 @@ Le client UCANESS est remplacé par un faux qui renvoie les jeux de données de 
 aucun appel réseau, aucune écriture possible.
 """
 import json
+from datetime import timedelta
 import pathlib
 from unittest.mock import patch
 
@@ -15,6 +16,7 @@ from homeassistant.data_entry_flow import FlowResultType
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er, issue_registry as ir
+from homeassistant.util import dt as dt_util
 
 from custom_components.ucaness.api import (
     CONFIG_KEYS,
@@ -417,6 +419,92 @@ async def test_options_keep_secret_when_left_empty(hass, fake_client):
     await hass.async_block_till_done()
     assert entry.options["app_secret"] == "s"
     assert entry.options["write_enabled"] is True
+
+
+async def test_vehicule_choisi_dans_le_catalogue_puis_plan_a_blanc(hass, fake_client):
+    entry = await _entry_with_options(hass)
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "reglages": {
+        "type_tarif": "Heures pleines / heures creuses", "prix_hp": 0.30, "prix_hc": 0.17,
+        "hc_debut": "23:00:00", "hc_fin": "06:00:00", "hc_jours_non_ouvres": False, "prix_injection": 0.04}})
+    await hass.async_block_till_done()
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(
+        flow["flow_id"], {"scan_interval": 60, "app_key": "", "app_secret": "", "write_enabled": False, "configurer_vehicule": True}
+    )
+    assert flow["step_id"] == "vehicule_marque"
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"marque": "Renault"})
+    assert flow["step_id"] == "vehicule_modele"
+    choix = flow["data_schema"].schema["modele"].config["options"][0]["value"]
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"modele": choix})
+    assert flow["step_id"] == "vehicule_details"
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {
+        "nom": "Voiture", "gabarit": "citadine", "couleur": [200, 30, 30], "capacite_kwh": 52, "ac_kw": 11,
+        "phases": "3", "conso_kwh_100km": 16, "soc_cible": 80, "puissance_borne_kw": 7.4})
+    await hass.async_block_till_done()
+    cfg = entry.options["vehicule"]
+    assert cfg["marque"] == "Renault" and cfg["couleur"] == "#c81e1e" and cfg["phases"] == 3
+    assert entry.options["scan_interval"] == 60
+    etat = hass.states.get("sensor.ucaness_vehicule")
+    assert etat is not None and etat.attributes["capacite_kwh"] == 52
+
+    # Les options générales modifiées ensuite gardent le véhicule.
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        flow["flow_id"], {"scan_interval": 90, "app_key": "", "app_secret": "", "write_enabled": False})
+    await hass.async_block_till_done()
+    assert entry.options["vehicule"]["nom"] == "Voiture"
+
+    # Image : seules les adresses servies par Home Assistant passent.
+    await hass.services.async_call(DOMAIN, "definir_image_vehicule", {"image": "/api/image/serve/abc/original"}, blocking=True)
+    assert entry.options["vehicule"]["image"] == "/api/image/serve/abc/original"
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(DOMAIN, "definir_image_vehicule", {"image": "https://exemple.invalid/x.png"}, blocking=True)
+
+    # Plan sans état de charge connu : refusé ; avec : calcul seul, aucune écriture.
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(DOMAIN, "planifier_recharge_vehicule", {}, blocking=True, return_response=True)
+    ecritures = list(FakeClient.instances[-1].writes)
+    plan = await hass.services.async_call(DOMAIN, "planifier_recharge_vehicule",
+                                          {"soc_actuel": 40, "depart": (dt_util.now() + timedelta(hours=30)).isoformat()}, blocking=True, return_response=True)
+    assert plan["a_blanc"] is True and plan["puissance_kw"] == 7.4 and plan["source_soc"] == "saisi"
+    assert plan["energie_kwh"] == pytest.approx(52 * 0.4 / 0.9, abs=0.01)
+    assert plan["complet"] and plan["plages"]
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(DOMAIN, "planifier_recharge_vehicule",
+                                       {"soc_actuel": 40, "depart": (dt_util.now() + timedelta(days=9)).isoformat()}, blocking=True, return_response=True)
+    assert FakeClient.instances[-1].writes == ecritures
+
+    # Retrait du véhicule.
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(
+        flow["flow_id"], {"scan_interval": 90, "app_key": "", "app_secret": "", "write_enabled": False, "configurer_vehicule": True})
+    await hass.config_entries.options.async_configure(flow["flow_id"], {"marque": "retirer"})
+    await hass.async_block_till_done()
+    assert "vehicule" not in entry.options
+
+
+async def test_vehicule_meilleures_ventes_du_pays_en_tete(hass, fake_client):
+    hass.config.country = "FR"
+    entry = await _entry_with_options(hass)
+    init = {"scan_interval": 60, "app_key": "", "app_secret": "", "write_enabled": False, "configurer_vehicule": True}
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], init)
+    options = flow["data_schema"].schema["marque"].config["options"]
+    assert options[0] == {"value": "top:0", "label": "★ Tesla Model Y"} and len([o for o in options if o["value"].startswith("top:")]) == 10
+    assert "Avere-France" in flow["description_placeholders"]["source"]
+    # Modèle du catalogue : seules ses versions sont proposées.
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"marque": "top:0"})
+    assert flow["step_id"] == "vehicule_modele"
+    assert all(o["label"].startswith("Model Y") for o in flow["data_schema"].schema["modele"].config["options"])
+    hass.config_entries.options.async_abort(flow["flow_id"])
+    # Modèle récent absent du catalogue : on passe directement aux caractéristiques, nom et silhouette proposés.
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], init)
+    twingo = next(o["value"] for o in flow["data_schema"].schema["marque"].config["options"] if "Twingo" in o["label"])
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"marque": twingo})
+    assert flow["step_id"] == "vehicule_details"
+    defauts = {str(k): k.default() for k in flow["data_schema"].schema if hasattr(k, "default") and callable(k.default)}
+    assert defauts["nom"] == "Renault Twingo E-Tech" and defauts["gabarit"] == "citadine"
 
 
 async def test_mode_confirmed_by_inverter_state_when_cloud_does_not_store_it(hass, fake_client, fast_readback):

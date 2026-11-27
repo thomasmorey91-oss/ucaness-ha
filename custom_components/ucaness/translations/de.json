@@ -37,7 +37,42 @@
           "scan_interval": "Abfrageintervall der Cloud (Sekunden, mindestens 30)",
           "app_key": "Persönlicher UCanpower-Anwendungsschlüssel (optional)",
           "app_secret": "Persönliches UCanpower-Anwendungs-Secret (optional)",
-          "write_enabled": "Schreiben erlaubt (nur Betriebsmodus und Ladefenster)"
+          "write_enabled": "Schreiben erlaubt (nur Betriebsmodus und Ladefenster)",
+          "configurer_vehicule": "Ihr Elektrofahrzeug im nächsten Schritt einrichten"
+        }
+      },
+      "vehicule_marque": {
+        "title": "Ihr Fahrzeug: Marke",
+        "description": "Mit ★ markierte Modelle sind die meistverkauften in Ihrem Land ({source}). Andernfalls wählen Sie die Marke. Daten aus dem freien Katalog OpenEV Data: Prüfen Sie die vorgeschlagenen Werte im nächsten Schritt.",
+        "data": {
+          "marque": "Marke"
+        }
+      },
+      "vehicule_modele": {
+        "title": "Ihr Fahrzeug: Modell",
+        "description": "Modell und Version Ihres {marque}.",
+        "data": {
+          "modele": "Modell und Version"
+        }
+      },
+      "vehicule_details": {
+        "title": "Ihr Fahrzeug: Daten",
+        "description": "Vorgeschlagene Werte für {vehicule}, anhand von Fahrzeugschein oder Handbuch zu bestätigen oder zu korrigieren. Sie dienen der Berechnung des Ladeplans; an die Wallbox wird nichts gesendet.",
+        "data": {
+          "nom": "Angezeigter Name",
+          "gabarit": "Silhouette",
+          "couleur": "Farbe",
+          "capacite_kwh": "Nutzbare Batteriekapazität",
+          "ac_kw": "Maximale Ladeleistung des Fahrzeugs (Wechselstrom)",
+          "phases": "Phasen des Bordladegeräts",
+          "conso_kwh_100km": "Durchschnittsverbrauch",
+          "soc_cible": "Ziel-Ladestand vor der Abfahrt",
+          "puissance_borne_kw": "Leistung der Wallbox",
+          "entite_soc": "Vom Auto gemeldeter Ladestand (optional)"
+        },
+        "data_description": {
+          "entite_soc": "Entität einer Hersteller-Integration, die den Batterie-Prozentsatz liefert. Ohne sie wird der Ladestand beim Anstecken eingegeben.",
+          "puissance_borne_kw": "7,4 kW für eine einphasige 32-A-Wallbox."
         }
       }
     }
@@ -248,6 +283,46 @@
           "description": "Aus dem Netz bezogene Leistung (W)."
         }
       }
+    },
+    "planifier_recharge_vehicule": {
+      "name": "Laden des Fahrzeugs planen",
+      "description": "Nur Berechnung, an die Wallbox wird nichts gesendet: wann vor der Abfahrt am günstigsten geladen wird, zuerst Solarüberschuss, dann die günstigsten Stunden. Zeitfenster mit Netzbezug werden markiert, damit sich die Hausbatterie nicht ins Auto entlädt.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Gerät",
+          "description": "Zu verwendender UCANESS-Eintrag (optional, wenn es nur ein Gerät gibt)."
+        },
+        "soc_actuel": {
+          "name": "Aktueller Ladestand",
+          "description": "In %. Leer lassen, um den vom Auto gemeldeten Wert zu lesen."
+        },
+        "soc_cible": {
+          "name": "Ziel-Ladestand vor der Abfahrt",
+          "description": "In %. Standard: Wert aus den Optionen."
+        },
+        "depart": {
+          "name": "Abfahrt",
+          "description": "Uhrzeit, zu der das Auto bereit sein muss (standardmäßig 7:30 am nächsten Tag)."
+        },
+        "puissance_borne_kw": {
+          "name": "Leistung der Wallbox",
+          "description": "In kW. Standard: Wert aus den Optionen."
+        }
+      }
+    },
+    "definir_image_vehicule": {
+      "name": "Fahrzeugbild festlegen",
+      "description": "Speichert das auf der Fahrzeugkarte gezeigte Bild (freigestelltes, in Home Assistant hochgeladenes Foto). Leer: zurück zur gezeichneten Silhouette.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Gerät",
+          "description": "Zu verwendender UCANESS-Eintrag (optional, wenn es nur ein Gerät gibt)."
+        },
+        "image": {
+          "name": "Bild",
+          "description": "Adresse eines von Home Assistant bereitgestellten Bildes (/api/image/serve/… oder /local/…)."
+        }
+      }
     }
   },
   "selector": {
@@ -261,6 +336,28 @@
       "options": {
         "hphc": "Hochtarif / Niedertarif",
         "base": "Einheitstarif"
+      }
+    },
+    "marque_vehicule": {
+      "options": {
+        "autre": "Anderes Fahrzeug (nicht im Katalog)",
+        "retirer": "Fahrzeug entfernen"
+      }
+    },
+    "gabarit": {
+      "options": {
+        "citadine": "Kleinwagen",
+        "compacte": "Kompaktwagen",
+        "berline": "Limousine",
+        "suv": "SUV",
+        "grand_suv": "Großer SUV",
+        "utilitaire": "Transporter"
+      }
+    },
+    "phases": {
+      "options": {
+        "1": "Einphasig",
+        "3": "Dreiphasig"
       }
     }
   },
@@ -530,6 +627,9 @@
           "en_service": "In Betrieb",
           "a_verifier": "Zu prüfen"
         }
+      },
+      "vehicule": {
+        "name": "Fahrzeug"
       }
     },
     "binary_sensor": {
@@ -652,6 +752,21 @@
     },
     "reglage_ni_vrai_ni_faux": {
       "message": "Einstellung abgelehnt: {reglage}: {valeur} ist weder wahr noch falsch"
+    },
+    "vehicule_absent": {
+      "message": "Kein Fahrzeug eingerichtet: Einstellungen > Geräte & Dienste > UCANESS > Konfigurieren, dann „Ihr Elektrofahrzeug einrichten“."
+    },
+    "vehicule_soc_inconnu": {
+      "message": "Ladestand des Fahrzeugs unbekannt: Geben Sie ihn an (soc_actuel) oder wählen Sie in den Optionen die Entität, die ihn meldet."
+    },
+    "vehicule_tarif_inconnu": {
+      "message": "Strompreise nicht eingetragen: Ergänzen Sie Preise und Nebenzeiten in den Steuerungseinstellungen."
+    },
+    "vehicule_image_invalide": {
+      "message": "Bild abgelehnt: Nur von Home Assistant bereitgestellte Bilder (/api/image/serve/… oder /local/…) werden akzeptiert."
+    },
+    "vehicule_depart_invalide": {
+      "message": "Abfahrt abgelehnt: Wählen Sie einen künftigen Zeitpunkt innerhalb der nächsten 7 Tage."
     }
   }
 }

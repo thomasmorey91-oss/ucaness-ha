@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.6.1`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.7.0`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -163,6 +163,18 @@ Conventions de signe de l'intégration : batterie positive en charge, réseau po
 ### `custom:ucaness-ucan-card` (0.5.1)
 
 Ucan, la batterie UHome avec un visage, et son conseil du moment (package `pilotage/packages/ucan_conseils.yaml`). L'écran du module du haut change d'expression : orange « à surveiller » si une alerte de `alert_entities` est en cours, « un conseil » si `sensor.ucan_conseil` en propose un, yeux fermés quand le soleil est couché (`sun.sun`), sourire sinon. Les barres des trois modules s'allument avec la charge (`soc`, `sensor.uhome_soc` par défaut : au-dessus de 0, 33 et 66 %). Le conseil s'affiche dans une bulle (constat, geste, gain, avertissement) avec trois boutons : « Je le fais », « Pas maintenant », « Ne plus proposer », envoyés à `script.ucan_conseil_reponse`. Options : `conseil`, `soc`, `script`, `alert_entities`, `compact: true` (petit avatar, pour une colonne de 300 px ou le téléphone). Dans une colonne étroite, la bulle passe sous l'avatar (0.5.2). `floating: true` (0.5.3) : Ucan devient un bouton rond en bas à droite de l'écran, devant les cartes, comme une fenêtre de discussion ; un appui ouvre le conseil, la croix ou Échap le referme ; une pastille et un léger battement signalent un conseil ou une alerte (sans animation en mode allégé ou si l'appareil demande moins de mouvement). `offset_bottom` et `offset_right` (px, 20 par défaut) le décalent, par exemple au-dessus de la barre de navigation du téléphone. Placée n'importe où dans la page, la carte n'y prend aucune place. Depuis la 0.5.4, la bulle se déplace en la faisant glisser (souris ou doigt) si elle cache quelque chose ; la position est gardée sur cet appareil, et « Replacer » dans la fenêtre la remet à sa place d'origine. Depuis la 0.5.5, l'option `simulateur` (`puissance_actuelle_kva`, `abonnement_actuel_eur_an`, `jours`, 30 par défaut) ajoute dans la fenêtre deux questions « Et si… je changeais de contrat ? » et « … de puissance ? » : l'action `ucaness.simuler` calcule sur les mesures de la maison, sans rien appliquer, et Ucan répond dans la fenêtre.
+
+### `custom:ucaness-vehicle-card` (0.7.0)
+
+La voiture de la maison, telle que réglée dans les options de l'intégration (« Configurer votre véhicule ») : `sensor.ucaness_vehicule`.
+
+- **Image** : silhouette dessinée dans le style de la maison en direct (citadine, compacte, berline, SUV, grand SUV ou utilitaire, à la couleur choisie ; formes génériques, pas la reproduction d'un modèle), ou **photo de votre voiture**, le seul moyen d'afficher votre vrai modèle : « Ajouter la photo de ma voiture », choisir une photo, le fond est retiré, « Utiliser cette image ». Le détourage se fait dans le navigateur : la photo n'est envoyée qu'à votre Home Assistant (`/api/image/upload`, fourni par `default_config`, compte administrateur). « Revenir au dessin » remet la silhouette.
+- **Détourage automatique (facultatif)** : lancer `tools/vehicules/installer_detourage.sh`, puis copier `www/ucaness/detourage/` (19 Mo : modèle u2netp, Apache-2.0 ; onnxruntime-web 1.31.1, MIT) dans `/config/www/ucaness/detourage/`. Sans ces fichiers, détourage simple d'un fond uni, avec une tolérance réglable : photographier la voiture devant un mur ou un ciel dégagé.
+- **Charge** : barre avec l'objectif (trait orange) ; si la voiture ne transmet pas sa charge, un champ permet de la saisir au branchement.
+- **Planifier la recharge** : appelle `ucaness.planifier_recharge_vehicule` (calcul seul) et affiche les plages, l'énergie, le coût estimé et la part solaire ; « réseau, batterie maison tenue » signale les plages où la batterie de la maison ne doit pas alimenter la voiture.
+- Options : `entity` (`sensor.ucaness_vehicule`), `charger_entity` (état de la borne, par exemple `sensor.wallbox_status_description`), `title`.
+
+L'image téléversée est servie par Home Assistant à une adresse difficile à deviner mais sans mot de passe, comme le dossier `www` : n'utilisez pas une photo où l'on voit la plaque d'immatriculation ou la maison si cela vous gêne.
 
 ### `custom:ucaness-note-card`
 

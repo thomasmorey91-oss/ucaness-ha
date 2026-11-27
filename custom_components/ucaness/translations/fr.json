@@ -37,7 +37,42 @@
           "scan_interval": "Fréquence d'interrogation du cloud (secondes, 30 au minimum)",
           "app_key": "Clé d'application UCanpower personnelle (facultative)",
           "app_secret": "Secret d'application UCanpower personnel (facultatif)",
-          "write_enabled": "Écriture autorisée (mode et plages de charge seulement)"
+          "write_enabled": "Écriture autorisée (mode et plages de charge seulement)",
+          "configurer_vehicule": "Configurer votre véhicule électrique à l'étape suivante"
+        }
+      },
+      "vehicule_marque": {
+        "title": "Votre véhicule : marque",
+        "description": "Les modèles marqués ★ sont les plus vendus dans votre pays ({source}). Sinon, choisissez la marque. Fiches tirées du catalogue libre OpenEV Data : vérifiez les valeurs proposées à l'étape suivante.",
+        "data": {
+          "marque": "Marque"
+        }
+      },
+      "vehicule_modele": {
+        "title": "Votre véhicule : modèle",
+        "description": "Modèle et version de votre {marque}.",
+        "data": {
+          "modele": "Modèle et version"
+        }
+      },
+      "vehicule_details": {
+        "title": "Votre véhicule : caractéristiques",
+        "description": "Valeurs proposées pour {vehicule}, à confirmer ou corriger d'après la carte grise ou la notice. Elles servent au calcul du plan de recharge ; rien n'est envoyé à la borne.",
+        "data": {
+          "nom": "Nom affiché",
+          "gabarit": "Silhouette",
+          "couleur": "Couleur",
+          "capacite_kwh": "Capacité utile de la batterie",
+          "ac_kw": "Puissance de charge maximale du véhicule (courant alternatif)",
+          "phases": "Phases du chargeur embarqué",
+          "conso_kwh_100km": "Consommation moyenne",
+          "soc_cible": "Charge visée avant le départ",
+          "puissance_borne_kw": "Puissance de la borne",
+          "entite_soc": "État de charge transmis par la voiture (facultatif)"
+        },
+        "data_description": {
+          "entite_soc": "Entité d'une intégration du constructeur qui donne le pourcentage de la batterie. Sans elle, l'état de charge se saisit au branchement.",
+          "puissance_borne_kw": "7,4 kW pour une borne monophasée 32 A."
         }
       }
     }
@@ -248,6 +283,46 @@
           "description": "Puissance prise au réseau (W)."
         }
       }
+    },
+    "planifier_recharge_vehicule": {
+      "name": "Planifier la recharge du véhicule",
+      "description": "Calcul seul, rien n'est envoyé à la borne : quand recharger avant le départ au moindre coût, surplus solaire d'abord puis heures les moins chères. Les plages où une partie vient du réseau sont marquées pour que la batterie de la maison ne se vide pas dans la voiture.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Appareil",
+          "description": "Entrée UCANESS à utiliser (facultatif s'il n'y a qu'un appareil)."
+        },
+        "soc_actuel": {
+          "name": "État de charge actuel",
+          "description": "En %. Laissez vide pour lire celui transmis par la voiture."
+        },
+        "soc_cible": {
+          "name": "Charge visée avant le départ",
+          "description": "En %. Par défaut, la valeur des options."
+        },
+        "depart": {
+          "name": "Départ",
+          "description": "Heure à laquelle la voiture doit être prête (7 h 30 le lendemain par défaut)."
+        },
+        "puissance_borne_kw": {
+          "name": "Puissance de la borne",
+          "description": "En kW. Par défaut, la valeur des options."
+        }
+      }
+    },
+    "definir_image_vehicule": {
+      "name": "Définir l'image du véhicule",
+      "description": "Enregistre l'image affichée sur la carte du véhicule (photo détourée téléversée dans Home Assistant). Vide : retour à la silhouette dessinée.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Appareil",
+          "description": "Entrée UCANESS à utiliser (facultatif s'il n'y a qu'un appareil)."
+        },
+        "image": {
+          "name": "Image",
+          "description": "Adresse d'une image servie par Home Assistant (/api/image/serve/… ou /local/…)."
+        }
+      }
     }
   },
   "selector": {
@@ -261,6 +336,28 @@
       "options": {
         "hphc": "Heures pleines / heures creuses",
         "base": "Base"
+      }
+    },
+    "marque_vehicule": {
+      "options": {
+        "autre": "Autre véhicule (hors catalogue)",
+        "retirer": "Retirer le véhicule"
+      }
+    },
+    "gabarit": {
+      "options": {
+        "citadine": "Citadine",
+        "compacte": "Compacte",
+        "berline": "Berline",
+        "suv": "SUV",
+        "grand_suv": "Grand SUV",
+        "utilitaire": "Utilitaire"
+      }
+    },
+    "phases": {
+      "options": {
+        "1": "Monophasé",
+        "3": "Triphasé"
       }
     }
   },
@@ -530,6 +627,9 @@
           "en_service": "En service",
           "a_verifier": "À vérifier"
         }
+      },
+      "vehicule": {
+        "name": "Véhicule"
       }
     },
     "binary_sensor": {
@@ -652,6 +752,21 @@
     },
     "reglage_ni_vrai_ni_faux": {
       "message": "Réglage refusé : {reglage} : {valeur} n'est ni vrai ni faux"
+    },
+    "vehicule_absent": {
+      "message": "Aucun véhicule n'est configuré : Paramètres > Appareils et services > UCANESS > Configurer, puis « Configurer votre véhicule »."
+    },
+    "vehicule_soc_inconnu": {
+      "message": "État de charge du véhicule inconnu : indiquez-le (soc_actuel) ou choisissez l'entité qui le transmet dans les options."
+    },
+    "vehicule_tarif_inconnu": {
+      "message": "Prix de l'électricité non renseignés : complétez les prix et les heures creuses dans les réglages du pilotage."
+    },
+    "vehicule_image_invalide": {
+      "message": "Image refusée : seules les images servies par Home Assistant (/api/image/serve/… ou /local/…) sont acceptées."
+    },
+    "vehicule_depart_invalide": {
+      "message": "Départ refusé : choisissez une heure à venir, dans les 7 prochains jours."
     }
   }
 }

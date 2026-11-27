@@ -9,10 +9,25 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.helpers.selector import (
+    ColorRGBSelector,
+    EntitySelector,
+    EntitySelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .api import UcanessApiError, UcanessAuthError, UcanessClient, UcanessError, hash_password
+from . import vehicules
 from .reglages import CONF_REGLAGES
+from .vehicule_ha import CONF_VEHICULE, DEFAUTS as DEFAUTS_VEHICULE, couleur_hex, couleur_rgb
 from .const import (
     CONF_APP_KEY,
     CONF_APP_SECRET,
@@ -116,9 +131,13 @@ class UcanessOptionsFlow(config_entries.OptionsFlow):
                 CONF_APP_SECRET: (user_input.get(CONF_APP_SECRET) or "").strip() or options.get(CONF_APP_SECRET, ""),
                 CONF_WRITE_ENABLED: bool(user_input.get(CONF_WRITE_ENABLED, False)),
             }
-            # Les réglages du pilotage (reglages.py) vivent aussi dans les options : on les garde.
-            if CONF_REGLAGES in options:
-                data[CONF_REGLAGES] = options[CONF_REGLAGES]
+            # Les réglages du pilotage (reglages.py) et le véhicule vivent aussi dans les options : on les garde.
+            for cle in (CONF_REGLAGES, CONF_VEHICULE):
+                if cle in options:
+                    data[cle] = options[cle]
+            if user_input.get("configurer_vehicule"):
+                self._data = data
+                return await self.async_step_vehicule_marque()
             return self.async_create_entry(title="", data=data)
         schema = vol.Schema(
             {
@@ -130,6 +149,108 @@ class UcanessOptionsFlow(config_entries.OptionsFlow):
                     TextSelectorConfig(type=TextSelectorType.PASSWORD)
                 ),
                 vol.Required(CONF_WRITE_ENABLED, default=options.get(CONF_WRITE_ENABLED, False)): bool,
+                vol.Optional("configurer_vehicule", default=False): bool,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
+
+    # ---------------------------------------------------------------- votre véhicule
+
+    async def _catalogue(self) -> tuple[vehicules.Vehicule, ...]:
+        return await self.hass.async_add_executor_job(vehicules.charger_catalogue)
+
+    async def async_step_vehicule_marque(self, user_input: dict[str, Any] | None = None):
+        """Les modèles les plus vendus du pays d'abord, puis les marques du catalogue (OpenEV Data),
+        « hors catalogue » ou retrait du véhicule."""
+        cat = await self._catalogue()
+        ventes = await self.hass.async_add_executor_job(vehicules.meilleures_ventes, cat, self.hass.config.country)
+        self._preset = {}
+        if user_input is not None:
+            choix = user_input["marque"]
+            if choix == "retirer":
+                self._data.pop(CONF_VEHICULE, None)
+                return self.async_create_entry(title="", data=self._data)
+            if choix == "autre":
+                self._modele = None
+                return await self.async_step_vehicule_details()
+            if choix.startswith("top:"):
+                vente = ventes[int(choix[4:])]
+                self._preset = {"nom": vente.nom, "gabarit": vente.gabarit}
+                if not vente.versions:            # modèle récent, absent du catalogue : valeurs à saisir
+                    self._modele = None
+                    return await self.async_step_vehicule_details()
+                self._marque, self._versions = vente.versions[0].marque, vente.versions
+                return await self.async_step_vehicule_modele()
+            self._marque, self._versions = choix, None
+            return await self.async_step_vehicule_modele()
+        actuel = self._data.get(CONF_VEHICULE) or {}
+        options = [{"value": f"top:{i}", "label": f"★ {m.nom}"} for i, m in enumerate(ventes)]
+        options += [{"value": m, "label": m} for m in vehicules.marques(cat)]
+        options.append({"value": "autre", "label": "—"})
+        if actuel:
+            options.append({"value": "retirer", "label": "×"})
+        schema = vol.Schema({vol.Required("marque", default=actuel.get("marque") or vol.UNDEFINED): SelectSelector(
+            SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN, translation_key="marque_vehicule")
+        )})
+        source = await self.hass.async_add_executor_job(vehicules.source_ventes, self.hass.config.country)
+        return self.async_show_form(step_id="vehicule_marque", data_schema=schema,
+                                    description_placeholders={"source": source or "—"})
+
+    async def async_step_vehicule_modele(self, user_input: dict[str, Any] | None = None):
+        cat = await self._catalogue()
+        if user_input is not None:
+            self._modele = vehicules.par_id(cat, user_input["modele"])
+            return await self.async_step_vehicule_details()
+        liste = list(getattr(self, "_versions", None) or vehicules.de_la_marque(cat, self._marque))
+        actuel = (self._data.get(CONF_VEHICULE) or {}).get("id")
+        schema = vol.Schema({vol.Required("modele", default=actuel if any(v.id == actuel for v in liste) else vol.UNDEFINED): SelectSelector(
+            SelectSelectorConfig(options=[{"value": v.id, "label": f"{v.modele} {v.version} ({v.annee}) · {v.capacite_kwh:g} kWh".replace("  ", " ")} for v in liste],
+                                 mode=SelectSelectorMode.DROPDOWN)
+        )})
+        return self.async_show_form(step_id="vehicule_modele", data_schema=schema,
+                                    description_placeholders={"marque": self._marque})
+
+    async def async_step_vehicule_details(self, user_input: dict[str, Any] | None = None):
+        """Valeurs proposées par le catalogue, à confirmer ou corriger (la fiche peut se tromper)."""
+        actuel = self._data.get(CONF_VEHICULE) or {}
+        v = self._modele
+        preset = getattr(self, "_preset", None) or {}
+        if user_input is not None:
+            cfg = {
+                "id": v.id if v else None,
+                "marque": v.marque if v else None,
+                "modele": v.modele if v else None,
+                "nom": (user_input.get("nom") or "").strip() or preset.get("nom") or (v.libelle if v else "Véhicule"),
+                "gabarit": user_input["gabarit"],
+                "couleur": couleur_hex(user_input.get("couleur")),
+                "capacite_kwh": float(user_input["capacite_kwh"]),
+                "ac_kw": float(user_input["ac_kw"]),
+                "phases": int(user_input["phases"]),
+                "conso_kwh_100km": float(user_input["conso_kwh_100km"]),
+                "soc_cible": float(user_input["soc_cible"]),
+                "puissance_borne_kw": float(user_input["puissance_borne_kw"]),
+                "entite_soc": user_input.get("entite_soc") or None,
+                "image": actuel.get("image", ""),     # photo détourée gardée si le véhicule change
+            }
+            return self.async_create_entry(title="", data={**self._data, CONF_VEHICULE: cfg})
+        meme = actuel if (not v or actuel.get("id") == v.id) else {}
+        def defaut(cle, cat):
+            return meme.get(cle) if meme.get(cle) is not None else cat
+        nombre = lambda mini, maxi, pas, unite: NumberSelector(NumberSelectorConfig(min=mini, max=maxi, step=pas, unit_of_measurement=unite, mode=NumberSelectorMode.BOX))
+        schema = vol.Schema({
+            vol.Optional("nom", default=defaut("nom", preset.get("nom") or (v.libelle if v else ""))): str,
+            vol.Required("gabarit", default=defaut("gabarit", preset.get("gabarit") or (v.gabarit if v else "citadine"))): SelectSelector(
+                SelectSelectorConfig(options=list(vehicules.GABARITS), translation_key="gabarit")),
+            vol.Required("couleur", default=couleur_rgb(actuel.get("couleur") or DEFAUTS_VEHICULE["couleur"])): ColorRGBSelector(),
+            vol.Required("capacite_kwh", default=defaut("capacite_kwh", v.capacite_kwh if v else 50.0)): nombre(5, 250, 0.1, "kWh"),
+            vol.Required("ac_kw", default=defaut("ac_kw", v.ac_kw if v else 7.4)): nombre(1, 43, 0.1, "kW"),
+            vol.Required("phases", default=str(defaut("phases", v.phases if v else 1))): SelectSelector(
+                SelectSelectorConfig(options=["1", "3"], translation_key="phases")),
+            vol.Required("conso_kwh_100km", default=defaut("conso_kwh_100km", (v.conso_kwh_100km if v else None) or 17.0)): nombre(5, 60, 0.1, "kWh/100 km"),
+            vol.Required("soc_cible", default=actuel.get("soc_cible", DEFAUTS_VEHICULE["soc_cible"])): nombre(20, 100, 5, "%"),
+            vol.Required("puissance_borne_kw", default=actuel.get("puissance_borne_kw", DEFAUTS_VEHICULE["puissance_borne_kw"])): nombre(1.4, 22, 0.1, "kW"),
+            vol.Optional("entite_soc", description={"suggested_value": actuel.get("entite_soc")}): EntitySelector(
+                EntitySelectorConfig(domain="sensor", device_class="battery")),
+        })
+        return self.async_show_form(step_id="vehicule_details", data_schema=schema,
+                                    description_placeholders={"vehicule": v.libelle if v else preset.get("nom") or "—"})

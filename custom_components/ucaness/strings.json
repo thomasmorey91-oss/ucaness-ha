@@ -37,7 +37,42 @@
           "scan_interval": "Cloud polling interval (seconds, minimum 30)",
           "app_key": "Personal UCanpower application key (optional)",
           "app_secret": "Personal UCanpower application secret (optional)",
-          "write_enabled": "Write allowed (work mode and charge windows only)"
+          "write_enabled": "Write allowed (work mode and charge windows only)",
+          "configurer_vehicule": "Set up your electric vehicle in the next step"
+        }
+      },
+      "vehicule_marque": {
+        "title": "Your vehicle: make",
+        "description": "Models marked ★ are the best sellers in your country ({source}). Otherwise, choose the make. Data from the open OpenEV Data catalogue: check the suggested values in the next step.",
+        "data": {
+          "marque": "Make"
+        }
+      },
+      "vehicule_modele": {
+        "title": "Your vehicle: model",
+        "description": "Model and version of your {marque}.",
+        "data": {
+          "modele": "Model and version"
+        }
+      },
+      "vehicule_details": {
+        "title": "Your vehicle: specifications",
+        "description": "Suggested values for {vehicule}, to confirm or correct from the registration document or manual. They are used to compute the charging plan; nothing is sent to the charger.",
+        "data": {
+          "nom": "Display name",
+          "gabarit": "Silhouette",
+          "couleur": "Colour",
+          "capacite_kwh": "Usable battery capacity",
+          "ac_kw": "Maximum vehicle charging power (AC)",
+          "phases": "On-board charger phases",
+          "conso_kwh_100km": "Average consumption",
+          "soc_cible": "Target charge before departure",
+          "puissance_borne_kw": "Charger power",
+          "entite_soc": "State of charge reported by the car (optional)"
+        },
+        "data_description": {
+          "entite_soc": "Entity from a manufacturer integration giving the battery percentage. Without it, the state of charge is entered when plugging in.",
+          "puissance_borne_kw": "7.4 kW for a single-phase 32 A charger."
         }
       }
     }
@@ -248,6 +283,46 @@
           "description": "Power taken from the grid (W)."
         }
       }
+    },
+    "planifier_recharge_vehicule": {
+      "name": "Plan vehicle charging",
+      "description": "Calculation only, nothing is sent to the charger: when to charge before departure at the lowest cost, solar surplus first, then the cheapest hours. Slots partly drawing from the grid are flagged so the house battery does not empty into the car.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Device",
+          "description": "UCANESS entry to use (optional if only one device)."
+        },
+        "soc_actuel": {
+          "name": "Current state of charge",
+          "description": "In %. Leave empty to read the value reported by the car."
+        },
+        "soc_cible": {
+          "name": "Target charge before departure",
+          "description": "In %. Defaults to the options value."
+        },
+        "depart": {
+          "name": "Departure",
+          "description": "Time the car must be ready (7:30 the next day by default)."
+        },
+        "puissance_borne_kw": {
+          "name": "Charger power",
+          "description": "In kW. Defaults to the options value."
+        }
+      }
+    },
+    "definir_image_vehicule": {
+      "name": "Set vehicle image",
+      "description": "Saves the image shown on the vehicle card (cut-out photo uploaded to Home Assistant). Empty: back to the drawn silhouette.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Device",
+          "description": "UCANESS entry to use (optional if only one device)."
+        },
+        "image": {
+          "name": "Image",
+          "description": "Address of an image served by Home Assistant (/api/image/serve/… or /local/…)."
+        }
+      }
     }
   },
   "selector": {
@@ -261,6 +336,28 @@
       "options": {
         "hphc": "Peak / off-peak hours",
         "base": "Base (single price)"
+      }
+    },
+    "marque_vehicule": {
+      "options": {
+        "autre": "Other vehicle (not in catalogue)",
+        "retirer": "Remove the vehicle"
+      }
+    },
+    "gabarit": {
+      "options": {
+        "citadine": "City car",
+        "compacte": "Compact",
+        "berline": "Sedan",
+        "suv": "SUV",
+        "grand_suv": "Large SUV",
+        "utilitaire": "Van"
+      }
+    },
+    "phases": {
+      "options": {
+        "1": "Single-phase",
+        "3": "Three-phase"
       }
     }
   },
@@ -530,6 +627,9 @@
           "en_service": "In service",
           "a_verifier": "To be checked"
         }
+      },
+      "vehicule": {
+        "name": "Vehicle"
       }
     },
     "binary_sensor": {
@@ -652,6 +752,21 @@
     },
     "reglage_ni_vrai_ni_faux": {
       "message": "Setting refused: {reglage}: {valeur} is neither true nor false"
+    },
+    "vehicule_absent": {
+      "message": "No vehicle is set up: Settings > Devices & services > UCANESS > Configure, then “Set up your electric vehicle”."
+    },
+    "vehicule_soc_inconnu": {
+      "message": "Vehicle state of charge unknown: enter it (soc_actuel) or choose the entity that reports it in the options."
+    },
+    "vehicule_tarif_inconnu": {
+      "message": "Electricity prices not set: fill in prices and off-peak hours in the control settings."
+    },
+    "vehicule_image_invalide": {
+      "message": "Image refused: only images served by Home Assistant (/api/image/serve/… or /local/…) are accepted."
+    },
+    "vehicule_depart_invalide": {
+      "message": "Departure refused: choose a future time within the next 7 days."
     }
   }
 }

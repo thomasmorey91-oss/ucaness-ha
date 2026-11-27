@@ -1,0 +1,335 @@
+{
+ "note": "Modèles 100 % électriques les plus immatriculés, par pays (voitures particulières neuves). Sert seulement à proposer ces modèles en tête de liste ; marque et modele renvoient au catalogue (null : absent du catalogue, valeurs à saisir).",
+ "pays": {
+  "FR": {
+   "periode": "janvier à octobre 2026",
+   "source": "Avere-France, relevé publié par mondial.paris",
+   "modeles": [
+    {
+     "nom": "Tesla Model Y",
+     "marque": "Tesla",
+     "modele": "Model Y",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Renault 5 E-Tech",
+     "marque": "Renault",
+     "modele": "5 E-Tech",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Renault Scénic E-Tech",
+     "marque": "Renault",
+     "modele": "Scenic E-Tech",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Renault Twingo E-Tech",
+     "marque": null,
+     "modele": null,
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Peugeot e-208",
+     "marque": "Peugeot",
+     "modele": "e-208",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Citroën ë-C3",
+     "marque": "Citroën",
+     "modele": "ë-C3",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Škoda Elroq",
+     "marque": "Škoda",
+     "modele": "Elroq",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Volkswagen ID.4",
+     "marque": "Volkswagen",
+     "modele": "ID.4",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Renault Mégane E-Tech",
+     "marque": "Renault",
+     "modele": "Megane E-Tech Electric",
+     "gabarit": "compacte"
+    },
+    {
+     "nom": "Peugeot e-3008",
+     "marque": "Peugeot",
+     "modele": "e-3008",
+     "gabarit": "suv"
+    }
+   ]
+  },
+  "DE": {
+   "periode": "janvier à juin 2026",
+   "source": "KBA, relevé publié par InsideEVs Allemagne",
+   "modeles": [
+    {
+     "nom": "Škoda Elroq",
+     "marque": "Škoda",
+     "modele": "Elroq",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Tesla Model Y",
+     "marque": "Tesla",
+     "modele": "Model Y",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Volkswagen ID.3",
+     "marque": "Volkswagen",
+     "modele": "ID.3",
+     "gabarit": "compacte"
+    },
+    {
+     "nom": "Škoda Enyaq",
+     "marque": "Škoda",
+     "modele": "Enyaq iV",
+     "gabarit": "grand_suv"
+    },
+    {
+     "nom": "Volkswagen ID.7",
+     "marque": "Volkswagen",
+     "modele": "ID.7",
+     "gabarit": "berline"
+    },
+    {
+     "nom": "Mercedes-Benz CLA",
+     "marque": "Mercedes-Benz",
+     "modele": "CLA EV",
+     "gabarit": "berline"
+    },
+    {
+     "nom": "Volkswagen ID.4",
+     "marque": "Volkswagen",
+     "modele": "ID.4",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "BMW iX1",
+     "marque": "BMW",
+     "modele": "iX1",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Audi A6 e-tron",
+     "marque": null,
+     "modele": null,
+     "gabarit": "berline"
+    },
+    {
+     "nom": "Tesla Model 3",
+     "marque": "Tesla",
+     "modele": "Model 3",
+     "gabarit": "berline"
+    }
+   ]
+  },
+  "IT": {
+   "periode": "janvier à juin 2026",
+   "source": "UNRAE, relevé publié par HDmotori",
+   "modeles": [
+    {
+     "nom": "Leapmotor T03",
+     "marque": "Leapmotor",
+     "modele": "T03",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Dacia Spring",
+     "marque": "Dacia",
+     "modele": "Spring",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Tesla Model Y",
+     "marque": "Tesla",
+     "modele": "Model Y",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Citroën ë-C3",
+     "marque": "Citroën",
+     "modele": "ë-C3",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Tesla Model 3",
+     "marque": "Tesla",
+     "modele": "Model 3",
+     "gabarit": "berline"
+    },
+    {
+     "nom": "BYD Dolphin Surf",
+     "marque": "BYD",
+     "modele": "Dolphin Mini",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "BMW iX1",
+     "marque": "BMW",
+     "modele": "iX1",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Škoda Elroq",
+     "marque": "Škoda",
+     "modele": "Elroq",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Leapmotor B10",
+     "marque": "Leapmotor",
+     "modele": "B10",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Ford Puma Gen-E",
+     "marque": "Ford",
+     "modele": "Puma Gen-E",
+     "gabarit": "suv"
+    }
+   ]
+  },
+  "ES": {
+   "periode": "janvier au 26 novembre 2026",
+   "source": "DGT, relevé publié par TestCoches",
+   "modeles": [
+    {
+     "nom": "Tesla Model 3",
+     "marque": "Tesla",
+     "modele": "Model 3",
+     "gabarit": "berline"
+    },
+    {
+     "nom": "Tesla Model Y",
+     "marque": "Tesla",
+     "modele": "Model Y",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "BYD Dolphin Surf",
+     "marque": "BYD",
+     "modele": "Dolphin Mini",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Kia EV3",
+     "marque": null,
+     "modele": null,
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Toyota C-HR+",
+     "marque": "Toyota",
+     "modele": "C-HR+",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "BYD Atto 2",
+     "marque": "BYD",
+     "modele": "Yuan Up",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Deepal S05",
+     "marque": null,
+     "modele": null,
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Renault 5 E-Tech",
+     "marque": "Renault",
+     "modele": "5 E-Tech",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "BYD Atto 3",
+     "marque": "BYD",
+     "modele": "Yuan Plus",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Citroën ë-C3",
+     "marque": "Citroën",
+     "modele": "ë-C3",
+     "gabarit": "citadine"
+    }
+   ]
+  },
+  "PT": {
+   "periode": "janvier à juillet 2026",
+   "source": "ACAP, relevé publié par Razão Automóvel",
+   "modeles": [
+    {
+     "nom": "Tesla Model 3",
+     "marque": "Tesla",
+     "modele": "Model 3",
+     "gabarit": "berline"
+    },
+    {
+     "nom": "Tesla Model Y",
+     "marque": "Tesla",
+     "modele": "Model Y",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Volvo EX30",
+     "marque": "Volvo",
+     "modele": "EX30",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Citroën ë-C3",
+     "marque": "Citroën",
+     "modele": "ë-C3",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Mercedes-Benz CLA",
+     "marque": "Mercedes-Benz",
+     "modele": "CLA EV",
+     "gabarit": "berline"
+    },
+    {
+     "nom": "BMW iX1",
+     "marque": "BMW",
+     "modele": "iX1",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "Renault 5 E-Tech",
+     "marque": "Renault",
+     "modele": "5 E-Tech",
+     "gabarit": "citadine"
+    },
+    {
+     "nom": "Peugeot e-2008",
+     "marque": "Peugeot",
+     "modele": "e-2008",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "XPeng G6",
+     "marque": "XPeng",
+     "modele": "G6",
+     "gabarit": "suv"
+    },
+    {
+     "nom": "BMW iX2",
+     "marque": "BMW",
+     "modele": "iX2",
+     "gabarit": "suv"
+    }
+   ]
+  }
+ }
+}

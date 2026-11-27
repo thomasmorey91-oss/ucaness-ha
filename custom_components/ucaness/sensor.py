@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from . import assistant, installation, parser
+from . import assistant, installation, parser, vehicule_ha
 from .const import CONF_DEVICE_CODE, DOMAIN, OBJECT_IDS
 from .coordinator import UcanessConfigEntry, UcanessCoordinator
 
@@ -48,7 +48,8 @@ async def async_setup_entry(
 ) -> None:
     coordinator = entry.runtime_data
     async_add_entities(
-        [*(UcanessSensor(coordinator, entry, m) for m in parser.MEASURES), UcanessInstallation(coordinator, entry)]
+        [*(UcanessSensor(coordinator, entry, m) for m in parser.MEASURES), UcanessInstallation(coordinator, entry),
+         UcanessVehicule(coordinator, entry)]
     )
 
 
@@ -115,3 +116,39 @@ class UcanessInstallation(CoordinatorEntity[UcanessCoordinator], SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return assistant.bilan(self.hass, self._entry).attributs()
+
+
+class UcanessVehicule(CoordinatorEntity[UcanessCoordinator], SensorEntity):
+    """Véhicule électrique de la maison (Options > Votre véhicule) : état de charge connu, fiche et image.
+
+    Valeur : état de charge transmis par la voiture si une entité est indiquée, sinon inconnu.
+    Rien n'est envoyé à la borne."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "vehicule"
+    _attr_icon = "mdi:car-electric"
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_native_unit_of_measurement = "%"
+
+    def __init__(self, coordinator: UcanessCoordinator, entry: UcanessConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._entry = entry
+        self._attr_unique_id = f"{entry.data[CONF_DEVICE_CODE]}_vehicule"
+        self._attr_device_info = device_info(entry, coordinator)
+        self.entity_id = "sensor.ucaness_vehicule"
+
+    @property
+    def available(self) -> bool:
+        return vehicule_ha.config(self._entry) is not None
+
+    @property
+    def native_value(self) -> float | None:
+        cfg = vehicule_ha.config(self._entry)
+        return vehicule_ha.soc_mesure(self.hass, cfg) if cfg else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        cfg = vehicule_ha.config(self._entry) or {}
+        cles = ("nom", "marque", "modele", "gabarit", "couleur", "capacite_kwh", "ac_kw", "phases",
+                "conso_kwh_100km", "soc_cible", "puissance_borne_kw", "entite_soc", "image")
+        return {c: cfg.get(c) for c in cles if c in cfg}
