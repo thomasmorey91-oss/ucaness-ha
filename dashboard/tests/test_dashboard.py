@@ -324,6 +324,29 @@ def test_carte_ucan_conseil_et_reponse(cartes):
     assert etat["appels"] == [["script", "ucan_conseil_reponse", {"reponse": "plus_tard"}]]
 
 
+@pytest.mark.parametrize(("langue", "boutons"), [
+    ("en", ["I'll do it", "Not now", "Don't suggest again"]),
+    ("zh-Hans", ["我来做", "以后再说", "不再提示"]),
+    ("zh-CN", ["我来做", "以后再说", "不再提示"]),
+    ("de", ["Mache ich", "Nicht jetzt", "Nicht mehr vorschlagen"]),
+    ("fr", ["Je le fais", "Pas maintenant", "Ne plus proposer"]),
+])
+def test_carte_ucan_traduite(cartes, langue, boutons):
+    got = cartes.evaluate("""(langue) => {
+      const find = (root) => { for (const el of root.querySelectorAll('*')) {
+        if (el.tagName === 'UCANESS-UCAN-CARD') return el;
+        if (el.shadowRoot) { const f = find(el.shadowRoot); if (f) return f; } } return null; };
+      const card = find(document);
+      card._hass = Object.assign({}, window.fakeHass, { locale: { language: langue }, language: langue });
+      card._render();
+      const out = [...card.shadowRoot.querySelectorAll('button[data-r]')].map((b) => b.textContent.trim());
+      card._hass = window.fakeHass;
+      card._render();
+      return out;
+    }""", langue)
+    assert got == boutons
+
+
 def test_ucan_en_bulle_en_bas_a_droite(cartes):
     etat = cartes.evaluate("""() => {
       const hote = document.querySelector('body > .ucaness-ucan-bulle');
@@ -538,6 +561,33 @@ def test_scene_flux_selon_l_etat(scene):
     set_scene(scene, {"sensor.borne_puissance_de_charge": 0, "sensor.borne_description_de_l_etat": "Ready",
                       "sensor.uhome_puissance_reseau": 0, "sensor.uhome_puissance_solaire": 1240,
                       "sensor.uhome_puissance_batterie": 820})
+
+
+@pytest.mark.parametrize(("langue", "attendu"), [
+    ("en", ["Solar panels", "Battery: ", "charging", "Inverter: self-consumption"]),
+    ("de", ["Solarmodule", "Batterie: ", "lädt", "Wechselrichter: Eigenverbrauch"]),
+    ("zh-Hans", ["光伏板", "电池：", "充电中", "逆变器：自发自用"]),
+    ("es", ["Solar panels", "Battery: "]),          # langue sans traduction : anglais
+])
+def test_scene_traduite(scene, langue, attendu):
+    """Les textes des cartes suivent la langue du profil Home Assistant (les nombres aussi)."""
+    def langue_de(code):
+        scene.evaluate("""(code) => {
+            const h = Object.assign({}, window.fakeHass, { locale: { language: code }, language: code });
+            h.states = Object.assign({}, h.states);
+            for (const k of Object.keys(h.states)) h.states[k] = Object.assign({}, h.states[k]);
+            window.fakeHass = h;
+            document.querySelector('ucaness-layout-card').hass = h;
+        }""", code)
+        scene.wait_for_timeout(300)
+    try:
+        langue_de(langue)
+        st = scene_state(scene)
+        assert all(x in st["text"] for x in attendu), st["text"]
+        assert scene.errors == []
+    finally:
+        langue_de("fr")
+    assert "Panneaux solaires" in scene_state(scene)["text"]
 
 
 def test_scene_flux_garde_ses_animations_entre_deux_mesures(scene):

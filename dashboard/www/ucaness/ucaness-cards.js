@@ -44,7 +44,625 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.5.5';
+const UC_VERSION = '0.6.0';
+
+/* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand.
+ * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
+ * (mêmes clés et mêmes paramètres {…} dans chaque langue, toute clé utilisée existe). */
+const UC_I18N = /* I18N-DEBUT */{
+ "fr": {
+  "meteo": "Météo : {etat}",
+  "vues": "Vues",
+  "alertes_en_cours": "{n} alerte(s) en cours",
+  "aucune_alerte": "Aucune alerte",
+  "cloud_en_ligne": "Liaison au cloud en ligne",
+  "cloud_perdu": "Liaison au cloud perdue",
+  "deplier": "Déplier",
+  "reduire": "Réduire",
+  "afficher": "Afficher {titre}",
+  "lire_la_suite": "Lire la suite",
+  "navigation": "Navigation",
+  "fermer": "Fermer",
+  "replacer": "Replacer",
+  "flux_direct": "Flux d'énergie en direct",
+  "solaire": "Solaire",
+  "reseau": "Réseau",
+  "batterie": "Batterie",
+  "maison": "Maison",
+  "onduleur": "Onduleur",
+  "panneaux_solaires": "Panneaux solaires",
+  "recharge": "Recharge",
+  "borne": "Borne",
+  "injection": "injection",
+  "bat_chargement": "Chargement",
+  "bat_decharge": "Décharge",
+  "bat_veille": "Veille",
+  "en_charge": "en charge",
+  "en_decharge": "en décharge",
+  "au_repos": "au repos",
+  "batterie_a": "Batterie à {soc} %, {etat}",
+  "uhome_batterie_a": "UHome : batterie à {soc} %, {etat}",
+  "ouvrir_page_batterie": "Ouvrir la page de la batterie",
+  "en_attente_mesures": "en attente des mesures",
+  "en_direct": "en direct · relevé il y a {age}",
+  "batterie_deux_points": "Batterie : ",
+  "onduleur_mode": "Onduleur : {mode}",
+  "scene_soleil": "Le soleil produit {kw} kW.",
+  "scene_batterie": "La batterie est {etat}.",
+  "scene_batterie_soc": "La batterie est {etat} à {soc} %.",
+  "scene_maison": "La maison consomme {kw} kW.",
+  "scene_achat": "Achat au réseau.",
+  "scene_injection": "Injection sur le réseau.",
+  "scene_voiture": "Voiture en charge.",
+  "scene_mode_autoconsommation": "autoconsommation",
+  "scene_mode_arbitrage": "arbitrage horaire",
+  "scene_mode_secours": "secours",
+  "mode_autoconsommation": "Autoconsommation",
+  "mode_arbitrage": "Arbitrage horaire",
+  "mode_secours": "Secours",
+  "borne_en_charge": "en charge",
+  "borne_libre": "libre",
+  "borne_en_pause": "en pause",
+  "borne_programmee": "programmée",
+  "borne_branchee": "branchée",
+  "borne_hors_ligne": "hors ligne",
+  "borne_en_defaut": "en défaut",
+  "borne_indisponible": "indisponible",
+  "borne_inconnue": "inconnue",
+  "charge_de_la_batterie": "Charge de la batterie : {v}",
+  "indisponible": "indisponible",
+  "charge_majuscules": "CHARGE",
+  "stockee": "Stockée",
+  "avant_plancher": "Avant plancher",
+  "batterie_etat": "Batterie : {v}",
+  "charge_indisponible": "charge indisponible",
+  "simulation": "Simulation",
+  "en_reserve": "En réserve",
+  "utilisable_avant_plancher": "Utilisable avant le plancher",
+  "plancher": "Plancher {v} %",
+  "tout_va_bien": "Tout va bien",
+  "n_alertes": "{n} alertes : ",
+  "pourquoi": "Pourquoi ?",
+  "chargement": "Chargement…",
+  "journal_indisponible": "Journal indisponible.",
+  "journal_vide": "Aucune entrée sur la période.",
+  "journal_simulation": "simulation",
+  "historique_indisponible": "Historique indisponible",
+  "pas_de_mesure": "Pas encore de mesure aujourd’hui",
+  "prevu": "prévu",
+  "de_a": "{nom} : de {min} à {max}",
+  "heure_en_cours": "barre estompée : heure en cours",
+  "pointilles_prevision": "pointillés : prévision",
+  "graphique_heures": "Graphique heure par heure",
+  "nom_heures": "{nom} heure par heure",
+  "un_conseil": "Un conseil",
+  "je_le_fais": "Je le fais",
+  "pas_maintenant": "Pas maintenant",
+  "ne_plus_proposer": "Ne plus proposer",
+  "alerte_conseils_attendront": "Une alerte est en cours : {noms}. Les conseils attendront.",
+  "ucan_tout_va_bien": "Tout va bien. Je vous ferai signe quand un geste en vaudra la peine.",
+  "calcul_en_cours": "Je calcule avec vos mesures…",
+  "calcul_impossible": "Calcul impossible : {erreur}",
+  "sur_vos_jours": "Sur vos {jours} derniers jours de mesures (estimation {fiabilite}) :",
+  "fiab_fiable": "fiable",
+  "fiab_indicatif": "indicative",
+  "fiab_insuffisant": "insuffisante",
+  "contrat_actuel_par_an": "Contrat actuel : {montant} par an.",
+  "offre_par_an": "{nom} : {montant} par an",
+  "prix_a_verifier": "Prix à vérifier chez le fournisseur avant de changer.",
+  "puissance_garder": "Pointe prise au réseau : {pointe} kVA sur {jours} jours. Votre puissance de {actuelle} kVA convient : {reco} kVA suffiraient avec {marge} % de marge.",
+  "puissance_baisser": "Pointe prise au réseau : {pointe} kVA sur {jours} jours. Votre puissance de {actuelle} kVA pourrait baisser : {reco} kVA suffiraient avec {marge} % de marge.",
+  "puissance_augmenter": "Pointe prise au réseau : {pointe} kVA sur {jours} jours. Votre puissance de {actuelle} kVA est trop juste : {reco} kVA suffiraient avec {marge} % de marge.",
+  "et_si": "Et si…",
+  "q_contrat": "je changeais de contrat ?",
+  "q_puissance": "je changeais de puissance ?",
+  "erreur_inconnue": "erreur inconnue",
+  "ucan_conseil_attend": "Ucan : un conseil vous attend",
+  "ucan_alerte": "Ucan : une alerte est en cours",
+  "err_layout": "ucaness-layout-card : « columns » est obligatoire (liste de colonnes avec « cards »).",
+  "err_panel": "ucaness-panel-card : indiquez « cards » ou « slides ».",
+  "err_note": "ucaness-note-card : indiquez « content » (texte markdown) ou « card ».",
+  "err_app": "ucaness-app-card : « cards » est obligatoire.",
+  "err_stats": "ucaness-stats-card : « items » est obligatoire.",
+  "err_info": "ucaness-info-card : indiquez « template » ou « text ».",
+  "err_shortcuts": "ucaness-shortcuts-card : « items » est obligatoire.",
+  "err_detail": "ucaness-detail-card : indiquez « headline » ou « headline_template ».",
+  "err_hours_tabs": "ucaness-hours-card : « tabs » est obligatoire.",
+  "err_hours_stat": "ucaness-hours-card : chaque onglet demande « statistic ».",
+  "carte_layout_nom": "UCANESS : mise en page",
+  "carte_layout_desc": "En-tête et colonnes du tableau de bord UCANESS HOME ASSISTANT.",
+  "carte_header_nom": "UCANESS : en-tête",
+  "carte_header_desc": "Bandeau titre, onglets, heure, liaison et alertes.",
+  "carte_panel_nom": "UCANESS : panneau",
+  "carte_panel_desc": "Panneau titré dans le style UCANESS, avec carrousel ou onglets facultatifs.",
+  "carte_flow_nom": "UCANESS : maison en direct",
+  "carte_flow_desc": "Flux solaire, réseau, batterie et maison sur l’image de votre maison.",
+  "carte_note_nom": "UCANESS : texte repliable",
+  "carte_note_desc": "Texte replié sur quelques lignes, déplié d’un appui.",
+  "carte_soc_nom": "UCANESS : charge batterie",
+  "carte_soc_desc": "Anneau de charge, énergie stockée et réserve avant le plancher.",
+  "carte_app_nom": "UCANESS : écran de téléphone",
+  "carte_app_desc": "En-tête compact, cartes en une colonne, navigation en bas.",
+  "carte_status_nom": "UCANESS : bandeau d’état",
+  "carte_status_desc": "« Tout va bien » ou les alertes en cours.",
+  "carte_stats_nom": "UCANESS : chiffres clés",
+  "carte_stats_desc": "Deux à quatre chiffres côte à côte.",
+  "carte_info_nom": "UCANESS : ligne d’information",
+  "carte_info_desc": "Une phrase calculée par un modèle, avec lien facultatif.",
+  "carte_shortcuts_nom": "UCANESS : raccourcis",
+  "carte_shortcuts_desc": "Tuiles icône et nom vers une page ou une fiche.",
+  "carte_detail_nom": "UCANESS : décision expliquée",
+  "carte_detail_desc": "Une décision en clair, l’explication sur demande.",
+  "carte_ucan_nom": "UCANESS : Ucan",
+  "carte_ucan_desc": "Ucan, la batterie qui conseille : son expression et le conseil du moment.",
+  "carte_hours_nom": "UCANESS : heure par heure",
+  "carte_hours_desc": "Graphique de la journée heure par heure, avec un choix en haut."
+ },
+ "en": {
+  "meteo": "Weather: {etat}",
+  "vues": "Views",
+  "alertes_en_cours": "{n} active alert(s)",
+  "aucune_alerte": "No alerts",
+  "cloud_en_ligne": "Cloud link online",
+  "cloud_perdu": "Cloud link lost",
+  "deplier": "Expand",
+  "reduire": "Collapse",
+  "afficher": "Show {titre}",
+  "lire_la_suite": "Read more",
+  "navigation": "Navigation",
+  "fermer": "Close",
+  "replacer": "Reset position",
+  "flux_direct": "Live energy flow",
+  "solaire": "Solar",
+  "reseau": "Grid",
+  "batterie": "Battery",
+  "maison": "Home",
+  "onduleur": "Inverter",
+  "panneaux_solaires": "Solar panels",
+  "recharge": "Charging",
+  "borne": "Charger",
+  "injection": "export",
+  "bat_chargement": "Charging",
+  "bat_decharge": "Discharging",
+  "bat_veille": "Standby",
+  "en_charge": "charging",
+  "en_decharge": "discharging",
+  "au_repos": "idle",
+  "batterie_a": "Battery at {soc} %, {etat}",
+  "uhome_batterie_a": "UHome: battery at {soc} %, {etat}",
+  "ouvrir_page_batterie": "Open the battery page",
+  "en_attente_mesures": "waiting for readings",
+  "en_direct": "live · read {age} ago",
+  "batterie_deux_points": "Battery: ",
+  "onduleur_mode": "Inverter: {mode}",
+  "scene_soleil": "The sun is producing {kw} kW.",
+  "scene_batterie": "The battery is {etat}.",
+  "scene_batterie_soc": "The battery is {etat} at {soc} %.",
+  "scene_maison": "The house is using {kw} kW.",
+  "scene_achat": "Buying from the grid.",
+  "scene_injection": "Exporting to the grid.",
+  "scene_voiture": "Car charging.",
+  "scene_mode_autoconsommation": "self-consumption",
+  "scene_mode_arbitrage": "time arbitrage",
+  "scene_mode_secours": "backup",
+  "mode_autoconsommation": "Self-consumption",
+  "mode_arbitrage": "Time arbitrage",
+  "mode_secours": "Backup",
+  "borne_en_charge": "charging",
+  "borne_libre": "available",
+  "borne_en_pause": "paused",
+  "borne_programmee": "scheduled",
+  "borne_branchee": "plugged in",
+  "borne_hors_ligne": "offline",
+  "borne_en_defaut": "fault",
+  "borne_indisponible": "unavailable",
+  "borne_inconnue": "unknown",
+  "charge_de_la_batterie": "Battery charge: {v}",
+  "indisponible": "unavailable",
+  "charge_majuscules": "CHARGE",
+  "stockee": "Stored",
+  "avant_plancher": "Above floor",
+  "batterie_etat": "Battery: {v}",
+  "charge_indisponible": "charge unavailable",
+  "simulation": "Simulation",
+  "en_reserve": "In reserve",
+  "utilisable_avant_plancher": "Usable above the floor",
+  "plancher": "Floor {v} %",
+  "tout_va_bien": "All good",
+  "n_alertes": "{n} alerts: ",
+  "pourquoi": "Why?",
+  "chargement": "Loading…",
+  "journal_indisponible": "Logbook unavailable.",
+  "journal_vide": "No entries for this period.",
+  "journal_simulation": "simulation",
+  "historique_indisponible": "History unavailable",
+  "pas_de_mesure": "No readings yet today",
+  "prevu": "forecast",
+  "de_a": "{nom}: from {min} to {max}",
+  "heure_en_cours": "faded bar: current hour",
+  "pointilles_prevision": "dotted: forecast",
+  "graphique_heures": "Hour-by-hour chart",
+  "nom_heures": "{nom} hour by hour",
+  "un_conseil": "A tip",
+  "je_le_fais": "I'll do it",
+  "pas_maintenant": "Not now",
+  "ne_plus_proposer": "Don't suggest again",
+  "alerte_conseils_attendront": "An alert is active: {noms}. Tips will wait.",
+  "ucan_tout_va_bien": "All good. I'll let you know when something is worth doing.",
+  "calcul_en_cours": "Calculating with your readings…",
+  "calcul_impossible": "Calculation failed: {erreur}",
+  "sur_vos_jours": "Over your last {jours} days of readings ({fiabilite} estimate):",
+  "fiab_fiable": "reliable",
+  "fiab_indicatif": "indicative",
+  "fiab_insuffisant": "insufficient",
+  "contrat_actuel_par_an": "Current contract: {montant} per year.",
+  "offre_par_an": "{nom}: {montant} per year",
+  "prix_a_verifier": "Check prices with the supplier before switching.",
+  "puissance_garder": "Peak drawn from the grid: {pointe} kVA over {jours} days. Your {actuelle} kVA is right: {reco} kVA would be enough with a {marge} % margin.",
+  "puissance_baisser": "Peak drawn from the grid: {pointe} kVA over {jours} days. Your {actuelle} kVA could be lowered: {reco} kVA would be enough with a {marge} % margin.",
+  "puissance_augmenter": "Peak drawn from the grid: {pointe} kVA over {jours} days. Your {actuelle} kVA is too tight: {reco} kVA would be enough with a {marge} % margin.",
+  "et_si": "What if…",
+  "q_contrat": "I changed my contract?",
+  "q_puissance": "I changed my power rating?",
+  "erreur_inconnue": "unknown error",
+  "ucan_conseil_attend": "Ucan: a tip is waiting for you",
+  "ucan_alerte": "Ucan: an alert is active",
+  "err_layout": "ucaness-layout-card: 'columns' is required (list of columns with 'cards').",
+  "err_panel": "ucaness-panel-card: provide 'cards' or 'slides'.",
+  "err_note": "ucaness-note-card: provide 'content' (markdown text) or 'card'.",
+  "err_app": "ucaness-app-card: 'cards' is required.",
+  "err_stats": "ucaness-stats-card: 'items' is required.",
+  "err_info": "ucaness-info-card: provide 'template' or 'text'.",
+  "err_shortcuts": "ucaness-shortcuts-card: 'items' is required.",
+  "err_detail": "ucaness-detail-card: provide 'headline' or 'headline_template'.",
+  "err_hours_tabs": "ucaness-hours-card: 'tabs' is required.",
+  "err_hours_stat": "ucaness-hours-card: each tab needs 'statistic'.",
+  "carte_layout_nom": "UCANESS: layout",
+  "carte_layout_desc": "Header and columns of the UCANESS HOME ASSISTANT dashboard.",
+  "carte_header_nom": "UCANESS: header",
+  "carte_header_desc": "Title bar, tabs, time, link and alerts.",
+  "carte_panel_nom": "UCANESS: panel",
+  "carte_panel_desc": "Titled panel in the UCANESS style, with optional carousel or tabs.",
+  "carte_flow_nom": "UCANESS: live home",
+  "carte_flow_desc": "Solar, grid, battery and home flows on a picture of your home.",
+  "carte_note_nom": "UCANESS: collapsible text",
+  "carte_note_desc": "Text folded to a few lines, expanded with a tap.",
+  "carte_soc_nom": "UCANESS: battery charge",
+  "carte_soc_desc": "Charge ring, stored energy and reserve above the floor.",
+  "carte_app_nom": "UCANESS: phone screen",
+  "carte_app_desc": "Compact header, single-column cards, bottom navigation.",
+  "carte_status_nom": "UCANESS: status bar",
+  "carte_status_desc": "\"All good\" or the active alerts.",
+  "carte_stats_nom": "UCANESS: key figures",
+  "carte_stats_desc": "Two to four figures side by side.",
+  "carte_info_nom": "UCANESS: info line",
+  "carte_info_desc": "A sentence computed by a template, with an optional link.",
+  "carte_shortcuts_nom": "UCANESS: shortcuts",
+  "carte_shortcuts_desc": "Icon and name tiles linking to a page or a card.",
+  "carte_detail_nom": "UCANESS: explained decision",
+  "carte_detail_desc": "A decision in plain words, the explanation on request.",
+  "carte_ucan_nom": "UCANESS: Ucan",
+  "carte_ucan_desc": "Ucan, the battery that gives advice: its mood and the current tip.",
+  "carte_hours_nom": "UCANESS: hour by hour",
+  "carte_hours_desc": "Hour-by-hour chart of the day, with a selector at the top."
+ },
+ "zh-Hans": {
+  "meteo": "天气：{etat}",
+  "vues": "视图",
+  "alertes_en_cours": "{n} 条告警进行中",
+  "aucune_alerte": "无告警",
+  "cloud_en_ligne": "云连接在线",
+  "cloud_perdu": "云连接已断开",
+  "deplier": "展开",
+  "reduire": "收起",
+  "afficher": "显示 {titre}",
+  "lire_la_suite": "阅读更多",
+  "navigation": "导航",
+  "fermer": "关闭",
+  "replacer": "复位",
+  "flux_direct": "实时能量流",
+  "solaire": "光伏",
+  "reseau": "电网",
+  "batterie": "电池",
+  "maison": "家庭",
+  "onduleur": "逆变器",
+  "panneaux_solaires": "光伏板",
+  "recharge": "充电",
+  "borne": "充电桩",
+  "injection": "上网",
+  "bat_chargement": "充电中",
+  "bat_decharge": "放电中",
+  "bat_veille": "待机",
+  "en_charge": "充电中",
+  "en_decharge": "放电中",
+  "au_repos": "静置",
+  "batterie_a": "电池 {soc}%，{etat}",
+  "uhome_batterie_a": "UHome：电池 {soc}%，{etat}",
+  "ouvrir_page_batterie": "打开电池页面",
+  "en_attente_mesures": "等待测量数据",
+  "en_direct": "实时 · {age}前读取",
+  "batterie_deux_points": "电池：",
+  "onduleur_mode": "逆变器：{mode}",
+  "scene_soleil": "太阳正在发电 {kw} kW。",
+  "scene_batterie": "电池{etat}。",
+  "scene_batterie_soc": "电池{etat}，电量 {soc}%。",
+  "scene_maison": "家庭正在用电 {kw} kW。",
+  "scene_achat": "正在从电网购电。",
+  "scene_injection": "正在向电网送电。",
+  "scene_voiture": "汽车充电中。",
+  "scene_mode_autoconsommation": "自发自用",
+  "scene_mode_arbitrage": "峰谷套利",
+  "scene_mode_secours": "备用",
+  "mode_autoconsommation": "自发自用",
+  "mode_arbitrage": "峰谷套利",
+  "mode_secours": "备用",
+  "borne_en_charge": "充电中",
+  "borne_libre": "空闲",
+  "borne_en_pause": "已暂停",
+  "borne_programmee": "已预约",
+  "borne_branchee": "已连接",
+  "borne_hors_ligne": "离线",
+  "borne_en_defaut": "故障",
+  "borne_indisponible": "不可用",
+  "borne_inconnue": "未知",
+  "charge_de_la_batterie": "电池电量：{v}",
+  "indisponible": "不可用",
+  "charge_majuscules": "电量",
+  "stockee": "已储存",
+  "avant_plancher": "下限以上",
+  "batterie_etat": "电池：{v}",
+  "charge_indisponible": "电量不可用",
+  "simulation": "模拟",
+  "en_reserve": "储备电量",
+  "utilisable_avant_plancher": "下限以上可用",
+  "plancher": "下限 {v}%",
+  "tout_va_bien": "一切正常",
+  "n_alertes": "{n} 条告警：",
+  "pourquoi": "为什么？",
+  "chargement": "加载中…",
+  "journal_indisponible": "日志不可用。",
+  "journal_vide": "此期间没有记录。",
+  "journal_simulation": "模拟",
+  "historique_indisponible": "历史数据不可用",
+  "pas_de_mesure": "今天还没有测量数据",
+  "prevu": "预计",
+  "de_a": "{nom}：从 {min} 到 {max}",
+  "heure_en_cours": "浅色柱：当前小时",
+  "pointilles_prevision": "虚线：预测",
+  "graphique_heures": "逐小时图表",
+  "nom_heures": "{nom} 逐小时",
+  "un_conseil": "一条建议",
+  "je_le_fais": "我来做",
+  "pas_maintenant": "以后再说",
+  "ne_plus_proposer": "不再提示",
+  "alerte_conseils_attendront": "有告警进行中：{noms}。建议稍后再说。",
+  "ucan_tout_va_bien": "一切正常。有值得做的事情时我会通知您。",
+  "calcul_en_cours": "正在根据您的测量数据计算…",
+  "calcul_impossible": "无法计算：{erreur}",
+  "sur_vos_jours": "根据您最近 {jours} 天的测量数据（{fiabilite}估算）：",
+  "fiab_fiable": "可靠",
+  "fiab_indicatif": "参考性",
+  "fiab_insuffisant": "数据不足",
+  "contrat_actuel_par_an": "当前合同：每年 {montant}。",
+  "offre_par_an": "{nom}：每年 {montant}",
+  "prix_a_verifier": "更换前请向供应商核实价格。",
+  "puissance_garder": "电网取电峰值：{jours} 天内 {pointe} kVA。您的 {actuelle} kVA 合适：留 {marge}% 余量时 {reco} kVA 即可。",
+  "puissance_baisser": "电网取电峰值：{jours} 天内 {pointe} kVA。您的 {actuelle} kVA 可以降低：留 {marge}% 余量时 {reco} kVA 即可。",
+  "puissance_augmenter": "电网取电峰值：{jours} 天内 {pointe} kVA。您的 {actuelle} kVA 偏小：留 {marge}% 余量时需要 {reco} kVA。",
+  "et_si": "如果……",
+  "q_contrat": "我更换合同？",
+  "q_puissance": "我更改签约功率？",
+  "erreur_inconnue": "未知错误",
+  "ucan_conseil_attend": "Ucan：有一条建议等着您",
+  "ucan_alerte": "Ucan：有告警进行中",
+  "err_layout": "ucaness-layout-card：必须提供“columns”（包含“cards”的列列表）。",
+  "err_panel": "ucaness-panel-card：请提供“cards”或“slides”。",
+  "err_note": "ucaness-note-card：请提供“content”（markdown 文本）或“card”。",
+  "err_app": "ucaness-app-card：必须提供“cards”。",
+  "err_stats": "ucaness-stats-card：必须提供“items”。",
+  "err_info": "ucaness-info-card：请提供“template”或“text”。",
+  "err_shortcuts": "ucaness-shortcuts-card：必须提供“items”。",
+  "err_detail": "ucaness-detail-card：请提供“headline”或“headline_template”。",
+  "err_hours_tabs": "ucaness-hours-card：必须提供“tabs”。",
+  "err_hours_stat": "ucaness-hours-card：每个标签页都需要“statistic”。",
+  "carte_layout_nom": "UCANESS：布局",
+  "carte_layout_desc": "UCANESS HOME ASSISTANT 仪表板的页眉和列。",
+  "carte_header_nom": "UCANESS：页眉",
+  "carte_header_desc": "标题栏、标签页、时间、连接和告警。",
+  "carte_panel_nom": "UCANESS：面板",
+  "carte_panel_desc": "UCANESS 风格的带标题面板，可选轮播或标签页。",
+  "carte_flow_nom": "UCANESS：实时家庭",
+  "carte_flow_desc": "在您的房屋图片上显示光伏、电网、电池和家庭能量流。",
+  "carte_note_nom": "UCANESS：可折叠文本",
+  "carte_note_desc": "文本折叠为几行，轻点即可展开。",
+  "carte_soc_nom": "UCANESS：电池电量",
+  "carte_soc_desc": "电量环、已储存电量和下限以上的储备。",
+  "carte_app_nom": "UCANESS：手机界面",
+  "carte_app_desc": "紧凑页眉、单列卡片、底部导航。",
+  "carte_status_nom": "UCANESS：状态栏",
+  "carte_status_desc": "“一切正常”或进行中的告警。",
+  "carte_stats_nom": "UCANESS：关键数据",
+  "carte_stats_desc": "并排显示两到四个数字。",
+  "carte_info_nom": "UCANESS：信息行",
+  "carte_info_desc": "由模板计算的一句话，可附链接。",
+  "carte_shortcuts_nom": "UCANESS：快捷方式",
+  "carte_shortcuts_desc": "带图标和名称的磁贴，链接到页面或详情。",
+  "carte_detail_nom": "UCANESS：决策说明",
+  "carte_detail_desc": "用平实语言说明决策，按需查看原因。",
+  "carte_ucan_nom": "UCANESS：Ucan",
+  "carte_ucan_desc": "Ucan，会提建议的电池：它的表情和当前建议。",
+  "carte_hours_nom": "UCANESS：逐小时",
+  "carte_hours_desc": "当天逐小时图表，顶部可切换。"
+ },
+ "de": {
+  "meteo": "Wetter: {etat}",
+  "vues": "Ansichten",
+  "alertes_en_cours": "{n} aktive Warnung(en)",
+  "aucune_alerte": "Keine Warnungen",
+  "cloud_en_ligne": "Cloud-Verbindung online",
+  "cloud_perdu": "Cloud-Verbindung verloren",
+  "deplier": "Aufklappen",
+  "reduire": "Einklappen",
+  "afficher": "{titre} anzeigen",
+  "lire_la_suite": "Weiterlesen",
+  "navigation": "Navigation",
+  "fermer": "Schließen",
+  "replacer": "Zurücksetzen",
+  "flux_direct": "Energiefluss live",
+  "solaire": "Solar",
+  "reseau": "Netz",
+  "batterie": "Batterie",
+  "maison": "Haus",
+  "onduleur": "Wechselrichter",
+  "panneaux_solaires": "Solarmodule",
+  "recharge": "Laden",
+  "borne": "Wallbox",
+  "injection": "Einspeisung",
+  "bat_chargement": "Lädt",
+  "bat_decharge": "Entlädt",
+  "bat_veille": "Standby",
+  "en_charge": "lädt",
+  "en_decharge": "entlädt",
+  "au_repos": "im Ruhezustand",
+  "batterie_a": "Batterie bei {soc} %, {etat}",
+  "uhome_batterie_a": "UHome: Batterie bei {soc} %, {etat}",
+  "ouvrir_page_batterie": "Batterieseite öffnen",
+  "en_attente_mesures": "warte auf Messwerte",
+  "en_direct": "live · vor {age} gelesen",
+  "batterie_deux_points": "Batterie: ",
+  "onduleur_mode": "Wechselrichter: {mode}",
+  "scene_soleil": "Die Sonne erzeugt {kw} kW.",
+  "scene_batterie": "Die Batterie {etat}.",
+  "scene_batterie_soc": "Die Batterie {etat}, Ladestand {soc} %.",
+  "scene_maison": "Das Haus verbraucht {kw} kW.",
+  "scene_achat": "Bezug aus dem Netz.",
+  "scene_injection": "Einspeisung ins Netz.",
+  "scene_voiture": "Auto wird geladen.",
+  "scene_mode_autoconsommation": "Eigenverbrauch",
+  "scene_mode_arbitrage": "Zeitarbitrage",
+  "scene_mode_secours": "Notstrom",
+  "mode_autoconsommation": "Eigenverbrauch",
+  "mode_arbitrage": "Zeitarbitrage",
+  "mode_secours": "Notstrom",
+  "borne_en_charge": "lädt",
+  "borne_libre": "frei",
+  "borne_en_pause": "pausiert",
+  "borne_programmee": "geplant",
+  "borne_branchee": "angesteckt",
+  "borne_hors_ligne": "offline",
+  "borne_en_defaut": "Fehler",
+  "borne_indisponible": "nicht verfügbar",
+  "borne_inconnue": "unbekannt",
+  "charge_de_la_batterie": "Batterieladestand: {v}",
+  "indisponible": "nicht verfügbar",
+  "charge_majuscules": "LADUNG",
+  "stockee": "Gespeichert",
+  "avant_plancher": "Über Untergrenze",
+  "batterie_etat": "Batterie: {v}",
+  "charge_indisponible": "Ladestand nicht verfügbar",
+  "simulation": "Simulation",
+  "en_reserve": "In Reserve",
+  "utilisable_avant_plancher": "Nutzbar über der Untergrenze",
+  "plancher": "Untergrenze {v} %",
+  "tout_va_bien": "Alles in Ordnung",
+  "n_alertes": "{n} Warnungen: ",
+  "pourquoi": "Warum?",
+  "chargement": "Wird geladen…",
+  "journal_indisponible": "Logbuch nicht verfügbar.",
+  "journal_vide": "Keine Einträge in diesem Zeitraum.",
+  "journal_simulation": "Simulation",
+  "historique_indisponible": "Verlauf nicht verfügbar",
+  "pas_de_mesure": "Heute noch keine Messwerte",
+  "prevu": "Prognose",
+  "de_a": "{nom}: von {min} bis {max}",
+  "heure_en_cours": "blasser Balken: aktuelle Stunde",
+  "pointilles_prevision": "gepunktet: Prognose",
+  "graphique_heures": "Stundendiagramm",
+  "nom_heures": "{nom} Stunde für Stunde",
+  "un_conseil": "Ein Tipp",
+  "je_le_fais": "Mache ich",
+  "pas_maintenant": "Nicht jetzt",
+  "ne_plus_proposer": "Nicht mehr vorschlagen",
+  "alerte_conseils_attendront": "Eine Warnung ist aktiv: {noms}. Die Tipps warten.",
+  "ucan_tout_va_bien": "Alles in Ordnung. Ich melde mich, wenn sich etwas lohnt.",
+  "calcul_en_cours": "Ich rechne mit Ihren Messwerten…",
+  "calcul_impossible": "Berechnung nicht möglich: {erreur}",
+  "sur_vos_jours": "Über Ihre letzten {jours} Messtage (Schätzung {fiabilite}):",
+  "fiab_fiable": "zuverlässig",
+  "fiab_indicatif": "Richtwert",
+  "fiab_insuffisant": "unzureichend",
+  "contrat_actuel_par_an": "Aktueller Vertrag: {montant} pro Jahr.",
+  "offre_par_an": "{nom}: {montant} pro Jahr",
+  "prix_a_verifier": "Preise vor einem Wechsel beim Anbieter prüfen.",
+  "puissance_garder": "Spitzenbezug aus dem Netz: {pointe} kVA in {jours} Tagen. Ihre {actuelle} kVA passen: {reco} kVA würden mit {marge} % Reserve reichen.",
+  "puissance_baisser": "Spitzenbezug aus dem Netz: {pointe} kVA in {jours} Tagen. Ihre {actuelle} kVA könnten sinken: {reco} kVA würden mit {marge} % Reserve reichen.",
+  "puissance_augmenter": "Spitzenbezug aus dem Netz: {pointe} kVA in {jours} Tagen. Ihre {actuelle} kVA sind zu knapp: {reco} kVA würden mit {marge} % Reserve reichen.",
+  "et_si": "Was wäre, wenn…",
+  "q_contrat": "ich den Vertrag wechsle?",
+  "q_puissance": "ich die Leistung ändere?",
+  "erreur_inconnue": "unbekannter Fehler",
+  "ucan_conseil_attend": "Ucan: Ein Tipp wartet auf Sie",
+  "ucan_alerte": "Ucan: Eine Warnung ist aktiv",
+  "err_layout": "ucaness-layout-card: „columns“ ist erforderlich (Liste von Spalten mit „cards“).",
+  "err_panel": "ucaness-panel-card: „cards“ oder „slides“ angeben.",
+  "err_note": "ucaness-note-card: „content“ (Markdown-Text) oder „card“ angeben.",
+  "err_app": "ucaness-app-card: „cards“ ist erforderlich.",
+  "err_stats": "ucaness-stats-card: „items“ ist erforderlich.",
+  "err_info": "ucaness-info-card: „template“ oder „text“ angeben.",
+  "err_shortcuts": "ucaness-shortcuts-card: „items“ ist erforderlich.",
+  "err_detail": "ucaness-detail-card: „headline“ oder „headline_template“ angeben.",
+  "err_hours_tabs": "ucaness-hours-card: „tabs“ ist erforderlich.",
+  "err_hours_stat": "ucaness-hours-card: Jeder Tab braucht „statistic“.",
+  "carte_layout_nom": "UCANESS: Layout",
+  "carte_layout_desc": "Kopfzeile und Spalten des Dashboards UCANESS HOME ASSISTANT.",
+  "carte_header_nom": "UCANESS: Kopfzeile",
+  "carte_header_desc": "Titelleiste, Tabs, Uhrzeit, Verbindung und Warnungen.",
+  "carte_panel_nom": "UCANESS: Panel",
+  "carte_panel_desc": "Panel mit Titel im UCANESS-Stil, optional mit Karussell oder Tabs.",
+  "carte_flow_nom": "UCANESS: Haus live",
+  "carte_flow_desc": "Solar-, Netz-, Batterie- und Hausflüsse auf dem Bild Ihres Hauses.",
+  "carte_note_nom": "UCANESS: einklappbarer Text",
+  "carte_note_desc": "Auf wenige Zeilen gekürzter Text, per Antippen aufklappbar.",
+  "carte_soc_nom": "UCANESS: Batterieladestand",
+  "carte_soc_desc": "Ladering, gespeicherte Energie und Reserve über der Untergrenze.",
+  "carte_app_nom": "UCANESS: Handybildschirm",
+  "carte_app_desc": "Kompakte Kopfzeile, Karten in einer Spalte, Navigation unten.",
+  "carte_status_nom": "UCANESS: Statusleiste",
+  "carte_status_desc": "„Alles in Ordnung“ oder die aktiven Warnungen.",
+  "carte_stats_nom": "UCANESS: Kennzahlen",
+  "carte_stats_desc": "Zwei bis vier Zahlen nebeneinander.",
+  "carte_info_nom": "UCANESS: Infozeile",
+  "carte_info_desc": "Ein von einer Vorlage berechneter Satz, optional mit Link.",
+  "carte_shortcuts_nom": "UCANESS: Verknüpfungen",
+  "carte_shortcuts_desc": "Kacheln mit Symbol und Name zu einer Seite oder Detailansicht.",
+  "carte_detail_nom": "UCANESS: erklärte Entscheidung",
+  "carte_detail_desc": "Eine Entscheidung in klaren Worten, die Erklärung auf Wunsch.",
+  "carte_ucan_nom": "UCANESS: Ucan",
+  "carte_ucan_desc": "Ucan, die Batterie, die berät: ihr Ausdruck und der aktuelle Tipp.",
+  "carte_hours_nom": "UCANESS: Stunde für Stunde",
+  "carte_hours_desc": "Stundendiagramm des Tages, mit Auswahl oben."
+ }
+}/* I18N-FIN */;
+let UC_LANG_VUE = null;   // dernière langue vue, pour les appels sans hass (configuration, sélecteur de cartes)
+
+/** Langue des cartes : celle du profil Home Assistant ; chinois → zh-Hans ; langue inconnue → anglais. */
+function ucLang(hass) {
+  const brute = (hass && ((hass.locale && hass.locale.language) || hass.language)) || UC_LANG_VUE
+    || (typeof document !== 'undefined' && document.documentElement.lang) || 'fr';
+  if (hass) UC_LANG_VUE = brute;
+  if (UC_I18N[brute]) return brute;
+  const base = String(brute).split('-')[0];
+  if (base === 'zh') return 'zh-Hans';
+  return UC_I18N[base] ? base : 'en';
+}
+
+/** Texte traduit ; {nom} est remplacé par params.nom. */
+function ucT(hass, cle, params) {
+  const l = ucLang(hass);
+  let t = (UC_I18N[l] && UC_I18N[l][cle]) || UC_I18N.en[cle] || UC_I18N.fr[cle] || cle;
+  if (params) t = t.replace(/\{(\w+)\}/g, (m, k) => (params[k] !== undefined && params[k] !== null ? String(params[k]) : m));
+  return t;
+}
 
 /* Dossier où se trouve ce fichier (en général /local/ucaness/). */
 const UC_BASE = (() => {
@@ -233,13 +851,14 @@ function ucMeteoHtml(hass, cfg) {
   const w = hass.states[wid];
   const t = Number((w.attributes || {}).temperature);
   const unit = (w.attributes || {}).temperature_unit || '°C';
-  return `<span class="meteo" role="img" aria-label="Météo : ${esc(w.state)}${Number.isFinite(t) ? ', ' + esc(ucNumber(hass, t, 0)) + ' ' + esc(unit) : ''}"><ha-icon icon="${esc(UC_METEO_ICONES[w.state] || 'mdi:weather-partly-cloudy')}"></ha-icon>${Number.isFinite(t) ? `<span>${esc(ucNumber(hass, t, 0))}${esc(unit === '°C' ? '°' : ' ' + unit)}</span>` : ''}</span>`;
+  return `<span class="meteo" role="img" aria-label="${esc(ucT(hass, 'meteo', { etat: hass.formatEntityState ? hass.formatEntityState(w) : w.state }))}${Number.isFinite(t) ? ', ' + esc(ucNumber(hass, t, 0)) + ' ' + esc(unit) : ''}"><ha-icon icon="${esc(UC_METEO_ICONES[w.state] || 'mdi:weather-partly-cloudy')}"></ha-icon>${Number.isFinite(t) ? `<span>${esc(ucNumber(hass, t, 0))}${esc(unit === '°C' ? '°' : ' ' + unit)}</span>` : ''}</span>`;
 }
 
 /** Vrai si l'état d'une des entités a changé depuis le dernier appel pour cette carte.
  *  Home Assistant transmet `hass` à chaque changement d'état de la maison : on ne redessine
  *  la carte que pour ses propres entités. */
 function ucChanged(card, hass, ids) {
+  if (hass) ucLang(hass);
   const next = ids.map((id) => (hass && hass.states ? hass.states[id] : undefined));
   const prev = card._ucSeen;
   card._ucSeen = next;
@@ -540,11 +1159,11 @@ class UcanessHeaderCard extends HTMLElement {
         <div class="plate"><div class="sweep" aria-hidden="true"></div><h1>${esc(c.title)}</h1></div>
         <div class="left">
           <span class="site"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F0883E" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5L12 4l9 7.5"/><path d="M6 10v10h12V10"/></svg><span>${esc(c.site)}</span></span>
-          <nav aria-label="Vues">${tabs}</nav>
+          <nav aria-label="${esc(ucT(hass, 'vues'))}">${tabs}</nav>
         </div>
         <div class="right">
-          ${(c.alert_entities || []).length ? `<span class="bell" role="img" aria-label="${alerts} alerte(s) en cours"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7DABCD" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>${alerts ? `<span class="badge">${alerts}</span>` : ''}</span>` : ''}
-          ${online === null ? '' : `<svg role="img" aria-label="${online ? 'Liaison au cloud en ligne' : 'Liaison au cloud perdue'}" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${online ? '#2ED198' : '#E5484D'}" stroke-width="2" stroke-linecap="round"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/></svg>`}
+          ${(c.alert_entities || []).length ? `<span class="bell" role="img" aria-label="${esc(ucT(hass, 'alertes_en_cours', { n: alerts }))}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7DABCD" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>${alerts ? `<span class="badge">${alerts}</span>` : ''}</span>` : ''}
+          ${online === null ? '' : `<svg role="img" aria-label="${esc(ucT(hass, online ? 'cloud_en_ligne' : 'cloud_perdu'))}" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${online ? '#2ED198' : '#E5484D'}" stroke-width="2" stroke-linecap="round"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/></svg>`}
           ${hass ? ucMeteoHtml(hass, c) : ''}
           <span class="clock"><b>${esc(time)}</b><span>${esc(date)}${subtitle ? ' · ' + esc(subtitle) : ''}</span></span>
         </div>
@@ -580,7 +1199,7 @@ class UcanessHeaderCard extends HTMLElement {
 class UcanessLayoutCard extends HTMLElement {
   setConfig(config) {
     if (!config || !Array.isArray(config.columns) || !config.columns.length) {
-      throw new Error('ucaness-layout-card : « columns » est obligatoire (liste de colonnes avec « cards »).');
+      throw new Error(ucT(null, 'err_layout'));
     }
     this._config = config;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
@@ -654,7 +1273,7 @@ class UcanessLayoutCard extends HTMLElement {
 class UcanessPanelCard extends HTMLElement {
   setConfig(config) {
     if (!config || (!config.cards && !config.slides)) {
-      throw new Error('ucaness-panel-card : indiquez « cards » ou « slides ».');
+      throw new Error(ucT(null, 'err_panel'));
     }
     this._config = config;
     this._slide = 0;
@@ -741,7 +1360,7 @@ class UcanessPanelCard extends HTMLElement {
     if (slides.length > 1 && !tabs) {
       const dots = document.createElement('div');
       dots.className = 'dots';
-      dots.innerHTML = slides.map((s, i) => `<button type="button" aria-label="Afficher ${esc(s.title || i + 1)}" class="${i ? '' : 'on'}" data-i="${i}"><i></i></button>`).join('');
+      dots.innerHTML = slides.map((s, i) => `<button type="button" aria-label="${esc(ucT(null, 'afficher', { titre: s.title || i + 1 }))}" class="${i ? '' : 'on'}" data-i="${i}"><i></i></button>`).join('');
       dots.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { this._show(Number(b.dataset.i)); this._startTimer(); }));
       body.appendChild(dots);
     }
@@ -761,7 +1380,7 @@ class UcanessPanelCard extends HTMLElement {
     const apply = () => {
       section.classList.toggle('reduit', reduit);
       bar.setAttribute('aria-expanded', String(!reduit));
-      bar.title = reduit ? 'Déplier' : 'Réduire';
+      bar.title = ucT(null, reduit ? 'deplier' : 'reduire');
     };
     bar.classList.add('toggle');
     bar.setAttribute('role', 'button');
@@ -806,11 +1425,11 @@ const UC_FLOW_DEFAULTS = {
   min_power: 30,
   calibration: false,
   nodes: {
-    solar: { entity: 'sensor.uhome_puissance_solaire', label: 'Solaire', x: 44, y: 11.5, details: ['sensor.uhome_tension_solaire'], details_side: 'left' },
-    grid: { entity: 'sensor.uhome_puissance_reseau', label: 'Réseau', x: 65, y: 11.5, details: ['sensor.uhome_tension_reseau', 'sensor.uhome_frequence_reseau'], details_side: 'right' },
-    inverter: { label: 'Onduleur', x: 44, y: 46 },
+    solar: { entity: 'sensor.uhome_puissance_solaire', x: 44, y: 11.5, details: ['sensor.uhome_tension_solaire'], details_side: 'left' },
+    grid: { entity: 'sensor.uhome_puissance_reseau', x: 65, y: 11.5, details: ['sensor.uhome_tension_reseau', 'sensor.uhome_frequence_reseau'], details_side: 'right' },
+    inverter: { x: 44, y: 46 },
     battery: { entity: 'sensor.uhome_puissance_batterie', soc_entity: 'sensor.uhome_soc', x: 20, y: 79, details: ['sensor.uhome_tension_batterie', 'sensor.uhome_courant_batterie'], details_side: 'right' },
-    home: { entity: 'sensor.uhome_puissance_maison', label: 'Maison', x: 60, y: 79, details: [], details_side: 'right' },
+    home: { entity: 'sensor.uhome_puissance_maison', x: 60, y: 79, details: [], details_side: 'right' },
   },
 };
 
@@ -923,7 +1542,7 @@ class UcanessFlowCard extends HTMLElement {
         paths += `<path class="idle" d="${d}"/>`;
       }
     }
-    const names = { solar: 'Solaire', grid: 'Réseau', battery: 'Batterie', home: 'Maison' };
+    const names = { solar: ucT(hass, 'solaire'), grid: ucT(hass, 'reseau'), battery: ucT(hass, 'batterie'), home: ucT(hass, 'maison') };
     const nodeHtml = (key, cls, label) => {
       const n = c.nodes[key];
       const f = flows[key];
@@ -940,7 +1559,7 @@ class UcanessFlowCard extends HTMLElement {
     const bat = c.nodes.battery;
     const soc = ucNum(hass, bat.soc_entity);
     const bf = flows.battery;
-    const batState = bf.dir === 'out' ? 'Chargement' : bf.dir === 'in' ? 'Décharge' : 'Veille';
+    const batState = ucT(hass, bf.dir === 'out' ? 'bat_chargement' : bf.dir === 'in' ? 'bat_decharge' : 'bat_veille');
     const home = c.nodes.home;
     let grid = '';
     if (c.calibration) {
@@ -990,20 +1609,20 @@ class UcanessFlowCard extends HTMLElement {
         .cal.h { left: 0; right: 0; height: 1px; }
         .cal span { position: absolute; font: 11px monospace; color: #FF8080; left: 2px; top: 2px; }
       </style>
-      <div class="stage" role="group" aria-label="Flux d'énergie en direct">
+      <div class="stage" role="group" aria-label="${esc(ucT(hass, 'flux_direct'))}">
         <img class="house" src="${esc(c.image)}" alt="">
         <svg class="lines" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${paths}</svg>
-        <div class="inv" aria-hidden="true"><svg viewBox="0 0 44 26" fill="none" stroke="#8FD3FF" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="40" height="22" rx="3"/><path d="M9 13c2-5 4-5 6 0s4 5 6 0 4-5 6 0 4 5 6 0"/></svg><span>${esc(inv.label || 'Onduleur')}</span></div>
-        ${nodeHtml('solar', 'solar', c.nodes.solar.label)}
-        ${nodeHtml('grid', 'grid', c.nodes.grid.label)}
+        <div class="inv" aria-hidden="true"><svg viewBox="0 0 44 26" fill="none" stroke="#8FD3FF" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="40" height="22" rx="3"/><path d="M9 13c2-5 4-5 6 0s4 5 6 0 4-5 6 0 4 5 6 0"/></svg><span>${esc(inv.label || ucT(hass, 'onduleur'))}</span></div>
+        ${nodeHtml('solar', 'solar', c.nodes.solar.label || names.solar)}
+        ${nodeHtml('grid', 'grid', c.nodes.grid.label || names.grid)}
         ${nodeHtml('battery', 'battery', c.nodes.battery.label || '')}
         ${nodeHtml('home', 'home', c.nodes.home.label || '')}
-        <button type="button" class="bat" data-entity="${esc(bat.soc_entity || '')}" aria-label="${esc('Batterie à ' + (soc === null ? '—' : Math.round(soc)) + ' %, ' + batState)}">
+        <button type="button" class="bat" data-entity="${esc(bat.soc_entity || '')}" aria-label="${esc(ucT(hass, 'batterie_a', { soc: soc === null ? '—' : Math.round(soc), etat: batState }))}">
           <span class="cell"><span class="fill" style="height:${soc === null ? 0 : Math.max(6, Math.min(100, soc)) * 0.86}%"></span></span>
           <span class="txt">${soc === null ? '—' : esc(ucNumber(hass, Math.round(soc), 0))} %<span>${batState}</span></span>
         </button>
         <svg class="bulb" viewBox="0 0 24 26" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4a6 6 0 0 0-4 10.5c.8.8 1 1.6 1 2.5h6c0-.9.2-1.7 1-2.5A6 6 0 0 0 12 4z" fill="#FFC440" stroke="#FFB020" stroke-width="1"/><path d="M9.5 19h5M10 21.5h4" stroke="#9AA6BE" stroke-width="1.6"/><path d="M3 5l2 1.5M21 5l-2 1.5M1.5 11.5h2.5M20 11.5h2.5M5 18l1.6-1.2M19 18l-1.6-1.2" stroke="#FFC440" stroke-width="1.4"/></svg>
-        <div class="live"><i></i>${age === null ? 'en attente des mesures' : `en direct · relevé il y a ${age < 120 ? age + ' s' : Math.round(age / 60) + ' min'}`}</div>
+        <div class="live"><i></i>${esc(age === null ? ucT(hass, 'en_attente_mesures') : ucT(hass, 'en_direct', { age: age < 120 ? age + ' s' : Math.round(age / 60) + ' min' }))}</div>
         <div class="glow" aria-hidden="true"></div>
         ${grid}
       </div>`;
@@ -1051,6 +1670,7 @@ class UcanessFlowCard extends HTMLElement {
     const sunOn = on(pv) && pv > 0;
     const charging = on(bat) && bat > 0;
     const discharging = on(bat) && bat < 0;
+    const etatBat = ucT(hass, charging ? 'en_charge' : discharging ? 'en_decharge' : 'au_repos');
     const homeOn = on(home) && home > 0;
     const gridIn = on(grid) && grid > 0;
     const gridOut = on(grid) && grid < 0;
@@ -1091,7 +1711,7 @@ class UcanessFlowCard extends HTMLElement {
         ${N.solar.leader ? `<path d="${D(N.solar.leader)}" fill="none" stroke="#F7B248" stroke-width="1.5" stroke-dasharray="3 4.5" stroke-opacity="0.8"/>` : ''}
       </svg>
       ${borne ? `<svg class="borne" style="left:${borne.x}%;top:${borne.y}%;width:${borne.w}%" viewBox="0 0 19 33" aria-hidden="true"><polygon points="0,8.5 16,0 16,24.5 0,33" fill="#1B2130" stroke="#6FD6F5" stroke-width="1.3" stroke-linejoin="round"/><polygon points="16,0 19,1.5 19,26 16,24.5" fill="#11151F" stroke="#6FD6F5" stroke-width="0.8"/><circle cx="8" cy="15" r="4" fill="none" stroke="${evLed}" stroke-width="1.8"/>${evOn && !UC_LIGHT ? `<circle class="uc-wave" cx="8" cy="15" r="4" fill="none" stroke="${evLed}" stroke-width="1.8" style="animation-duration: 1.6s"/>` : ''}</svg>` : ''}
-      <button type="button" class="uh" style="left:${uh.x}%;top:${uh.y}%;width:${uh.w}%" aria-label="UHome : batterie à ${soc === null ? '—' : Math.round(soc)} %, ${charging ? 'en charge' : discharging ? 'en décharge' : 'au repos'}${c.battery_path ? '. Ouvrir la page de la batterie' : ''}">
+      <button type="button" class="uh" style="left:${uh.x}%;top:${uh.y}%;width:${uh.w}%" aria-label="${esc(ucT(hass, 'uhome_batterie_a', { soc: soc === null ? '—' : Math.round(soc), etat: etatBat }) + (c.battery_path ? '. ' + ucT(hass, 'ouvrir_page_batterie') : ''))}">
         <svg viewBox="0 0 60 126" aria-hidden="true">
           <defs><linearGradient id="uhm" x1="0" x2="1"><stop offset="0" stop-color="#2B2E34"/><stop offset=".55" stop-color="#34373E"/><stop offset="1" stop-color="#24262B"/></linearGradient>
           <linearGradient id="uht" x1="0" x2="1"><stop offset="0" stop-color="#30333A"/><stop offset=".55" stop-color="#3A3D45"/><stop offset="1" stop-color="#2A2D33"/></linearGradient></defs>
@@ -1112,10 +1732,11 @@ class UcanessFlowCard extends HTMLElement {
     const det = (n) => (c.details === false ? '' : (n.details || []).map((e) => esc(ucDisplay(hass, e))).join(' · '));
     const kwv = (key, w) => (w === null ? '<b>—</b>' : `<b><span data-n="${key}" data-v="${Math.abs(w) / 1000}" data-d="2">${esc(ucNumber(hass, Math.abs(w) / 1000, 2))}</span> kW</b>`);
     const modeRaw = c.mode_entity && hass.states[c.mode_entity] ? hass.states[c.mode_entity].state : null;
-    const modeNames = Object.assign({ 'Match Load Mode': 'autoconsommation', 'Peak Fill Mode': 'arbitrage horaire', 'Backup Mode': 'secours' }, c.mode_names || {});
+    const modeNames = Object.assign({ 'Match Load Mode': ucT(hass, 'scene_mode_autoconsommation'), 'Peak Fill Mode': ucT(hass, 'scene_mode_arbitrage'), 'Backup Mode': ucT(hass, 'scene_mode_secours') }, c.mode_names || {});
     const mode = modeRaw && !['unknown', 'unavailable'].includes(modeRaw) ? (modeNames[modeRaw] || modeRaw) : null;
-    const evNames = Object.assign({ charging: 'en charge', ready: 'libre', paused: 'en pause', scheduled: 'programmée', 'waiting for car demand': 'branchée', 'connected: waiting car demand': 'branchée', 'waiting for next schedule': 'programmée', disconnected: 'hors ligne', error: 'en défaut', unavailable: 'indisponible', unknown: 'inconnue' }, (E && E.state_names) || {});
-    const evState = evOn ? 'en charge' : (evNames[evRaw.toLowerCase()] || evNames[evRaw] || (evRaw ? evRaw.toLowerCase() : 'libre'));
+    const B = (k) => ucT(hass, 'borne_' + k);
+    const evNames = Object.assign({ charging: B('en_charge'), ready: B('libre'), paused: B('en_pause'), scheduled: B('programmee'), 'waiting for car demand': B('branchee'), 'connected: waiting car demand': B('branchee'), 'waiting for next schedule': B('programmee'), disconnected: B('hors_ligne'), error: B('en_defaut'), unavailable: B('indisponible'), unknown: B('inconnue') }, (E && E.state_names) || {});
+    const evState = evOn ? B('en_charge') : (evNames[evRaw.toLowerCase()] || evNames[evRaw] || (evRaw ? evRaw.toLowerCase() : B('libre')));
     const ages = Object.values(N).map((n) => n.entity && hass.states[n.entity] && Date.parse(hass.states[n.entity].last_updated)).filter((t) => Number.isFinite(t));
     const age = ages.length ? Math.max(0, Math.round((Date.now() - Math.max(...ages)) / 1000)) : null;
     const L = (n, defAlign, ent, html, cls) => {
@@ -1127,13 +1748,19 @@ class UcanessFlowCard extends HTMLElement {
     const gd = det(N.grid);
     const hd = det(N.home);
     const labels = `
-      <div class="live"><i></i>${age === null ? 'en attente des mesures' : `en direct · relevé il y a ${age < 120 ? age + ' s' : Math.round(age / 60) + ' min'}`}</div>
-      ${L(N.solar, 'right', N.solar.entity, `<span class="t" style="color:#F7B248">${esc(N.solar.label && N.solar.label !== 'Solaire' ? N.solar.label : 'Panneaux solaires')}</span><br>${kwv('pv', pv)}${sd ? `<br><span class="o">${sd}</span>` : ''}`)}
-      ${L(N.battery, 'right', N.battery.soc_entity, `<span class="t" style="color:${uhColor}">${esc(N.battery.label || 'UHome')}</span><br><b>${soc === null ? '—' : `<span data-n="soc" data-v="${Math.round(soc)}" data-d="0">${esc(ucNumber(hass, Math.round(soc), 0))}</span>`} % · ${bat === null ? '—' : `<span data-n="bat" data-v="${Math.abs(bat) / 1000}" data-d="2">${esc(ucNumber(hass, Math.abs(bat) / 1000, 2))}</span>`} kW</b><br><span class="o">Batterie : </span>${charging ? 'en charge' : discharging ? 'en décharge' : 'au repos'}${mode ? `<br><span class="o">Onduleur : ${esc(mode)}</span>` : ''}`)}
-      ${E ? L(E, 'left', E.entity, `<span class="t" style="color:${evOn ? '#2ED198' : '#9CC9F5'}">Recharge</span><br>${kwv('ev', ev)}<br><span class="o">${esc(E.name || 'Borne')} · </span>${esc(evState)}`) : ''}
-      ${L(N.home, 'right', N.home.entity, `<span class="t" style="color:#FFC440">${esc(N.home.label || 'Maison')}</span><br>${kwv('home', home)}${hd ? `<br><span class="o">${hd}</span>` : ''}`)}
-      ${L(N.grid, 'left', N.grid.entity, `<span class="t" style="color:#F7B248">${esc(N.grid.label || 'Réseau')}</span><br>${kwv('grid', grid)}${gridOut ? '<br>injection' : ''}${gd ? `<br><span class="o">${gd.replace(' · ', '<br>')}</span>` : ''}`, 'g')}`;
-    const label = `${sunOn ? 'Le soleil produit ' + ucNumber(hass, pv / 1000, 2) + ' kW. ' : ''}La batterie est ${charging ? 'en charge' : discharging ? 'en décharge' : 'au repos'}${soc === null ? '' : ' à ' + Math.round(soc) + ' %'}. La maison consomme ${home === null ? '—' : ucNumber(hass, Math.max(0, home) / 1000, 2)} kW.${gridIn ? ' Achat au réseau.' : gridOut ? ' Injection sur le réseau.' : ''}${evOn ? ' Voiture en charge.' : ''}`;
+      <div class="live"><i></i>${esc(age === null ? ucT(hass, 'en_attente_mesures') : ucT(hass, 'en_direct', { age: age < 120 ? age + ' s' : Math.round(age / 60) + ' min' }))}</div>
+      ${L(N.solar, 'right', N.solar.entity, `<span class="t" style="color:#F7B248">${esc(N.solar.label && N.solar.label !== 'Solaire' ? N.solar.label : ucT(hass, 'panneaux_solaires'))}</span><br>${kwv('pv', pv)}${sd ? `<br><span class="o">${sd}</span>` : ''}`)}
+      ${L(N.battery, 'right', N.battery.soc_entity, `<span class="t" style="color:${uhColor}">${esc(N.battery.label || 'UHome')}</span><br><b>${soc === null ? '—' : `<span data-n="soc" data-v="${Math.round(soc)}" data-d="0">${esc(ucNumber(hass, Math.round(soc), 0))}</span>`} % · ${bat === null ? '—' : `<span data-n="bat" data-v="${Math.abs(bat) / 1000}" data-d="2">${esc(ucNumber(hass, Math.abs(bat) / 1000, 2))}</span>`} kW</b><br><span class="o">${esc(ucT(hass, 'batterie_deux_points'))}</span>${esc(etatBat)}${mode ? `<br><span class="o">${esc(ucT(hass, 'onduleur_mode', { mode }))}</span>` : ''}`)}
+      ${E ? L(E, 'left', E.entity, `<span class="t" style="color:${evOn ? '#2ED198' : '#9CC9F5'}">${esc(ucT(hass, 'recharge'))}</span><br>${kwv('ev', ev)}<br><span class="o">${esc(E.name || ucT(hass, 'borne'))} · </span>${esc(evState)}`) : ''}
+      ${L(N.home, 'right', N.home.entity, `<span class="t" style="color:#FFC440">${esc(N.home.label || ucT(hass, 'maison'))}</span><br>${kwv('home', home)}${hd ? `<br><span class="o">${hd}</span>` : ''}`)}
+      ${L(N.grid, 'left', N.grid.entity, `<span class="t" style="color:#F7B248">${esc(N.grid.label || ucT(hass, 'reseau'))}</span><br>${kwv('grid', grid)}${gridOut ? '<br>' + esc(ucT(hass, 'injection')) : ''}${gd ? `<br><span class="o">${gd.replace(' · ', '<br>')}</span>` : ''}`, 'g')}`;
+    const label = [
+      sunOn ? ucT(hass, 'scene_soleil', { kw: ucNumber(hass, pv / 1000, 2) }) : '',
+      soc === null ? ucT(hass, 'scene_batterie', { etat: etatBat }) : ucT(hass, 'scene_batterie_soc', { etat: etatBat, soc: Math.round(soc) }),
+      ucT(hass, 'scene_maison', { kw: home === null ? '—' : ucNumber(hass, Math.max(0, home) / 1000, 2) }),
+      gridIn ? ucT(hass, 'scene_achat') : gridOut ? ucT(hass, 'scene_injection') : '',
+      evOn ? ucT(hass, 'scene_voiture') : '',
+    ].filter(Boolean).join(' ');
     const root = this.shadowRoot;
     if (!root.querySelector('.stage.scene')) {
       const ia = c.image_area;
@@ -1249,7 +1876,7 @@ class UcanessSocCard extends HTMLElement {
     const cap = c.capacity !== undefined ? c.capacity : ucNum(hass, c.capacity_entity);
     const R = 88, C = 2 * Math.PI * R;
     const dash = soc === null ? 0 : C * Math.max(0, Math.min(100, soc)) / 100;
-    const state = p === null || Math.abs(p) < 30 ? 'Veille' : p > 0 ? 'Chargement' : 'Décharge';
+    const state = ucT(hass, p === null || Math.abs(p) < 30 ? 'bat_veille' : p > 0 ? 'bat_chargement' : 'bat_decharge');
     const stored = soc !== null && cap ? ucNumber(hass, cap * soc / 100, 2) + ' kWh' : '—';
     const avail = soc !== null && cap && floor !== null ? ucNumber(hass, Math.max(0, cap * (soc - floor) / 100), 2) + ' kWh' : '—';
     const lk = this._look(p);
@@ -1277,16 +1904,16 @@ class UcanessSocCard extends HTMLElement {
       </style>
       <div class="wrap">
         <div class="ring">
-          <svg viewBox="0 0 250 250" role="img" aria-label="Charge de la batterie : ${soc === null ? 'indisponible' : Math.round(soc) + ' %'}">
+          <svg viewBox="0 0 250 250" role="img" aria-label="${esc(ucT(hass, 'charge_de_la_batterie', { v: soc === null ? ucT(hass, 'indisponible') : Math.round(soc) + ' %' }))}">
             <defs><linearGradient id="ucg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${lk.g[1]}"/><stop offset="1" stop-color="${lk.g[0]}"/></linearGradient></defs>
             ${lk.moving && !UC_LIGHT ? `<circle class="halo" cx="125" cy="125" r="${R}" fill="none" stroke="${lk.g[0]}" stroke-width="6"/>` : ''}
             <circle cx="125" cy="125" r="104" fill="none" stroke="#12345E" stroke-width="2" stroke-dasharray="3 6"/>
             <circle cx="125" cy="125" r="${R}" fill="none" stroke="#16365F" stroke-width="20"/>
             <circle class="arc${first ? ' draw' : ''}" cx="125" cy="125" r="${R}" fill="none" stroke="url(#ucg)" stroke-width="20" stroke-linecap="round" stroke-dasharray="${dash.toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 125 125)"/>
           </svg>
-          <div class="mid"><small>CHARGE</small><b>${soc === null ? '—' : `<span data-n="soc" data-v="${Math.round(soc)}" data-d="0">${esc(ucNumber(hass, Math.round(soc), 0))}</span>`} %</b><span>${state}${p !== null && Math.abs(p) >= 30 ? ' · ' + esc(ucNumber(hass, Math.abs(p) / 1000, 2)) + ' kW' : ''}</span>${floor !== null ? `<em>plancher ${esc(ucNumber(hass, floor, 0))} %${cap ? ' · ' + esc(ucNumber(hass, cap, 1)) + ' kWh' : ''}</em>` : ''}</div>
+          <div class="mid"><small>${esc(ucT(hass, 'charge_majuscules'))}</small><b>${soc === null ? '—' : `<span data-n="soc" data-v="${Math.round(soc)}" data-d="0">${esc(ucNumber(hass, Math.round(soc), 0))}</span>`} %</b><span>${state}${p !== null && Math.abs(p) >= 30 ? ' · ' + esc(ucNumber(hass, Math.abs(p) / 1000, 2)) + ' kW' : ''}</span>${floor !== null ? `<em>plancher ${esc(ucNumber(hass, floor, 0))} %${cap ? ' · ' + esc(ucNumber(hass, cap, 1)) + ' kWh' : ''}</em>` : ''}</div>
         </div>
-        <div class="row"><span>Stockée <span>${esc(stored)}</span></span><span class="warn">Avant plancher <span>${esc(avail)}</span></span></div>
+        <div class="row"><span>${esc(ucT(hass, 'stockee'))} <span>${esc(stored)}</span></span><span class="warn">${esc(ucT(hass, 'avant_plancher'))} <span>${esc(avail)}</span></span></div>
       </div>`;
     ucCount(this, this.shadowRoot, hass);
   }
@@ -1305,13 +1932,13 @@ class UcanessSocCard extends HTMLElement {
     const dash = soc === null ? 0 : C * Math.max(0, Math.min(100, soc)) / 100;
     const low = soc !== null && floor !== null && soc <= floor + 2;
     const moving = p !== null && Math.abs(p) >= 30;
-    const state = p === null ? '' : !moving ? 'au repos' : p > 0 ? 'en charge' : 'en décharge';
+    const state = p === null ? '' : ucT(hass, !moving ? 'au_repos' : p > 0 ? 'en_charge' : 'en_decharge');
     const stateColor = !moving ? 'var(--uc-muted)' : p > 0 ? '#2ECC71' : '#7FD3FF';
     const kwh = (v) => esc(ucFormat(hass, v, v < 10 ? 1 : 0, 'kWh'));
     const stored = soc !== null && cap ? kwh(cap * soc / 100) : '—';
     const avail = soc !== null && cap && floor !== null ? kwh(Math.max(0, cap * (soc - floor) / 100)) : '—';
     const modeRaw = c.mode_entity && hass.states[c.mode_entity] ? hass.states[c.mode_entity].state : null;
-    const modeNames = Object.assign({ 'Match Load Mode': 'Autoconsommation', 'Peak Fill Mode': 'Arbitrage horaire', 'Backup Mode': 'Secours' }, c.mode_names || {});
+    const modeNames = Object.assign({ 'Match Load Mode': ucT(hass, 'mode_autoconsommation'), 'Peak Fill Mode': ucT(hass, 'mode_arbitrage'), 'Backup Mode': ucT(hass, 'mode_secours') }, c.mode_names || {});
     const mode = modeRaw && !['unknown', 'unavailable'].includes(modeRaw) ? (modeNames[modeRaw] || modeRaw) : null;
     const sim = c.simulation_entity && hass.states[c.simulation_entity] && hass.states[c.simulation_entity].state === 'on';
     const lk = this._look(p);
@@ -1345,8 +1972,8 @@ class UcanessSocCard extends HTMLElement {
         .v.warn { color: var(--uc-orange); }
         .s { font-size: 13px; color: #9CC9F5; }
       </style>
-      <button type="button" class="box" aria-label="Batterie : ${soc === null ? 'charge indisponible' : esc(Math.round(soc)) + ' %'}">
-        <span class="head"><span class="t">${esc(c.title || 'Batterie')}</span><span class="chips">${mode ? `<span class="chip">${esc(mode)}</span>` : ''}${sim ? '<span class="chip sim">Simulation</span>' : ''}</span></span>
+      <button type="button" class="box" aria-label="${esc(ucT(hass, 'batterie_etat', { v: soc === null ? ucT(hass, 'charge_indisponible') : Math.round(soc) + ' %' }))}">
+        <span class="head"><span class="t">${esc(c.title || ucT(hass, 'batterie'))}</span><span class="chips">${mode ? `<span class="chip">${esc(mode)}</span>` : ''}${sim ? `<span class="chip sim">${esc(ucT(hass, 'simulation'))}</span>` : ''}</span></span>
         <span class="body">
           <span class="ring">
             <svg viewBox="0 0 124 124" aria-hidden="true">
@@ -1358,9 +1985,9 @@ class UcanessSocCard extends HTMLElement {
             <span class="mid"><b>${soc === null ? '—' : `<span data-n="soc" data-v="${Math.round(soc)}" data-d="0">${esc(ucNumber(hass, Math.round(soc), 0))}</span> %`}</b>${state ? `<span style="color:${stateColor}">${esc(state)}</span>` : ''}${moving ? `<span style="color:#CFE6FF">${esc(ucFormat(hass, Math.abs(p) / 1000, 2, 'kW'))}</span>` : ''}</span>
           </span>
           <span class="figs">
-            <span class="f"><span class="n">En réserve</span><span class="v">${stored}</span></span>
-            <span class="f"><span class="n">Utilisable avant le plancher</span><span class="v warn">${avail}</span></span>
-            ${floor !== null ? `<span class="s">Plancher ${esc(ucNumber(hass, floor, 0))} %${cap ? ' · ' + esc(ucFormat(hass, cap, 1, 'kWh')) : ''}</span>` : ''}
+            <span class="f"><span class="n">${esc(ucT(hass, 'en_reserve'))}</span><span class="v">${stored}</span></span>
+            <span class="f"><span class="n">${esc(ucT(hass, 'utilisable_avant_plancher'))}</span><span class="v warn">${avail}</span></span>
+            ${floor !== null ? `<span class="s">${esc(ucT(hass, 'plancher', { v: ucNumber(hass, floor, 0) }))}${cap ? ' · ' + esc(ucFormat(hass, cap, 1, 'kWh')) : ''}</span>` : ''}
           </span>
         </span>
       </button>`;
@@ -1381,7 +2008,7 @@ class UcanessSocCard extends HTMLElement {
 class UcanessNoteCard extends HTMLElement {
   setConfig(config) {
     if (!config || (!config.content && !config.card)) {
-      throw new Error('ucaness-note-card : indiquez « content » (texte markdown) ou « card ».');
+      throw new Error(ucT(null, 'err_note'));
     }
     this._config = Object.assign({ lines: 4 }, config);
     this._open = false;
@@ -1433,8 +2060,8 @@ class UcanessNoteCard extends HTMLElement {
         .clip:not(.cut) .fade, .clip:not(.cut) .more, .clip.open .fade, .clip.open .more { display: none; }
         .less[hidden] { display: none; }
       </style>
-      <div class="clip" part="clip"><div class="slot"></div><div class="fade" aria-hidden="true"></div><button type="button" class="more uc-key" aria-expanded="false" aria-label="Lire la suite">…</button></div>
-      <button type="button" class="less uc-key" aria-expanded="true" hidden>Réduire</button>`;
+      <div class="clip" part="clip"><div class="slot"></div><div class="fade" aria-hidden="true"></div><button type="button" class="more uc-key" aria-expanded="false" aria-label="${esc(ucT(null, 'lire_la_suite'))}">…</button></div>
+      <button type="button" class="less uc-key" aria-expanded="true" hidden>${esc(ucT(null, 'reduire'))}</button>`;
     const clip = this.shadowRoot.querySelector('.clip');
     const more = this.shadowRoot.querySelector('.more');
     const less = this.shadowRoot.querySelector('.less');
@@ -1527,7 +2154,7 @@ const UC_APP_CSS = `
 
 class UcanessAppCard extends HTMLElement {
   setConfig(config) {
-    if (!config || !Array.isArray(config.cards)) throw new Error('ucaness-app-card : « cards » est obligatoire.');
+    if (!config || !Array.isArray(config.cards)) throw new Error(ucT(null, 'err_app'));
     this._config = Object.assign({ site: 'Maison', title: 'UCANESS', nav: [], alert_entities: [] }, config);
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this._build();
@@ -1595,7 +2222,7 @@ class UcanessAppCard extends HTMLElement {
           <div class="right"><span class="alerts"></span><span class="clock"></span></div>
         </header>
         <main></main>
-        <nav aria-label="Navigation"></nav>
+        <nav aria-label="${esc(ucT(null, 'navigation'))}"></nav>
       </div>`;
     const cards = await ucCreateCards(c.cards, this._hass, this);
     if (build !== this._buildId) return;
@@ -1625,7 +2252,7 @@ class UcanessAppCard extends HTMLElement {
     }
     const active = ucActiveAlerts(hass, c.alert_entities);
     const alerts = this.shadowRoot.querySelector('.alerts');
-    alerts.innerHTML = ucAlertList(c.alert_entities).length ? `<button type="button" class="bell" aria-label="${active.length ? active.length + ' alerte(s) en cours' : 'Aucune alerte'}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${active.length ? '#FFB4B6' : '#7DABCD'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>${active.length ? `<span class="badge">${active.length}</span>` : ''}</button>` : '';
+    alerts.innerHTML = ucAlertList(c.alert_entities).length ? `<button type="button" class="bell" aria-label="${esc(active.length ? ucT(hass, 'alertes_en_cours', { n: active.length }) : ucT(hass, 'aucune_alerte'))}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${active.length ? '#FFB4B6' : '#7DABCD'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>${active.length ? `<span class="badge">${active.length}</span>` : ''}</button>` : '';
     const bell = alerts.querySelector('button');
     if (bell && active.length) bell.addEventListener('click', () => ucMoreInfo(this, active[0].entity));
     const path = window.location.pathname;
@@ -1665,7 +2292,7 @@ function ucActiveAlerts(hass, list) {
  */
 class UcanessStatusCard extends HTMLElement {
   setConfig(config) {
-    this._config = Object.assign({ ok_text: 'Tout va bien', alert_entities: [], notice_entities: [] }, config || {});
+    this._config = Object.assign({ alert_entities: [], notice_entities: [] }, config || {});
     this._ucSeen = null;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this._render();
@@ -1693,7 +2320,7 @@ class UcanessStatusCard extends HTMLElement {
     const info = (this._ucTpl && this._ucTpl.info && this._ucTpl.info.value) || '';
     const kind = alerts.length ? 'alert' : notices.length ? 'notice' : 'ok';
     const list = alerts.length ? alerts : notices;
-    const text = kind === 'ok' ? esc(c.ok_text) : `${alerts.length > 1 ? alerts.length + ' alertes : ' : ''}${list.map((a) => esc(a.name)).join(' · ')}`;
+    const text = kind === 'ok' ? esc(c.ok_text || ucT(this._hass, 'tout_va_bien')) : `${alerts.length > 1 ? esc(ucT(this._hass, 'n_alertes', { n: alerts.length })) : ''}${list.map((a) => esc(a.name)).join(' · ')}`;
     this.shadowRoot.innerHTML = `
       <style>${UC_BASE_CSS}
         :host { display: block; }
@@ -1723,7 +2350,7 @@ class UcanessStatusCard extends HTMLElement {
  */
 class UcanessStatsCard extends HTMLElement {
   setConfig(config) {
-    if (!config || !Array.isArray(config.items) || !config.items.length) throw new Error('ucaness-stats-card : « items » est obligatoire.');
+    if (!config || !Array.isArray(config.items) || !config.items.length) throw new Error(ucT(null, 'err_stats'));
     this._config = config;
     this._ucSeen = null;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
@@ -1812,7 +2439,7 @@ class UcanessStatsCard extends HTMLElement {
  */
 class UcanessInfoCard extends HTMLElement {
   setConfig(config) {
-    if (!config || (!config.template && !config.text)) throw new Error('ucaness-info-card : indiquez « template » ou « text ».');
+    if (!config || (!config.template && !config.text)) throw new Error(ucT(null, 'err_info'));
     this._config = config;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
     this._render();
@@ -1860,7 +2487,7 @@ class UcanessInfoCard extends HTMLElement {
  */
 class UcanessShortcutsCard extends HTMLElement {
   setConfig(config) {
-    if (!config || !Array.isArray(config.items)) throw new Error('ucaness-shortcuts-card : « items » est obligatoire.');
+    if (!config || !Array.isArray(config.items)) throw new Error(ucT(null, 'err_shortcuts'));
     this._config = config;
     this._ucSeen = null;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
@@ -1942,7 +2569,7 @@ function ucMiniMarkdown(text) {
  */
 class UcanessDetailCard extends HTMLElement {
   setConfig(config) {
-    if (!config || (!config.headline && !config.headline_template)) throw new Error('ucaness-detail-card : indiquez « headline » ou « headline_template ».');
+    if (!config || (!config.headline && !config.headline_template)) throw new Error(ucT(null, 'err_detail'));
     this._config = config;
     this._panel = null;
     this._journal = null;
@@ -1999,15 +2626,15 @@ class UcanessDetailCard extends HTMLElement {
 
   _journalHtml() {
     const j = this._journal;
-    if (!j || j.loading) return '<p class="m">Chargement…</p>';
-    if (j.error) return '<p class="m">Journal indisponible.</p>';
-    if (!j.entries.length) return '<p class="m">Aucune entrée sur la période.</p>';
+    if (!j || j.loading) return `<p class="m">${esc(ucT(this._hass, 'chargement'))}</p>`;
+    if (j.error) return `<p class="m">${esc(ucT(this._hass, 'journal_indisponible'))}</p>`;
+    if (!j.entries.length) return `<p class="m">${esc(ucT(this._hass, 'journal_vide'))}</p>`;
     const lang = (this._hass && this._hass.locale && this._hass.locale.language) || 'fr';
     return `<ul class="jl">${j.entries.map((e, i) => {
       const date = e.when.toLocaleDateString(lang, { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' ' + e.when.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
       const sim = /^\[simulation\]/i.test(e.text);
       const text = e.text.replace(/^\[(réel|simulation)\]\s*/i, '').replace(/(\d)\.(\d)/g, '$1,$2');
-      return `<li><button type="button" class="je" data-j="${i}" aria-expanded="false"><span class="jd">${esc(date)}${sim ? ' · simulation' : ''}</span><span class="jt">${esc(text)}</span></button></li>`;
+      return `<li><button type="button" class="je" data-j="${i}" aria-expanded="false"><span class="jd">${esc(date)}${sim ? ' · ' + esc(ucT(this._hass, 'journal_simulation')) : ''}</span><span class="jt">${esc(text)}</span></button></li>`;
     }).join('')}</ul>`;
   }
 
@@ -2026,10 +2653,10 @@ class UcanessDetailCard extends HTMLElement {
     const details = c.details ? this._tpl('d', '') : '';
     const buttons = [];
     const why = this._panel === 'why';
-    if (c.details) buttons.push(`<button type="button" class="b uc-key${why ? ' on' : ''}" data-k="why" aria-expanded="${why}">${esc(why ? (c.details_close_label || 'Réduire') : (c.details_label || 'Pourquoi ?'))}</button>`);
+    if (c.details) buttons.push(`<button type="button" class="b uc-key${why ? ' on' : ''}" data-k="why" aria-expanded="${why}">${esc(why ? (c.details_close_label || ucT(this._hass, 'reduire')) : (c.details_label || ucT(this._hass, 'pourquoi')))}</button>`);
     (c.buttons || []).forEach((b, i) => {
       const on = b.logbook && this._panel === 'journal';
-      buttons.push(`<button type="button" class="b uc-key${on ? ' on' : ''}" data-k="${i}"${b.logbook ? ` aria-expanded="${on}"` : ''}>${b.icon ? `<ha-icon icon="${esc(b.icon)}"></ha-icon>` : ''}${esc(on ? 'Réduire' : (b.name || ''))}</button>`);
+      buttons.push(`<button type="button" class="b uc-key${on ? ' on' : ''}" data-k="${i}"${b.logbook ? ` aria-expanded="${on}"` : ''}>${b.icon ? `<ha-icon icon="${esc(b.icon)}"></ha-icon>` : ''}${esc(on ? ucT(this._hass, 'reduire') : (b.name || ''))}</button>`);
     });
     this.shadowRoot.innerHTML = `
       <style>${UC_BASE_CSS}
@@ -2111,8 +2738,8 @@ class UcanessDetailCard extends HTMLElement {
  */
 class UcanessHoursCard extends HTMLElement {
   setConfig(config) {
-    if (!config || !Array.isArray(config.tabs) || !config.tabs.length) throw new Error('ucaness-hours-card : « tabs » est obligatoire.');
-    if (config.tabs.some((t) => !t.statistic)) throw new Error('ucaness-hours-card : chaque onglet demande « statistic ».');
+    if (!config || !Array.isArray(config.tabs) || !config.tabs.length) throw new Error(ucT(null, 'err_hours_tabs'));
+    if (config.tabs.some((t) => !t.statistic)) throw new Error(ucT(null, 'err_hours_stat'));
     this._config = config;
     this._tab = Math.min(Number(config.default_tab) || 0, config.tabs.length - 1);
     this._sel = null;
@@ -2288,21 +2915,21 @@ class UcanessHoursCard extends HTMLElement {
     // Légende sous le graphique : total de la journée, ou la valeur de l'heure choisie.
     const known = vals.filter((v) => v !== null);
     let caption;
-    if (!data) caption = 'Chargement…';
-    else if (data.error && !known.length) caption = 'Historique indisponible';
-    else if (!known.length) caption = 'Pas encore de mesure aujourd’hui';
+    if (!data) caption = ucT(this._hass, 'chargement');
+    else if (data.error && !known.length) caption = ucT(this._hass, 'historique_indisponible');
+    else if (!known.length) caption = ucT(this._hass, 'pas_de_mesure');
     else if (this._sel !== null) {
       const v = vals[this._sel];
       const f = fc ? fc[this._sel] : null;
-      caption = `${this._sel} h – ${this._sel + 1} h : ${v === null ? '—' : fmt(v, line ? digits : 2)}${f !== null && f !== undefined ? ` · ${t.forecast_label || 'prévu'} ${fmt(f, 2)}` : ''}`;
+      caption = `${this._sel} h – ${this._sel + 1} h : ${v === null ? '—' : fmt(v, line ? digits : 2)}${f !== null && f !== undefined ? ` · ${t.forecast_label || ucT(this._hass, 'prevu')} ${fmt(f, 2)}` : ''}`;
     } else if (line) {
-      caption = `${t.total_label || t.name} : de ${fmt(Math.min(...known))} à ${fmt(Math.max(...known))}`;
+      caption = ucT(this._hass, 'de_a', { nom: t.total_label || t.name, min: fmt(Math.min(...known)), max: fmt(Math.max(...known)) });
     } else {
       const total = known.reduce((a, b) => a + b, 0);
       const fTotal = fc ? fc.filter((v) => v !== null).reduce((a, b) => a + b, 0) : null;
-      caption = `${t.total_label || t.name} : ${fmt(total)}${fTotal !== null ? ` · ${t.forecast_label || 'prévu'} ${fmt(fTotal)}` : ''}`;
+      caption = `${t.total_label || t.name} : ${fmt(total)}${fTotal !== null ? ` · ${t.forecast_label || ucT(this._hass, 'prevu')} ${fmt(fTotal)}` : ''}`;
     }
-    const legend = [line ? '' : (data && data.current >= from && data.current < to ? 'barre estompée : heure en cours' : ''), shownFc ? 'pointillés : prévision' : ''].filter(Boolean).join(' · ');
+    const legend = [line ? '' : (data && data.current >= from && data.current < to ? ucT(this._hass, 'heure_en_cours') : ''), shownFc ? ucT(this._hass, 'pointilles_prevision') : ''].filter(Boolean).join(' · ');
     this.shadowRoot.innerHTML = `
       <style>${UC_BASE_CSS}
         :host { display: block; }
@@ -2323,9 +2950,9 @@ class UcanessHoursCard extends HTMLElement {
         .cap { font-size: 15px; color: #E6ECF5; }
         .leg { font-size: 12px; color: #9CC9F5; }
       </style>
-      <section aria-label="Graphique heure par heure">
+      <section aria-label="${esc(ucT(this._hass, 'graphique_heures'))}">
         ${c.tabs.length > 1 ? `<div class="tabs" role="tablist">${c.tabs.map((x, i) => `<button type="button" class="uc-key" role="tab" data-i="${i}" aria-selected="${i === this._tab}">${esc(x.name)}</button>`).join('')}</div>` : ''}
-        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t.name)} heure par heure">${defs}${marks}${body}${hits}</svg>
+        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(ucT(this._hass, 'nom_heures', { nom: t.name }))}">${defs}${marks}${body}${hits}</svg>
         <span class="cap">${esc(caption)}</span>
         ${legend ? `<span class="leg">${esc(legend)}</span>` : ''}
       </section>`;
@@ -2499,17 +3126,17 @@ class UcanessUcanCard extends HTMLElement {
   _corps(conseil, alertes) {
     const a = conseil ? conseil.attributes : {};
     if (conseil) {
-      return `<p class="k">${esc(a.titre || 'Un conseil')}</p>
+      return `<p class="k">${esc(a.titre || ucT(this._hass, 'un_conseil'))}</p>
         <p class="t">${esc(a.constat || '')}</p><p class="t">${esc(a.geste || '')}</p>
         ${a.gain ? `<p class="t g">${esc(a.gain)}</p>` : ''}${a.avertissement ? `<p class="n">${esc(a.avertissement)}</p>` : ''}
         <div class="btns">
-          <button type="button" class="uc-key p" data-r="fait">Je le fais</button>
-          <button type="button" class="uc-key s" data-r="plus_tard">Pas maintenant</button>
-          <button type="button" class="uc-key q" data-r="jamais">Ne plus proposer</button>
+          <button type="button" class="uc-key p" data-r="fait">${esc(ucT(this._hass, 'je_le_fais'))}</button>
+          <button type="button" class="uc-key s" data-r="plus_tard">${esc(ucT(this._hass, 'pas_maintenant'))}</button>
+          <button type="button" class="uc-key q" data-r="jamais">${esc(ucT(this._hass, 'ne_plus_proposer'))}</button>
         </div>`;
     }
-    if (alertes.length) return `<p class="t">Une alerte est en cours : ${esc(alertes.map((x) => x.name).join(', '))}. Les conseils attendront.</p>`;
-    return `<p class="t">Tout va bien. Je vous ferai signe quand un geste en vaudra la peine.</p>`;
+    if (alertes.length) return `<p class="t">${esc(ucT(this._hass, 'alerte_conseils_attendront', { noms: alertes.map((x) => x.name).join(', ') }))}</p>`;
+    return `<p class="t">${esc(ucT(this._hass, 'ucan_tout_va_bien'))}</p>`;
   }
 
   /* Simulateur « et si » (option simulateur: {puissance_actuelle_kva, abonnement_actuel_eur_an, jours}) :
@@ -2518,28 +3145,29 @@ class UcanessUcanCard extends HTMLElement {
     const c = this._config;
     if (!c.simulateur) return '';
     const s = this._simu;
-    const eur = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`;
+    const h = this._hass;
+    const eur = (v) => `${Math.round(v).toLocaleString(ucLang(h))} €`;
     let rep = '';
-    if (s && s.charge) rep = '<p class="t">Je calcule avec vos mesures…</p>';
-    else if (s && s.erreur) rep = `<p class="t">Calcul impossible : ${esc(s.erreur)}</p>`;
+    if (s && s.charge) rep = `<p class="t">${esc(ucT(h, 'calcul_en_cours'))}</p>`;
+    else if (s && s.erreur) rep = `<p class="t">${esc(ucT(h, 'calcul_impossible', { erreur: s.erreur }))}</p>`;
     else if (s && s.r && s.r.question === 'contrat') {
       const r = s.r;
       const act = r.contrat_actuel;
-      const lignes = (r.classement || []).slice(0, 3).map((l) => `<li>${esc(l.nom)} : ${eur(l.cout_annuel_eur)} par an${typeof l.ecart_avec_contrat_actuel_eur_an === 'number' ? ` (${l.ecart_avec_contrat_actuel_eur_an <= 0 ? '' : '+'}${eur(l.ecart_avec_contrat_actuel_eur_an)})` : ''}</li>`).join('');
-      const fiab = { fiable: 'fiable', indicatif: 'indicative', insuffisant: 'insuffisante' }[r.fiabilite] || r.fiabilite;
-      rep = `<p class="t">Sur vos ${esc(act ? act.jours_mesures : r.jours_demandes)} derniers jours de mesures (estimation ${esc(fiab)}) :</p>
-        ${act ? `<p class="t">Contrat actuel : ${eur(act.cout_annuel_eur)} par an.</p>` : ''}<ul class="t">${lignes}</ul>
-        <p class="n">${esc((r.limites || [])[0] || '')} Prix à vérifier chez le fournisseur avant de changer.</p>`;
+      const lignes = (r.classement || []).slice(0, 3).map((l) => `<li>${esc(ucT(h, 'offre_par_an', { nom: l.nom, montant: eur(l.cout_annuel_eur) }))}${typeof l.ecart_avec_contrat_actuel_eur_an === 'number' ? ` (${l.ecart_avec_contrat_actuel_eur_an <= 0 ? '' : '+'}${eur(l.ecart_avec_contrat_actuel_eur_an)})` : ''}</li>`).join('');
+      const fiab = ['fiable', 'indicatif', 'insuffisant'].includes(r.fiabilite) ? ucT(h, 'fiab_' + r.fiabilite) : r.fiabilite;
+      rep = `<p class="t">${esc(ucT(h, 'sur_vos_jours', { jours: act ? act.jours_mesures : r.jours_demandes, fiabilite: fiab }))}</p>
+        ${act ? `<p class="t">${esc(ucT(h, 'contrat_actuel_par_an', { montant: eur(act.cout_annuel_eur) }))}</p>` : ''}<ul class="t">${lignes}</ul>
+        <p class="n">${esc((r.limites || [])[0] || '')} ${esc(ucT(h, 'prix_a_verifier'))}</p>`;
     } else if (s && s.r && s.r.question === 'puissance') {
       const r = s.r;
-      const verbe = { garder: 'convient', baisser: 'pourrait baisser', augmenter: 'est trop juste', inconnu: 'reste à mesurer' }[r.conseil] || r.conseil;
+      const nb = (v) => Number(v).toLocaleString(ucLang(h));
       rep = r.conseil === 'inconnu' ? `<p class="t">${esc(r.raison || '')}</p>`
-        : `<p class="t">Pointe prise au réseau : ${esc(String(r.pointe_mesuree_kva).replace('.', ','))} kVA sur ${esc(r.jours_mesures)} jours. Votre puissance de ${esc(r.puissance_souscrite_kva)} kVA ${verbe} : ${esc(r.puissance_recommandee_kva)} kVA suffiraient avec ${esc(r.marge_pct)} % de marge.</p>
+        : `<p class="t">${esc(['garder', 'baisser', 'augmenter'].includes(r.conseil) ? ucT(h, 'puissance_' + r.conseil, { pointe: nb(r.pointe_mesuree_kva), jours: r.jours_mesures, actuelle: nb(r.puissance_souscrite_kva), reco: nb(r.puissance_recommandee_kva), marge: r.marge_pct }) : (r.raison || r.conseil || ''))}</p>
           ${(r.remarques || []).map((x) => `<p class="n">${esc(x)}</p>`).join('')}`;
     }
-    return `<div class="etsi"><p class="k">Et si…</p><div class="btns">
-        <button type="button" class="uc-key s" data-q="contrat">je changeais de contrat ?</button>
-        <button type="button" class="uc-key s" data-q="puissance">je changeais de puissance ?</button></div>
+    return `<div class="etsi"><p class="k">${esc(ucT(h, 'et_si'))}</p><div class="btns">
+        <button type="button" class="uc-key s" data-q="contrat">${esc(ucT(h, 'q_contrat'))}</button>
+        <button type="button" class="uc-key s" data-q="puissance">${esc(ucT(h, 'q_puissance'))}</button></div>
         ${rep ? `<div class="msg">${rep}</div>` : ''}</div>`;
   }
 
@@ -2555,7 +3183,7 @@ class UcanessUcanCard extends HTMLElement {
       const rep = await this._hass.connection.sendMessagePromise({ type: 'call_service', domain: 'ucaness', service: 'simuler', service_data: data, return_response: true });
       this._simu = { r: rep && rep.response };
     } catch (err) {
-      this._simu = { erreur: (err && err.message) || 'erreur inconnue' };
+      this._simu = { erreur: (err && err.message) || ucT(this._hass, 'erreur_inconnue') };
     }
     this._render();
   }
@@ -2592,7 +3220,7 @@ class UcanessUcanCard extends HTMLElement {
       const droite = pos.droite;
       const ouvrirDessous = bas > (window.innerHeight || 800) / 2;
       const attente = !!conseil || alertes.length > 0;
-      const label = conseil ? 'Ucan : un conseil vous attend' : alertes.length ? 'Ucan : une alerte est en cours' : 'Ucan';
+      const label = esc(conseil ? ucT(this._hass, 'ucan_conseil_attend') : alertes.length ? ucT(this._hass, 'ucan_alerte') : 'Ucan');
       const r = this._flot.shadowRoot;
       r.innerHTML = `
         <style>${UC_BASE_CSS}
@@ -2618,8 +3246,8 @@ class UcanessUcanCard extends HTMLElement {
         </style>
         ${this._ouvert ? `<section class="panneau" role="dialog" aria-label="Ucan">
           <div class="tete"><div class="av">${ucUcanSvg(humeur, soc)}</div><h2>Ucan</h2>
-            ${this._deplace ? '<button type="button" class="replacer">Replacer</button>' : ''}
-            <button type="button" class="fermer" aria-label="Fermer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+            ${this._deplace ? `<button type="button" class="replacer">${esc(ucT(this._hass, 'replacer'))}</button>` : ''}
+            <button type="button" class="fermer" aria-label="${esc(ucT(this._hass, 'fermer'))}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
           <div class="msg">${this._corps(conseil, alertes)}</div>${this._etsiHtml()}</section>` : ''}
         <button type="button" class="fab uc-tap${attente && !this._ouvert && !UC_REDUCED && !UC_LIGHT ? ' appel' : ''}" aria-label="${label}" aria-expanded="${this._ouvert ? 'true' : 'false'}">
           ${ucUcanSvg(humeur, soc).replace('viewBox="0 0 220 300"', 'viewBox="30 4 160 118"')}${attente && !this._ouvert ? '<span class="pastille" aria-hidden="true"></span>' : ''}
@@ -2654,20 +3282,20 @@ class UcanessUcanCard extends HTMLElement {
 /* ------------------------------------------------------------------ enregistrement */
 
 const UC_CARDS = [
-  ['ucaness-layout-card', UcanessLayoutCard, 'UCANESS : mise en page', 'En-tête et colonnes du tableau de bord UCANESS HOME ASSISTANT.'],
-  ['ucaness-header-card', UcanessHeaderCard, 'UCANESS : en-tête', 'Bandeau titre, onglets, heure, liaison et alertes.'],
-  ['ucaness-panel-card', UcanessPanelCard, 'UCANESS : panneau', 'Panneau titré dans le style UCANESS, avec carrousel ou onglets facultatifs.'],
-  ['ucaness-flow-card', UcanessFlowCard, 'UCANESS : maison en direct', 'Flux solaire, réseau, batterie et maison sur l’image de votre maison.'],
-  ['ucaness-note-card', UcanessNoteCard, 'UCANESS : texte repliable', 'Texte replié sur quelques lignes, déplié d’un appui.'],
-  ['ucaness-soc-card', UcanessSocCard, 'UCANESS : charge batterie', 'Anneau de charge, énergie stockée et réserve avant le plancher.'],
-  ['ucaness-app-card', UcanessAppCard, 'UCANESS : écran de téléphone', 'En-tête compact, cartes en une colonne, navigation en bas.'],
-  ['ucaness-status-card', UcanessStatusCard, 'UCANESS : bandeau d’état', '« Tout va bien » ou les alertes en cours.'],
-  ['ucaness-stats-card', UcanessStatsCard, 'UCANESS : chiffres clés', 'Deux à quatre chiffres côte à côte.'],
-  ['ucaness-info-card', UcanessInfoCard, 'UCANESS : ligne d’information', 'Une phrase calculée par un modèle, avec lien facultatif.'],
-  ['ucaness-shortcuts-card', UcanessShortcutsCard, 'UCANESS : raccourcis', 'Tuiles icône et nom vers une page ou une fiche.'],
-  ['ucaness-detail-card', UcanessDetailCard, 'UCANESS : décision expliquée', 'Une décision en clair, l’explication sur demande.'],
-  ['ucaness-ucan-card', UcanessUcanCard, 'UCANESS : Ucan', 'Ucan, la batterie qui conseille : son expression et le conseil du moment.'],
-  ['ucaness-hours-card', UcanessHoursCard, 'UCANESS : heure par heure', 'Graphique de la journée heure par heure, avec un choix en haut.'],
+  ['ucaness-layout-card', UcanessLayoutCard, ucT(null, 'carte_layout_nom'), ucT(null, 'carte_layout_desc')],
+  ['ucaness-header-card', UcanessHeaderCard, ucT(null, 'carte_header_nom'), ucT(null, 'carte_header_desc')],
+  ['ucaness-panel-card', UcanessPanelCard, ucT(null, 'carte_panel_nom'), ucT(null, 'carte_panel_desc')],
+  ['ucaness-flow-card', UcanessFlowCard, ucT(null, 'carte_flow_nom'), ucT(null, 'carte_flow_desc')],
+  ['ucaness-note-card', UcanessNoteCard, ucT(null, 'carte_note_nom'), ucT(null, 'carte_note_desc')],
+  ['ucaness-soc-card', UcanessSocCard, ucT(null, 'carte_soc_nom'), ucT(null, 'carte_soc_desc')],
+  ['ucaness-app-card', UcanessAppCard, ucT(null, 'carte_app_nom'), ucT(null, 'carte_app_desc')],
+  ['ucaness-status-card', UcanessStatusCard, ucT(null, 'carte_status_nom'), ucT(null, 'carte_status_desc')],
+  ['ucaness-stats-card', UcanessStatsCard, ucT(null, 'carte_stats_nom'), ucT(null, 'carte_stats_desc')],
+  ['ucaness-info-card', UcanessInfoCard, ucT(null, 'carte_info_nom'), ucT(null, 'carte_info_desc')],
+  ['ucaness-shortcuts-card', UcanessShortcutsCard, ucT(null, 'carte_shortcuts_nom'), ucT(null, 'carte_shortcuts_desc')],
+  ['ucaness-detail-card', UcanessDetailCard, ucT(null, 'carte_detail_nom'), ucT(null, 'carte_detail_desc')],
+  ['ucaness-ucan-card', UcanessUcanCard, ucT(null, 'carte_ucan_nom'), ucT(null, 'carte_ucan_desc')],
+  ['ucaness-hours-card', UcanessHoursCard, ucT(null, 'carte_hours_nom'), ucT(null, 'carte_hours_desc')],
 ];
 
 for (const [tag, cls, name, description] of UC_CARDS) {
