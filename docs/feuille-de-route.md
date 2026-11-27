@@ -42,5 +42,23 @@ Modèle d'offre unique : jusqu'à 4 niveaux de prix, plusieurs plages par jour, 
 | Allemagne | Bridage par le gestionnaire de réseau (§ 14a) respecté ; tarifs de réseau à trois niveaux (module 3) |
 | Pays-Bas | Fin de la compensation de l'injection (01/01/2027) : priorité à l'autoconsommation |
 | Chine | Prix par province, vallée possible à midi |
+| Suisse | Tarifs par commune et par gestionnaire de réseau (données ouvertes de l'ElCom) ; devise CHF |
+| Royaume-Uni | Prix à la demi-heure (offres dynamiques), prix négatifs |
+
+Fonctions communes à tous les pays (ajout du 27/11/2026) :
+
+| Fonction | Ce qu'elle fait |
+|---|---|
+| Langue néerlandaise | Traduction `nl` de l'intégration, des cartes et des messages (Flandre, Pays-Bas) |
+| Saisons selon l'hémisphère | Dates été et hiver du profil pays ; à défaut, déduites de la latitude du domicile (inversées dans l'hémisphère sud, une seule saison sous les tropiques) |
+| Jours fériés par région | Région demandée à l'installation (réglage « Subdivision » de l'intégration Workday) ; jours fériés à venir lus dans son calendrier |
+| Pas de 15, 30 ou 60 minutes | Le bilan suit le pas le plus fin entre l'offre et la prévision solaire ; les demi-heures voisines sont regroupées en 3 plages de charge au plus |
+| Compteur du réseau par pays | Entité choisie par l'utilisateur : prise TIC (France), port P1 (Belgique, Pays-Bas, Luxembourg ; pointe quart-horaire lue directement en Flandre), Datadis pour l'historique (Espagne). Données officielles ou lecture locale, jamais de service relais |
+| Prix négatifs | Offres à prix dynamique : plage de charge quand le prix final d'achat est négatif, après la place réservée au solaire prévu ; conseils pour décaler les usages. **À blanc** tant que le comportement de l'onduleur en plein soleil n'est pas confirmé par le constructeur |
+| Signaux du réseau | France : EcoWatt (pas de recharge réseau pendant une heure orange ou rouge, batterie pleine avant). Europe : intensité carbone (production par filière d'ENTSO-E), second critère à coût égal |
+| Catalogues en données ouvertes | Italie : offres du Portale Offerte de l'ARERA ; Suisse : tarifs de l'ElCom ; Espagne : PVPC, lu dans l'intégration PVPC de Home Assistant |
+| Jeux de tests par pays | Une journée type inventée par pays et le résultat attendu : changement d'heure, hémisphère sud, férié régional, compteur de 3 kW, pointe mensuelle, demi-heures et prix négatifs, devise autre que l'euro |
+
+Principe : les intégrations de Home Assistant qui existent déjà (DSMR, PVPC, Workday, Holiday, prix dynamiques) sont lues telles quelles ; Ucaness n'ajoute un client que si aucune n'existe.
 
 Les règles de chaque pays sont à confirmer par un professionnel local avant leur mise en service.
