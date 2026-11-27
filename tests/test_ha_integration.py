@@ -832,9 +832,13 @@ def test_cle_effective(cle_livree, options, attendu):
     assert cle_effective(options) == attendu
 
 
-def test_cle_effective_sans_cle_livree():
+def test_cle_effective_sans_cle_livree(monkeypatch):
     """Dépôt sans clé livrée : seule une clé personnelle complète sert."""
+    from custom_components.ucaness import cle_application
     from custom_components.ucaness.cle_application import cle_effective
+
+    monkeypatch.setattr(cle_application, "CLE_LIVREE", "")
+    monkeypatch.setattr(cle_application, "SECRET_LIVRE", "")
 
     assert cle_effective({}) == ("", "", None)
     assert cle_effective({"app_key": "perso", "app_secret": "s"}) == ("perso", "s", "personnelle")
