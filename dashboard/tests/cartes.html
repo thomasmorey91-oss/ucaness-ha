@@ -10,7 +10,12 @@
 </style>
 <script>
   // Données inventées : aucune mesure réelle.
-  window.fakeHass = { locale: { language: 'fr' }, language: 'fr', states: {} };
+  window.ucanAppels = [];
+  window.fakeHass = { locale: { language: 'fr' }, language: 'fr', states: {
+    'sensor.uhome_soc': { state: '55', attributes: {} },
+    'sensor.ucan_conseil': { state: 'machines', attributes: { titre: 'Les machines d’hier', constat: 'Le mardi 15/01, 7,9 kWh ont été achetés en heures pleines.',
+      geste: 'Répartir les machines sur la semaine.', gain: 'Jusqu’à 1,05 € de moins ce jour-là.', avertissement: 'Estimation sur vos mesures, pas une garantie.' } },
+  }, callService: (d, s, data) => { window.ucanAppels.push([d, s, data]); return Promise.resolve(); } };
   // Comme une carte markdown de Home Assistant : élément « en ligne », texte dans son propre shadow DOM.
   customElements.define('faux-markdown', class extends HTMLElement {
     constructor() { super(); this.attachShadow({ mode: 'open' }); }
@@ -64,6 +69,7 @@
       ] },
       { width: '300px', cards: [
         { type: 'custom:ucaness-panel-card', title: 'Pilotage', cards: [note('reconfig', { lines: 3, content: long })] },
+        { type: 'custom:ucaness-panel-card', title: 'Ucan', cards: [{ type: 'custom:ucaness-ucan-card', compact: true }] },
       ] },
     ],
   });

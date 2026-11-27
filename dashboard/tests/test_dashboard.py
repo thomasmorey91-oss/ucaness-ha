@@ -308,6 +308,22 @@ def test_cartes_sans_erreur(cartes):
     assert cartes.errors == []
 
 
+def test_carte_ucan_conseil_et_reponse(cartes):
+    etat = cartes.evaluate("""() => {
+      const find = (root) => { for (const el of root.querySelectorAll('*')) {
+        if (el.tagName === 'UCANESS-UCAN-CARD') return el;
+        if (el.shadowRoot) { const f = find(el.shadowRoot); if (f) return f; } } return null; };
+      const card = find(document);
+      const r = card.shadowRoot;
+      const boutons = [...r.querySelectorAll('button[data-r]')].map((b) => b.textContent.trim());
+      r.querySelector('button[data-r="plus_tard"]').click();
+      return { boutons, texte: r.querySelector('.b').textContent, svg: !!r.querySelector('.av svg'), appels: window.ucanAppels };
+    }""")
+    assert etat["svg"] and "7,9 kWh" in etat["texte"]
+    assert etat["boutons"] == ["Je le fais", "Pas maintenant", "Ne plus proposer"]
+    assert etat["appels"] == [["script", "ucan_conseil_reponse", {"reponse": "plus_tard"}]]
+
+
 def test_texte_court_non_replie(cartes):
     st = note_state(cartes, "court")
     assert not st["cut"] and not st["more"] and not st["less"]

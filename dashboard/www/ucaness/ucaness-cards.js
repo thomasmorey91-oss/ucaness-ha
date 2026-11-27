@@ -17,8 +17,11 @@
  *   custom:ucaness-shortcuts-card  raccourcis (icône + nom) vers une page ou une fiche
  *   custom:ucaness-detail-card  une décision en clair, l'explication (« Pourquoi ? ») sur demande
  *   custom:ucaness-hours-card   graphique de la journée heure par heure, avec un choix en haut
+ *   custom:ucaness-ucan-card    Ucan, la batterie UHome avec un visage, et son conseil du moment (0.5.1)
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
+ *
+ * 0.5.1 (27/11/2026) : carte Ucan (custom:ucaness-ucan-card), avatar et conseil du moment.
  *
  * 0.5.0 (27/11/2026) : style et animations.
  *   Encadrés arrondis à bordure fine, boutons en relief (survol à la souris seulement, enfoncement et onde au clic) ;
@@ -33,7 +36,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.5.0';
+const UC_VERSION = '0.5.1';
 
 /* Dossier où se trouve ce fichier (en général /local/ucaness/). */
 const UC_BASE = (() => {
@@ -2333,6 +2336,116 @@ class UcanessHoursCard extends HTMLElement {
   }
 }
 
+/* ------------------------------------------------------------------ Ucan, l'assistant */
+
+/*
+ * custom:ucaness-ucan-card : Ucan, la batterie UHome avec un visage, et son conseil du moment.
+ *   conseil: sensor.ucan_conseil (pilotage/packages/ucan_conseils.yaml) ; soc: sensor.uhome_soc ;
+ *   alert_entities: [...] (comme ucaness-status-card) ; script: script.ucan_conseil_reponse ;
+ *   compact: true (téléphone : petit avatar à côté de la bulle).
+ * Expression : « à surveiller » (lumière orange) si une alerte est en cours, « un conseil » si un
+ * conseil attend, « la nuit » (yeux fermés) quand le soleil est couché, sinon « tout va bien ».
+ * Les barres des trois modules s'allument avec la charge (au-dessus de 0, 33 et 66 %).
+ * Boutons : « Je le fais », « Pas maintenant », « Ne plus proposer » (réponse au script).
+ */
+function ucUcanSvg(humeur, charge) {
+  const lum = humeur === 'alerte' ? '#F39C12' : '#00D1D6';
+  const off = '#1B2230';
+  const c = Number.isFinite(charge) ? charge : 0;
+  const bar = (seuil) => (c > seuil ? lum : off);
+  const caisse = 'fill="#2A2D33" stroke="#50555F" stroke-width="2"';
+  const face = {
+    dort: `<path d="M74 62q10 7 20 0M126 62q10 7 20 0M102 84q8 4 16 0" fill="none" stroke="${lum}" stroke-width="4" stroke-linecap="round"/>`,
+    content: `<rect x="76" y="52" width="16" height="16" rx="8" fill="${lum}"/><rect x="128" y="52" width="16" height="16" rx="8" fill="${lum}"/><path d="M94 80q16 14 32 0" fill="none" stroke="${lum}" stroke-width="4" stroke-linecap="round"/>`,
+    conseil: `<rect x="76" y="52" width="16" height="16" rx="8" fill="${lum}"/><rect x="128" y="52" width="16" height="16" rx="8" fill="${lum}"/><path d="M96 82q14 9 28 0M124 44l20-5" fill="none" stroke="${lum}" stroke-width="4" stroke-linecap="round"/>`,
+    alerte: `<rect x="76" y="52" width="16" height="16" rx="8" fill="${lum}"/><rect x="128" y="52" width="16" height="16" rx="8" fill="${lum}"/><rect x="104" y="78" width="12" height="12" rx="6" fill="${lum}"/><path d="M72 44l20 6M148 44l-20 6" fill="none" stroke="${lum}" stroke-width="3.5" stroke-linecap="round"/>`,
+  }[humeur] || '';
+  return `<svg viewBox="0 0 220 300" role="img" aria-label="Ucan">
+    <ellipse cx="110" cy="286" rx="92" ry="10" fill="#000" opacity=".35"/>
+    <rect x="34" y="18" width="152" height="96" rx="22" ${caisse}/>
+    <rect x="34" y="120" width="152" height="50" rx="8" ${caisse}/><rect x="34" y="174" width="152" height="50" rx="8" ${caisse}/><rect x="34" y="228" width="152" height="50" rx="8" ${caisse}/>
+    <rect x="74" y="143" width="72" height="5" rx="2.5" fill="${bar(66)}"/><rect x="74" y="197" width="72" height="5" rx="2.5" fill="${bar(33)}"/><rect x="74" y="251" width="72" height="5" rx="2.5" fill="${bar(0)}"/>
+    <rect x="172" y="132" width="5" height="138" rx="2.5" fill="${lum}" opacity=".85"/>
+    <rect x="44" y="24" width="132" height="84" rx="26" fill="${lum}" opacity=".14"/>
+    <rect x="52" y="32" width="116" height="68" rx="20" fill="#061B3D" stroke="${lum}" stroke-width="2.5"/>
+    ${face}</svg>`;
+}
+
+class UcanessUcanCard extends HTMLElement {
+  setConfig(config) {
+    this._config = Object.assign({ conseil: 'sensor.ucan_conseil', soc: 'sensor.uhome_soc', script: 'script.ucan_conseil_reponse' }, config || {});
+    this._ucSeen = null;
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    const c = this._config;
+    const ids = [c.conseil, c.soc, 'sun.sun', ...ucAlertList(c.alert_entities).map((a) => a.entity)];
+    if (ucChanged(this, hass, ids)) this._render();
+  }
+
+  getCardSize() { return this._config && this._config.compact ? 3 : 5; }
+
+  _etat() {
+    const h = this._hass;
+    const c = this._config;
+    const st = h && h.states[c.conseil];
+    const conseil = st && !['aucun', 'unknown', 'unavailable'].includes(st.state) ? st : null;
+    const soc = h && h.states[c.soc] ? parseFloat(h.states[c.soc].state) : NaN;
+    const alertes = ucActiveAlerts(h, c.alert_entities);
+    const nuit = !!(h && h.states['sun.sun'] && h.states['sun.sun'].state === 'below_horizon');
+    const humeur = alertes.length ? 'alerte' : conseil ? 'conseil' : nuit ? 'dort' : 'content';
+    return { conseil, soc, alertes, humeur };
+  }
+
+  _render() {
+    if (!this.shadowRoot || !this._config) return;
+    const c = this._config;
+    const { conseil, soc, alertes, humeur } = this._etat();
+    const a = conseil ? conseil.attributes : {};
+    let corps;
+    if (conseil) {
+      corps = `<p class="k">${esc(a.titre || 'Un conseil')}</p>
+        <p class="t">${esc(a.constat || '')}</p><p class="t">${esc(a.geste || '')}</p>
+        ${a.gain ? `<p class="t g">${esc(a.gain)}</p>` : ''}${a.avertissement ? `<p class="n">${esc(a.avertissement)}</p>` : ''}
+        <div class="btns">
+          <button type="button" class="uc-key p" data-r="fait">Je le fais</button>
+          <button type="button" class="uc-key s" data-r="plus_tard">Pas maintenant</button>
+          <button type="button" class="uc-key q" data-r="jamais">Ne plus proposer</button>
+        </div>`;
+    } else if (alertes.length) {
+      corps = `<p class="t">Une alerte est en cours : ${esc(alertes.map((x) => x.name).join(', '))}. Les conseils attendront.</p>`;
+    } else {
+      corps = `<p class="t">Tout va bien. Je vous ferai signe quand un geste en vaudra la peine.</p>`;
+    }
+    this.shadowRoot.innerHTML = `
+      <style>${UC_BASE_CSS}
+        :host { display: block; }
+        .w { display: flex; gap: 16px; align-items: flex-start; }
+        .av { flex: 0 0 auto; width: ${c.compact ? 64 : 150}px; height: ${c.compact ? 87 : 204}px; }
+        .av svg { width: 100%; height: 100%; display: block; }
+        .b { flex: 1 1 auto; min-width: 0; padding: 14px 18px; border: 1px solid var(--uc-card-border); border-radius: 4px 14px 14px 14px; background: var(--uc-card-bg); box-shadow: var(--uc-card-shadow); display: flex; flex-direction: column; gap: 8px; }
+        p { margin: 0; }
+        .k { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--uc-label); }
+        .t { font: 400 ${c.compact ? 16 : 17}px/1.45 var(--uc-font); }
+        .g { color: var(--uc-green); }
+        .n { font-size: 13px; color: var(--uc-muted); }
+        .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+        button { min-height: 44px; padding: 0 16px; border-radius: 22px; cursor: pointer; font: 400 16px var(--uc-font); }
+        .p { border: 0; background: var(--uc-tab); color: #031428; }
+        .s { border: 1px solid var(--uc-tab-border); background: linear-gradient(180deg, rgba(26,111,190,.35) 0%, rgba(10,37,70,.6) 100%); color: var(--uc-text); }
+        .q { border: 1px solid var(--uc-tab-border); background: transparent; color: #9CC9F5; }
+      </style>
+      <div class="w"><div class="av">${ucUcanSvg(humeur, soc)}</div><div class="b">${corps}</div></div>`;
+    this.shadowRoot.querySelectorAll('button[data-r]').forEach((b) => b.addEventListener('click', () => {
+      const [dom, svc] = String(c.script).split('.');
+      if (this._hass && dom && svc) this._hass.callService(dom, svc, { reponse: b.dataset.r });
+    }));
+  }
+}
+
 /* ------------------------------------------------------------------ enregistrement */
 
 const UC_CARDS = [
@@ -2348,6 +2461,7 @@ const UC_CARDS = [
   ['ucaness-info-card', UcanessInfoCard, 'UCANESS : ligne d’information', 'Une phrase calculée par un modèle, avec lien facultatif.'],
   ['ucaness-shortcuts-card', UcanessShortcutsCard, 'UCANESS : raccourcis', 'Tuiles icône et nom vers une page ou une fiche.'],
   ['ucaness-detail-card', UcanessDetailCard, 'UCANESS : décision expliquée', 'Une décision en clair, l’explication sur demande.'],
+  ['ucaness-ucan-card', UcanessUcanCard, 'UCANESS : Ucan', 'Ucan, la batterie qui conseille : son expression et le conseil du moment.'],
   ['ucaness-hours-card', UcanessHoursCard, 'UCANESS : heure par heure', 'Graphique de la journée heure par heure, avec un choix en haut.'],
 ];
 
@@ -2361,4 +2475,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
