@@ -2,21 +2,34 @@
 # Ucan, assistant de sobriété : conseils tirés des mesures de la maison (facultatif)
 # -----------------------------------------------------------------------------
 # Lu par la carte « custom:ucaness-ucan-card » (dashboard/www/ucaness/ucaness-cards.js).
-# Principes (claude/spec : révéler avant de conseiller, un geste à la fois, gain mesuré,
-# sans réponse rien ne change) :
-#   - un seul conseil à la fois, recalculé chaque matin à 7h30 ;
+# Principes (révéler avant de conseiller, un geste à la fois, gain mesuré, sans réponse rien ne
+# change) :
+#   - un seul conseil à la fois, recalculé chaque matin à 7h30, dans cet ordre de priorité :
+#     « machines », « lavage », « veilles » ; un conseil traité ou en pause laisse passer le suivant ;
 #   - chaque conseil part d'une mesure de la maison et donne un gain chiffré ;
 #   - « Pas maintenant » écarte le conseil du jour ; deux fois de suite, ou « Ne plus proposer »,
 #     et ce conseil n'est plus proposé pendant 30 jours ;
+#   - « Je le fais » : la date est notée ; « lavage » et « veilles » laissent ensuite 14 jours
+#     pour que l'effet se voie dans les mesures avant d'être reproposés ;
 #   - notification sur le téléphone : seulement si « Ucan : me prévenir sur le téléphone » est
 #     allumé, au plus une par jour, par script.jarvis_notifier (jarvis_alertes.yaml).
 # Aucun réglage n'est modifié par ce package : il n'écrit que ses propres entrées.
 #
-# Premier conseil, « machines » : la veille (jour ouvré, fenêtre du gain réel), les achats en
-# heures pleines ont dépassé le seuil. Gain affiché : achats HP × (prix HP − prix HC), soit ce
-# qu'auraient coûté de moins ces kWh en heures creuses (borne haute : tout n'est pas déplaçable).
+# Conseils :
+#   - « machines » : la veille (jour ouvré, fenêtre du gain réel), les achats en heures pleines ont
+#     dépassé le seuil. Gain : achats HP × (prix HP − prix HC), borne haute.
+#   - « lavage » : la veille, un cycle du lave-linge a pris au moins 1,5 fois l'énergie d'un cycle
+#     ordinaire de la maison (médiane des cycles précédents, 5 au moins) et 0,4 kWh de plus :
+#     signature d'un lavage chaud. Gain : l'écart × prix HP, par cycle. Nécessite une prise mesurée :
+#     renseigner « Ucan : puissance du lave-linge » et « Ucan : énergie du lave-linge » (identifiants
+#     des capteurs, en W et en kWh cumulés). Vides : conseil inactif.
+#   - « veilles » : le talon de nuit (plus petite puissance moyenne horaire de la maison entre 2h et
+#     5h ; le plus bas des 7 nuits, pour écarter le chauffage d'une nuit froide) a monté d'au moins
+#     20 % et 30 W sur les 7 dernières nuits par rapport aux 7 d'avant, ou
+#     dépasse « Ucan : talon de nuit au-delà duquel conseiller » (0 = désactivé) de 30 W.
+#     Gain : l'écart × 8 760 h × prix moyen HP/HC, par an.
 # Entités lues : sensor.jarvis_gain_reel_du_jour (jarvis_batterie.yaml), input_number.jarvis_prix_hp
-# et jarvis_prix_hc (jarvis_tarif.yaml).
+# et jarvis_prix_hc (jarvis_tarif.yaml), statistiques de sensor.uhome_puissance_maison.
 # =============================================================================
 
 input_number:
@@ -34,21 +47,51 @@ input_number:
     step: 0.05
     unit_of_measurement: "EUR"
     mode: box
+  ucan_talon_seuil:
+    name: "Ucan : talon de nuit au-delà duquel conseiller (0 = désactivé)"
+    min: 0
+    max: 2000
+    step: 10
+    unit_of_measurement: W
+    mode: box
+  ucan_lave_linge_kwh_debut:
+    name: "Ucan : compteur du lave-linge au début du cycle (interne)"
+    min: 0
+    max: 1000000
+    step: 0.001
+    unit_of_measurement: kWh
+    mode: box
 
 input_boolean:
   ucan_notifier:
     name: "Ucan : me prévenir sur le téléphone"
     icon: mdi:message-badge-outline
+  ucan_lave_linge_en_cycle:
+    name: "Ucan : cycle du lave-linge en cours (interne)"
+    icon: mdi:washing-machine
 
 input_text:
-  # Jour du dernier conseil auquel l'utilisateur a répondu (il n'est plus montré).
+  # Conseils déjà traités, « conseil:jour » séparés par des espaces (les 8 derniers). Une date seule
+  # (version précédente du package) vaut « machines:date ».
   ucan_jour_traite:
-    name: "Ucan : jour du dernier conseil traité (interne)"
-    max: 32
-  # Réponses « Pas maintenant » de suite au conseil « machines » (interne).
+    name: "Ucan : conseils traités (interne)"
+    max: 255
+  # Réponses « Pas maintenant » de suite, par conseil (interne).
   ucan_refus_machines:
     name: "Ucan : refus de suite du conseil machines (interne)"
     max: 8
+  ucan_refus_lavage:
+    name: "Ucan : refus de suite du conseil lavage (interne)"
+    max: 8
+  ucan_refus_veilles:
+    name: "Ucan : refus de suite du conseil veilles (interne)"
+    max: 8
+  ucan_lave_linge_puissance:
+    name: "Ucan : puissance du lave-linge (identifiant du capteur, W)"
+    max: 100
+  ucan_lave_linge_energie:
+    name: "Ucan : énergie du lave-linge (identifiant du capteur, kWh cumulés)"
+    max: 100
 
 input_datetime:
   # Une date passée ou celle du jour (valeur par défaut d'une entrée neuve) : pas de pause.
@@ -56,12 +99,48 @@ input_datetime:
     name: "Ucan : conseil machines en pause jusqu'au"
     has_date: true
     has_time: false
+  ucan_pause_lavage:
+    name: "Ucan : conseil lavage en pause jusqu'au"
+    has_date: true
+    has_time: false
+  ucan_pause_veilles:
+    name: "Ucan : conseil veilles en pause jusqu'au"
+    has_date: true
+    has_time: false
   ucan_engagement_machines:
     name: "Ucan : machines réparties depuis le"
     has_date: true
     has_time: false
+  ucan_engagement_lavage:
+    name: "Ucan : lavage à basse température depuis le"
+    has_date: true
+    has_time: false
+  ucan_engagement_veilles:
+    name: "Ucan : veilles coupées depuis le"
+    has_date: true
+    has_time: false
 
 template:
+  # ---------------------------------------------------------------------------
+  # Cycles du lave-linge (30 derniers), alimentés par l'automatisation « cycle du lave-linge ».
+  # ---------------------------------------------------------------------------
+  - triggers:
+      - trigger: event
+        event_type: ucan_cycle_lave_linge
+    sensor:
+      - name: "Ucan cycles du lave-linge"
+        unique_id: ucan_cycles_lave_linge
+        icon: mdi:washing-machine
+        state: "{{ trigger.event.data.kwh }}"
+        unit_of_measurement: kWh
+        attributes:
+          cycles: >
+            {% set a = this.attributes if this is defined and this.attributes is defined else {} %}
+            {{ ((a.get('cycles') or []) + [{'jour': trigger.event.data.jour, 'kwh': trigger.event.data.kwh | float(0)}])[-30:] }}
+
+  # ---------------------------------------------------------------------------
+  # Conseil du moment.
+  # ---------------------------------------------------------------------------
   - triggers:
       - trigger: time
         at: "07:30:00"
@@ -69,44 +148,129 @@ template:
         event: start
       - trigger: event
         event_type: ucan_recalcul
+    actions:
+      - action: recorder.get_statistics
+        continue_on_error: true
+        data:
+          start_time: "{{ (today_at() - timedelta(days=15)).isoformat() }}"
+          end_time: "{{ today_at().isoformat() }}"
+          statistic_ids: [sensor.uhome_puissance_maison]
+          period: hour
+          types: [mean]
+        response_variable: nuits
+      - variables:
+          hier: "{{ (now().date() - timedelta(days=1)) | string }}"
+          gmin: >
+            {% set m = states('input_number.ucan_gain_min') | float(0) %}{{ m if m > 0 else 0.2 }}
+          prix_hp: "{{ states('input_number.jarvis_prix_hp') | float(0) }}"
+          prix_hc: "{{ states('input_number.jarvis_prix_hc') | float(0) }}"
+          # Talon de chaque nuit (W) : plus petite moyenne horaire de 2h à 5h, par date.
+          talons: >
+            {% set st = nuits.statistics if (nuits is defined and nuits is mapping and 'statistics' in nuits) else {} %}
+            {% set rows = st.get('sensor.uhome_puissance_maison', []) %}
+            {% set ns = namespace(t={}) %}
+            {% for r in rows %}
+              {% if r.mean is number %}
+                {% set t = r.start | as_datetime | as_local %}
+                {% if 2 <= t.hour <= 4 %}
+                  {% set d = t.date() | string %}
+                  {% set v = [ns.t.get(d, r.mean), r.mean] | min %}
+                  {% set ns.t = dict(ns.t, **{d: v}) %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.t }}
+          candidats: >
+            {% set ns = namespace(c=[]) %}
+            {# --- machines --- #}
+            {% set g = 'sensor.jarvis_gain_reel_du_jour' %}
+            {% set jour = state_attr(g, 'jour') | string %}
+            {% set hp = state_attr(g, 'soutirage_hp_kwh') | float(0) %}
+            {% set s = states('input_number.ucan_seuil_hp_kwh') | float(0) %}
+            {% set seuil = s if s > 0 else 3 %}
+            {% set gain = hp * (prix_hp - prix_hc) %}
+            {% if state_attr(g, 'calcul_valide') == true and state_attr(g, 'jour_ouvre') == true
+                  and jour | regex_match('^\\d{4}-\\d{2}-\\d{2}$') and jour >= hier
+                  and hp >= seuil and gain >= gmin %}
+              {% set jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] %}
+              {% set d = jour | as_datetime %}
+              {% set ns.c = ns.c + [{'cle': 'machines', 'jour': jour, 'titre': "Les machines d'hier",
+                  'constat': 'Le ' ~ jours[d.weekday()] ~ ' ' ~ d.strftime('%d/%m') ~ ', ' ~ ('%.1f' | format(hp)) | replace('.', ',') ~ ' kWh ont été achetés en heures pleines.',
+                  'geste': 'Répartir les machines sur la semaine, de préférence après le début des heures creuses ou à midi les jours de soleil.',
+                  'gain': "Jusqu'à " ~ ('%.2f' | format(gain)) | replace('.', ',') ~ ' € de moins ce jour-là.',
+                  'gain_eur': gain | round(2), 'mesure_kwh': hp | round(1)}] %}
+            {% endif %}
+            {# --- lavage --- #}
+            {% set cy = state_attr('sensor.ucan_cycles_du_lave_linge', 'cycles') or [] %}
+            {% set avant = cy | rejectattr('jour', 'eq', hier) | map(attribute='kwh') | select('number') | list | sort %}
+            {% set veille = cy | selectattr('jour', 'eq', hier) | map(attribute='kwh') | select('number') | list %}
+            {% if avant | count >= 5 and veille | count > 0 %}
+              {% set n = avant | count %}
+              {% set med = avant[n // 2] if n % 2 else (avant[n // 2 - 1] + avant[n // 2]) / 2 %}
+              {% set x = veille | max %}
+              {% set gain = (x - med) * prix_hp %}
+              {% if x >= 1.5 * med and x - med >= 0.4 and gain >= gmin %}
+                {% set ns.c = ns.c + [{'cle': 'lavage', 'jour': hier, 'titre': "Le lavage d'hier",
+                    'constat': 'Hier, un cycle du lave-linge a pris ' ~ ('%.1f' | format(x)) | replace('.', ',') ~ ' kWh, contre '
+                               ~ ('%.1f' | format(med)) | replace('.', ',') ~ ' kWh pour un cycle ordinaire chez vous : la signature d\'un lavage chaud.',
+                    'geste': 'Laver à 30 °C ou en programme éco quand le linge le permet.',
+                    'gain': 'Environ ' ~ ('%.2f' | format(gain)) | replace('.', ',') ~ ' € de moins par cycle.',
+                    'gain_eur': gain | round(2), 'mesure_kwh': x | round(2)}] %}
+              {% endif %}
+            {% endif %}
+            {# --- veilles --- #}
+            {% set dates = talons.keys() | list | sort %}
+            {% set recentes = dates[-7:] %}
+            {% set anciennes = dates[:-7][-7:] %}
+            {% if recentes | count >= 5 %}
+              {# Le plus bas des 7 talons : une veille est là toutes les nuits, le chauffage d'une nuit
+                 froide ou un appareil lancé une nuit ne comptent pas. #}
+              {% set ns2 = namespace(r=[], a=[]) %}
+              {% for d in recentes %}{% set ns2.r = ns2.r + [talons[d]] %}{% endfor %}
+              {% for d in anciennes %}{% set ns2.a = ns2.a + [talons[d]] %}{% endfor %}
+              {% set rec = ns2.r | min %}
+              {% set anc = (ns2.a | min) if anciennes | count >= 5 else none %}
+              {% set seuil = states('input_number.ucan_talon_seuil') | float(0) %}
+              {% set ref = anc if (anc is number and rec >= 1.2 * anc and rec - anc >= 30) else (seuil if (seuil > 0 and rec - seuil >= 30) else none) %}
+              {% if ref is number %}
+                {% set gain = (rec - ref) / 1000 * 8760 * (prix_hp + prix_hc) / 2 %}
+                {% if gain >= gmin %}
+                  {% set ns.c = ns.c + [{'cle': 'veilles', 'jour': now().date() | string, 'titre': 'Les veilles de la nuit',
+                      'constat': 'Ces 7 dernières nuits, la maison n\'est jamais descendue sous ' ~ (rec | round(0) | int) ~ ' W, contre '
+                                 ~ (ref | round(0) | int) ~ (' W les 7 nuits d\'avant.' if ref == anc else ' W, le seuil que vous avez fixé.'),
+                      'geste': 'Repérer ce qui reste allumé la nuit (box, ordinateur, chargeurs, appareils en veille) et le couper avec une multiprise à interrupteur.',
+                      'gain': 'Environ ' ~ (gain | round(0) | int) ~ ' € par an.',
+                      'gain_eur': gain | round(2), 'mesure_w': rec | round(0)}] %}
+                {% endif %}
+              {% endif %}
+            {% endif %}
+            {{ ns.c }}
+          choix: >
+            {% set traites = states('input_text.ucan_jour_traite') | regex_findall('(?:[a-z]+:)?\\d{4}-\\d{2}-\\d{2}') %}
+            {% set traites = traites | map('regex_replace', '^(\\d)', 'machines:\\1') | list %}
+            {% set ns = namespace(c=none) %}
+            {% for c in candidats %}
+              {% set p = states('input_datetime.ucan_pause_' ~ c.cle) %}
+              {% set en_pause = p | regex_match('^\\d{4}-\\d{2}-\\d{2}') and p[:10] > now().date() | string %}
+              {% if ns.c is none and (c.cle ~ ':' ~ c.jour) not in traites and not en_pause %}{% set ns.c = c %}{% endif %}
+            {% endfor %}
+            {{ ns.c if ns.c is not none else {'cle': 'aucun'} }}
     sensor:
       - name: "Ucan conseil"
         unique_id: ucan_conseil
         icon: mdi:battery-heart-variant
-        state: >
-          {% set g = 'sensor.jarvis_gain_reel_du_jour' %}
-          {% set jour = state_attr(g, 'jour') | string %}
-          {% set hp = state_attr(g, 'soutirage_hp_kwh') | float(0) %}
-          {% set s = states('input_number.ucan_seuil_hp_kwh') | float(0) %}
-          {% set seuil = s if s > 0 else 3 %}
-          {% set m = states('input_number.ucan_gain_min') | float(0) %}
-          {% set gmin = m if m > 0 else 0.2 %}
-          {% set ecart = states('input_number.jarvis_prix_hp') | float(0) - states('input_number.jarvis_prix_hc') | float(0) %}
-          {% set pause = states('input_datetime.ucan_pause_machines') %}
-          {% set en_pause = pause | regex_match('^\\d{4}-\\d{2}-\\d{2}') and pause[:10] > now().date() | string %}
-          {% if state_attr(g, 'calcul_valide') == true and state_attr(g, 'jour_ouvre') == true
-                and jour | regex_match('^\\d{4}-\\d{2}-\\d{2}$') and jour >= (now().date() - timedelta(days=1)) | string
-                and hp >= seuil and hp * ecart >= gmin and not en_pause
-                and states('input_text.ucan_jour_traite') != jour %}machines{% else %}aucun{% endif %}
+        state: "{{ choix.cle }}"
         attributes:
-          jour: "{{ state_attr('sensor.jarvis_gain_reel_du_jour', 'jour') }}"
-          achats_hp_kwh: "{{ state_attr('sensor.jarvis_gain_reel_du_jour', 'soutirage_hp_kwh') | float(0) | round(1) }}"
-          gain_eur: >
-            {% set hp = state_attr('sensor.jarvis_gain_reel_du_jour', 'soutirage_hp_kwh') | float(0) %}
-            {{ (hp * (states('input_number.jarvis_prix_hp') | float(0) - states('input_number.jarvis_prix_hc') | float(0))) | round(2) }}
-          titre: "Les machines d'hier"
-          constat: >
-            {% set j = state_attr('sensor.jarvis_gain_reel_du_jour', 'jour') | string %}
-            {% set jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] %}
-            {% set d = j | as_datetime(none) %}
-            {% set hp = state_attr('sensor.jarvis_gain_reel_du_jour', 'soutirage_hp_kwh') | float(0) %}
-            {{ ('Le ' ~ jours[d.weekday()] ~ ' ' ~ d.strftime('%d/%m') if d else 'Hier') ~ ', ' ~ ('%.1f' | format(hp)) | replace('.', ',') ~ ' kWh ont été achetés en heures pleines.' }}
-          geste: "Répartir les machines sur la semaine, de préférence après le début des heures creuses ou à midi les jours de soleil."
-          gain: >
-            {% set hp = state_attr('sensor.jarvis_gain_reel_du_jour', 'soutirage_hp_kwh') | float(0) %}
-            {% set e = (hp * (states('input_number.jarvis_prix_hp') | float(0) - states('input_number.jarvis_prix_hc') | float(0))) %}
-            {{ "Jusqu'à " ~ ('%.2f' | format(e)) | replace('.', ',') ~ ' € de moins ce jour-là.' }}
+          jour: "{{ choix.get('jour') }}"
+          titre: "{{ choix.get('titre') }}"
+          constat: "{{ choix.get('constat') }}"
+          geste: "{{ choix.get('geste') }}"
+          gain: "{{ choix.get('gain') }}"
+          gain_eur: "{{ choix.get('gain_eur') }}"
+          achats_hp_kwh: "{{ choix.get('mesure_kwh') if choix.cle == 'machines' else none }}"
           avertissement: "Estimation sur vos mesures, pas une garantie."
+          candidats: "{{ candidats | map(attribute='cle') | list }}"
+          talon_nuits_w: "{{ talons }}"
 
 script:
   ucan_conseil_reponse:
@@ -121,32 +285,37 @@ script:
       - variables:
           conseil: "{{ states('sensor.ucan_conseil') }}"
           jour: "{{ state_attr('sensor.ucan_conseil', 'jour') }}"
-          refus: "{{ states('input_text.ucan_refus_machines') | int(0) }}"
+          refus: "{{ states('input_text.ucan_refus_' ~ conseil) | int(0) }}"
           pause: "{{ reponse == 'jamais' or (reponse == 'plus_tard' and refus + 1 >= 2) }}"
       - condition: template
-        value_template: "{{ conseil == 'machines' and reponse in ['fait', 'plus_tard', 'jamais'] }}"
+        value_template: "{{ conseil in ['machines', 'lavage', 'veilles'] and reponse in ['fait', 'plus_tard', 'jamais'] }}"
       - action: input_text.set_value
         target: { entity_id: input_text.ucan_jour_traite }
         data:
-          value: "{{ jour }}"
+          value: >
+            {% set l = states('input_text.ucan_jour_traite') | regex_findall('(?:[a-z]+:)?\\d{4}-\\d{2}-\\d{2}') %}
+            {{ ((l + [conseil ~ ':' ~ jour])[-8:]) | join(' ') }}
       - action: input_text.set_value
-        target: { entity_id: input_text.ucan_refus_machines }
+        target:
+          entity_id: "input_text.ucan_refus_{{ conseil }}"
         data:
           value: "{{ 0 if (reponse == 'fait' or pause) else refus + 1 }}"
       - if:
           - condition: template
-            value_template: "{{ pause }}"
+            value_template: "{{ pause or (reponse == 'fait' and conseil != 'machines') }}"
         then:
           - action: input_datetime.set_datetime
-            target: { entity_id: input_datetime.ucan_pause_machines }
+            target:
+              entity_id: "input_datetime.ucan_pause_{{ conseil }}"
             data:
-              date: "{{ (now().date() + timedelta(days=30)) | string }}"
+              date: "{{ (now().date() + timedelta(days=30 if pause else 14)) | string }}"
       - if:
           - condition: template
             value_template: "{{ reponse == 'fait' }}"
         then:
           - action: input_datetime.set_datetime
-            target: { entity_id: input_datetime.ucan_engagement_machines }
+            target:
+              entity_id: "input_datetime.ucan_engagement_{{ conseil }}"
             data:
               date: "{{ now().date() | string }}"
       - action: logbook.log
@@ -154,7 +323,7 @@ script:
           name: "Ucan"
           entity_id: sensor.ucan_conseil
           message: >
-            Conseil « machines » du {{ jour }} : {{ {'fait': 'accepté (machines réparties à partir d\'aujourd\'hui)',
+            Conseil « {{ conseil }} » du {{ jour }} : {{ {'fait': 'accepté (engagement noté aujourd\'hui)',
             'plus_tard': 'remis à plus tard', 'jamais': 'refusé'}[reponse] }}{{ ' ; plus proposé pendant 30 jours' if pause else '' }}.
       - event: ucan_recalcul
 
@@ -170,9 +339,8 @@ automation:
       - condition: state
         entity_id: input_boolean.ucan_notifier
         state: "on"
-      - condition: state
-        entity_id: sensor.ucan_conseil
-        state: "machines"
+      - condition: template
+        value_template: "{{ states('sensor.ucan_conseil') in ['machines', 'lavage', 'veilles'] }}"
     actions:
       - action: script.jarvis_notifier
         data:
@@ -181,3 +349,62 @@ automation:
           message: >
             {{ state_attr('sensor.ucan_conseil', 'constat') }} {{ state_attr('sensor.ucan_conseil', 'geste') }}
             {{ state_attr('sensor.ucan_conseil', 'gain') }}
+
+  # Cycles du lave-linge : début au-dessus de 20 W, fin après 10 min sous 20 W (pauses du tambour).
+  # Énergie du cycle = compteur de fin − compteur de début ; un cycle de moins de 0,05 kWh (coupure
+  # volontaire au départ, par exemple) n'est pas compté.
+  - id: ucan_lave_linge_cycle
+    alias: "Ucan · Cycle du lave-linge (énergie mesurée)"
+    mode: queued
+    triggers:
+      - trigger: template
+        value_template: >
+          {% set p = states('input_text.ucan_lave_linge_puissance') %}
+          {{ p | regex_match('^sensor\\.') and states(p) | float(0) > 20 }}
+        id: debut
+      - trigger: template
+        value_template: >
+          {% set p = states('input_text.ucan_lave_linge_puissance') %}
+          {{ p | regex_match('^sensor\\.') and states(p) | float(0) <= 20 }}
+        for: "00:10:00"
+        id: fin
+    conditions:
+      - condition: template
+        value_template: >
+          {{ states('input_text.ucan_lave_linge_energie') | regex_match('^sensor\\.') }}
+    actions:
+      - variables:
+          compteur: "{{ states(states('input_text.ucan_lave_linge_energie')) | float(none) }}"
+      - condition: template
+        value_template: "{{ compteur is number }}"
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: debut
+              - condition: state
+                entity_id: input_boolean.ucan_lave_linge_en_cycle
+                state: "off"
+            sequence:
+              - action: input_number.set_value
+                target: { entity_id: input_number.ucan_lave_linge_kwh_debut }
+                data:
+                  value: "{{ compteur }}"
+              - action: input_boolean.turn_on
+                target: { entity_id: input_boolean.ucan_lave_linge_en_cycle }
+          - conditions:
+              - condition: trigger
+                id: fin
+              - condition: state
+                entity_id: input_boolean.ucan_lave_linge_en_cycle
+                state: "on"
+            sequence:
+              - action: input_boolean.turn_off
+                target: { entity_id: input_boolean.ucan_lave_linge_en_cycle }
+              - variables:
+                  kwh: "{{ (compteur - states('input_number.ucan_lave_linge_kwh_debut') | float(0)) | round(3) }}"
+              - condition: template
+                value_template: "{{ 0.05 <= kwh <= 6 }}"
+              - event: ucan_cycle_lave_linge
+                event_data:
+                  jour: "{{ now().date() | string }}"
+                  kwh: "{{ kwh }}"
