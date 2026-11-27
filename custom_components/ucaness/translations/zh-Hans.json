@@ -1,0 +1,657 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "连接 UCANESS 门户",
+        "description": "非官方集成。默认只读：只有启用“允许写入”选项后，才会控制逆变器（工作模式、充电时段）。“EMS ID”可在门户中您的电站“详情”框内找到。",
+        "data": {
+          "email": "UCANESS 账户邮箱",
+          "password": "UCANESS 密码",
+          "device_code": "设备 EMS ID"
+        }
+      },
+      "reauth_confirm": {
+        "title": "重新连接 UCANESS",
+        "description": "会话被拒绝。请重新输入 UCANESS 密码。",
+        "data": {
+          "password": "UCANESS 密码"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "UCANESS 拒绝了登录信息。",
+      "device_not_found": "未找到使用此 EMS ID 的设备。",
+      "cannot_connect": "无法连接 UCANESS 门户。"
+    },
+    "abort": {
+      "already_configured": "此设备已配置。",
+      "reauth_successful": "重新连接成功。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "UCANESS 选项",
+        "description": "本集成自带 UCanpower 提供的应用密钥：两个密钥字段留空即可使用它。只有在 UCanpower 为您提供了个人应用密钥和 secret 时才需填写，填写后将优先使用。要恢复使用自带密钥，请清空密钥字段。secret 留空则保留已保存的值。“允许写入”允许 Home Assistant 更改工作模式（自发自用或峰谷套利）和充电时段，仅此而已。",
+        "data": {
+          "scan_interval": "云端查询间隔（秒，最少 30 秒）",
+          "app_key": "个人 UCanpower 应用密钥（可选）",
+          "app_secret": "个人 UCanpower 应用 secret（可选）",
+          "write_enabled": "允许写入（仅限工作模式和充电时段）"
+        }
+      }
+    }
+  },
+  "services": {
+    "tester_api": {
+      "name": "测试 UCanpower API",
+      "description": "以只读方式检查已签名的第三方 API：设备 ID、逆变器型号、工作模式和时段。不会向逆变器发送任何内容。",
+      "fields": {
+        "config_entry_id": {
+          "name": "设备",
+          "description": "要使用的 UCANESS 条目（只有一台设备时可不填）。"
+        }
+      }
+    },
+    "definir_plages_charge": {
+      "name": "设置充电时段",
+      "description": "为峰谷套利模式设置最多 3 个充电时段（HHMM）。其他充电时段和所有放电时段将被清空。需要“允许写入”。",
+      "fields": {
+        "config_entry_id": {
+          "name": "设备",
+          "description": "要使用的 UCANESS 条目（只有一台设备时可不填）。"
+        },
+        "plages": {
+          "name": "时段",
+          "description": "{debut, fin} 列表，格式为 HHMM，例如 2300 到 2359，然后 0000 到 0130。"
+        }
+      }
+    },
+    "definir_mode": {
+      "name": "设置工作模式",
+      "description": "将逆变器切换为自发自用或峰谷套利。拒绝 Backup 模式。需要“允许写入”。",
+      "fields": {
+        "config_entry_id": {
+          "name": "设备",
+          "description": "要使用的 UCANESS 条目（只有一台设备时可不填）。"
+        },
+        "mode": {
+          "name": "模式",
+          "description": "自发自用或峰谷套利。"
+        }
+      }
+    },
+    "optimiser_charge": {
+      "name": "规划充电（动态电价）",
+      "description": "根据电价、预计用电量和光伏预测，计算最多 3 个电网充电时段，使可变电价下的成本最低。不会向逆变器发送任何内容。",
+      "fields": {
+        "prix": {
+          "name": "电价",
+          "description": "{debut, prix}（或 {start, price}）列表，单位为含税 EUR/kWh，按小时或按刻钟。"
+        },
+        "conso": {
+          "name": "用电量",
+          "description": "24 个数值（一天中每小时的 kWh）或 {debut, kwh} 列表。"
+        },
+        "solaire": {
+          "name": "光伏预测",
+          "description": "Solcast 的 detailedHourly 或 detailedForecast 列表，或 {debut, kwh}。"
+        },
+        "capacite_kwh": {
+          "name": "电池容量",
+          "description": "额定容量。"
+        },
+        "plancher_pct": {
+          "name": "SOC 下限",
+          "description": "低于此 SOC 时逆变器不再放电。"
+        },
+        "soc_pct": {
+          "name": "当前 SOC",
+          "description": "电池当前电量。"
+        },
+        "rendement_pct": {
+          "name": "效率",
+          "description": "单向效率（充电或放电）。"
+        },
+        "puissance_charge_kw": {
+          "name": "电网充电功率",
+          "description": "充电时段内实际观察到的功率。"
+        },
+        "prix_revente": {
+          "name": "上网电价",
+          "description": "上网电量每 kWh 获得的 EUR。"
+        },
+        "marge_pct": {
+          "name": "余量",
+          "description": "预计用电量的上浮比例。"
+        },
+        "charge_interdite": {
+          "name": "禁止充电",
+          "description": "电池低于 0 °C 时为真。"
+        },
+        "reserve": {
+          "name": "备用电量",
+          "description": "{debut, fin, soc_pct}：两个时刻之间需保留的最低 SOC（停电风险）。"
+        },
+        "seuil_gain_eur": {
+          "name": "最低收益",
+          "description": "估计收益低于此值时，不安排任何时段。"
+        },
+        "valeur_stock_eur_kwh": {
+          "name": "存电价值",
+          "description": "计算期末电池中每剩余 1 kWh 的价值，单位 EUR（默认：最低电价 / 效率）。"
+        },
+        "max_plages": {
+          "name": "最多时段数",
+          "description": "逆变器可用的充电时段数（3）。"
+        }
+      }
+    },
+    "plages_depuis_plan": {
+      "name": "根据外部计划生成时段",
+      "description": "将其他引擎的电池计划（EMHASS：P_batt < 0 = 充电，P_grid > 0 = 从电网取电）转换为最多 3 个充电时段。不会向逆变器发送任何内容。",
+      "fields": {
+        "plan": {
+          "name": "计划",
+          "description": "{debut, charge_reseau_kw} 列表，或 EMHASS 元素 {date, p_batt, p_grid}，单位 W。"
+        },
+        "seuil_kw": {
+          "name": "阈值",
+          "description": "电网充电功率低于此值的时段将被忽略。"
+        },
+        "max_plages": {
+          "name": "最多时段数",
+          "description": "逆变器可用的充电时段数（3）。"
+        }
+      }
+    },
+    "evaluer_offres": {
+      "name": "评估电力套餐",
+      "description": "仅计算：根据逐小时测量的电网取电量（已扣除电池），估算每个套餐的年费用，按费用排序，并评估签约功率。支持“base”和“hphc”计价方式。不会签订任何合同，也不会向逆变器发送任何内容。",
+      "fields": {
+        "offres": {
+          "name": "套餐",
+          "description": "套餐列表；每个套餐包含：nom、fournisseur、formule（base 或 hphc）、abonnement_eur_an（按功率 kVA 的含税年费，€）、prix_kwh（base，或 hp 和 hc，含税 €）、plages_hc（开始和结束列表）、weekend_hc、source、date_prix；Tempo：formule tempo，prix_kwh 为 bleu_hp、bleu_hc、blanc_hp、blanc_hc、rouge_hp、rouge_hc，jours_tempo 可选。"
+        },
+        "contrat_actuel": {
+          "name": "当前合同",
+          "description": "格式与套餐相同：作为计算年度差额的参照。"
+        },
+        "soutirage": {
+          "name": "电网取电量",
+          "description": "{debut, kwh} 列表：从电网取用的电量，每小时一个值。"
+        },
+        "puissance_kva": {
+          "name": "签约功率",
+          "description": "合同功率，单位 kVA。"
+        },
+        "jours_non_ouvres": {
+          "name": "法定节假日",
+          "description": "对于“周末按谷时计费”的套餐，这些日期按周末计算。"
+        },
+        "puissances_max_kva": {
+          "name": "最大功率",
+          "description": "每天一个最大功率值，单位 kVA，用于评估签约功率。"
+        },
+        "mesure_fine": {
+          "name": "电表读取的最大值",
+          "description": "如果最大功率来自电表（TIC 接口）而非估算，请启用。"
+        },
+        "capacite_utile_kwh": {
+          "name": "电池可用容量",
+          "description": "高于下限的容量。若提供，将为峰谷套餐估算夜间充电（偏高估计）。"
+        },
+        "rendement_pct": {
+          "name": "效率",
+          "description": "电池单向效率（充电或放电）。"
+        },
+        "recharge_deja_active": {
+          "name": "夜间充电已启用",
+          "description": "如果家中已在谷时给电池充电，请启用：测量的取电量已包含这部分。"
+        },
+        "couleurs_tempo": {
+          "name": "Tempo 颜色",
+          "description": "每个测量的 Tempo 日（6 点到次日 6 点）的颜色：日期，然后是 bleu、blanc 或 rouge（蓝、白、红）。不提供时，每种颜色按平均日用电量计算。"
+        }
+      }
+    },
+    "simuler": {
+      "name": "模拟（如果……）",
+      "description": "仅根据家中测量数据进行计算，不会应用任何更改。“contrat”：估算当前合同和参考套餐（受管制电价，包括 Tempo）或所传入套餐的年费用；“puissance”：签约功率是否合适。",
+      "fields": {
+        "question": {
+          "name": "问题",
+          "description": "contrat（合同）或 puissance（功率）。"
+        },
+        "jours": {
+          "name": "测量天数",
+          "description": "使用的逐小时测量天数（默认 30 天）。"
+        },
+        "puissance_actuelle_kva": {
+          "name": "当前签约功率",
+          "description": "单位 kVA。"
+        },
+        "abonnement_actuel_eur_an": {
+          "name": "当前基本费",
+          "description": "当前合同的含税年基本费，单位 €。"
+        },
+        "offres": {
+          "name": "套餐",
+          "description": "可选：要比较的套餐，格式同“评估电力套餐”。不提供时使用参考套餐。"
+        },
+        "soutirage": {
+          "name": "电网取电量",
+          "description": "从电网取电的电能表（累计 kWh）。"
+        },
+        "puissance_reseau": {
+          "name": "电网功率",
+          "description": "从电网取用的功率（W）。"
+        }
+      }
+    }
+  },
+  "selector": {
+    "mode": {
+      "options": {
+        "autoconsommation": "自发自用",
+        "arbitrage_horaire": "峰谷套利"
+      }
+    },
+    "type_tarif": {
+      "options": {
+        "hphc": "峰谷电价",
+        "base": "单一电价"
+      }
+    }
+  },
+  "issues": {
+    "etape_connexion": {
+      "title": "UCANESS：电池没有响应",
+      "description": "本集成已收不到“{appareil}”的测量数据。没有这些数据，就无法进行任何计算。\n\n请检查逆变器的互联网连接，然后[打开集成]({lien})。"
+    },
+    "etape_packages": {
+      "title": "UCANESS：安装充放电控制",
+      "description": "“{appareil}”已连接，但充放电控制尚未安装：每晚由这些 packages 决定是否在夜间充电。\n\n[充放电控制安装指南]({lien})。控制始终从模拟模式开始：不会向逆变器发送任何指令。"
+    },
+    "etape_entites": {
+      "title": "UCANESS：部分测量值未被充放电控制识别",
+      "description": "充放电控制按特定名称读取电池数据。以下名称未找到：{entites}。\n\n请在[设置 > 实体]({lien})中重命名相应实体（“实体 ID”字段）。在全新安装中，这些名称会自动设置。"
+    },
+    "etape_batterie": {
+      "title": "UCANESS：填写电池容量",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "您的电池",
+            "description": "逆变器报告有 {modules} 个电池模块。按每个模块 5.12 kWh 计算，共 {proposition} kWh：请确认或更正。\n\n下限是电池停止放电的电量水平（可观察一个未充电夜晚达到的最低值）。充电功率是您在电网充电时观察到的功率。这两个数值以后都可以再调整。",
+            "data": {
+              "capacite": "电池容量",
+              "plancher": "电量下限",
+              "puissance_charge": "电网充电功率"
+            }
+          }
+        },
+        "error": {
+          "capacite_nulle": "请输入大于 0 的容量。"
+        },
+        "abort": {
+          "entree_absente": "此电池已不再配置。"
+        }
+      }
+    },
+    "etape_contrat": {
+      "title": "UCANESS：填写您的电力合同",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "您的电力合同",
+            "description": "这些信息可在您的电费账单上找到。如果合同没有谷时电价，请选择“单一电价”，谷时相关字段留空。",
+            "data": {
+              "type_tarif": "合同类型",
+              "prix_hp": "峰时每 kWh 电价（或单一电价）",
+              "prix_hc": "谷时每 kWh 电价",
+              "hc_debut": "谷时开始",
+              "hc_fin": "谷时结束",
+              "hc_jours_non_ouvres": "周末和法定节假日全天按谷时计费",
+              "prix_injection": "余电上网价格"
+            }
+          },
+          "bilan": {
+            "title": "对您来说，夜间充电是划算的",
+            "description": "每 1 kWh 在谷时充入、在峰时使用，大约可节省 {gain} 分（电池每个方向的效率按 {rendement}% 计算）。\n\n充放电控制将在夜间充电，充到刚好能撑到太阳接力为止。确认后保存您的合同。"
+          },
+          "bilan_non_rentable": {
+            "title": "对您来说，夜间充电不划算",
+            "description": "按这些电价，每 1 kWh 在谷时充入、在峰时使用，大约会多花 {gain} 分（电池每个方向的效率按 {rendement}% 计算）。\n\n因此充放电控制不会安排电网充电；电池将继续储存您的光伏发电。确认后保存您的合同。"
+          },
+          "bilan_base": {
+            "title": "没有谷时电价的合同",
+            "description": "电价单一时，用电网给电池充电没有任何好处：充放电控制不会安排夜间充电。电池将继续储存您的光伏发电。确认后保存您的合同。"
+          }
+        },
+        "error": {
+          "prix_nul": "请输入大于 0 的电价。"
+        },
+        "abort": {
+          "entree_absente": "此电池已不再配置。"
+        }
+      }
+    },
+    "etape_jours_ouvres": {
+      "title": "UCANESS：添加工作日",
+      "description": "充放电控制会区分工作日与周末和法定节假日：用电量以及（视合同而定的）谷时都不相同。\n\n[添加 Workday 集成]({lien})并选择您的国家。"
+    },
+    "etape_prevision_solaire": {
+      "title": "UCANESS：添加光伏发电预测",
+      "description": "为了只充所需的电量，充放电控制需要今天和明天的预计发电量。没有预测，就不会安排任何充电。\n\n请从 Marketplace 安装 Solcast PV Forecast 集成（社区内容，未经 Home Assistant 审核），然后[进行配置]({lien})。"
+    },
+    "etape_notifications": {
+      "title": "UCANESS：选择接收通知的位置",
+      "description": "可选。用于在电池出现故障或充电安排失败时通知您。\n\n请在[设置 > 辅助元素]({lien})中填写“Alertes : service de notification”，例如 `mobile_app_mon_telephone`。"
+    },
+    "etape_solaire": {
+      "title": "UCANESS：您有光伏板吗？",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "光伏板",
+            "description": "逆变器尚未测量到任何光伏发电。电池有无光伏板都可以运行。\n\n有光伏板时，电池先储存您的发电量，充放电控制只在夜间补充不足的部分。没有光伏板时，电池用于在最便宜的时段买电、在最贵的时段使用：这完全取决于您的合同，助手会在下一步检查。",
+            "data": {
+              "solaire": "此逆变器连接了光伏板"
+            }
+          }
+        },
+        "abort": {
+          "entree_absente": "此电池已不再配置。"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "solar_power": {
+        "name": "光伏功率"
+      },
+      "pv1_power": {
+        "name": "MPPT 1 功率"
+      },
+      "pv2_power": {
+        "name": "MPPT 2 功率"
+      },
+      "battery_power": {
+        "name": "电池功率（充电 > 0）"
+      },
+      "load_power": {
+        "name": "家庭功率"
+      },
+      "grid_power": {
+        "name": "估算电网功率（取电 > 0）"
+      },
+      "inverter_power": {
+        "name": "逆变器功率"
+      },
+      "soc": {
+        "name": "电池电量（SOC）"
+      },
+      "soh": {
+        "name": "电池健康度（SOH）"
+      },
+      "battery_voltage": {
+        "name": "电池电压"
+      },
+      "battery_current": {
+        "name": "电池电流"
+      },
+      "battery_temp": {
+        "name": "电池温度"
+      },
+      "cell_temp_max": {
+        "name": "电芯最高温度"
+      },
+      "cell_temp_min": {
+        "name": "电芯最低温度"
+      },
+      "cell_voltage_max": {
+        "name": "电芯最高电压"
+      },
+      "cell_voltage_min": {
+        "name": "电芯最低电压"
+      },
+      "battery_modules": {
+        "name": "电池模块数量"
+      },
+      "battery_alarm_code": {
+        "name": "电池告警代码"
+      },
+      "battery_fault_code": {
+        "name": "电池故障代码"
+      },
+      "battery_pack_alarm_raw": {
+        "name": "电池包告警代码（原始值，待解读）"
+      },
+      "grid_voltage": {
+        "name": "电网电压"
+      },
+      "grid_frequency": {
+        "name": "电网频率"
+      },
+      "solar_voltage": {
+        "name": "光伏电压"
+      },
+      "inverter_temp": {
+        "name": "逆变器温度"
+      },
+      "ambient_temp": {
+        "name": "逆变器环境温度"
+      },
+      "pv_module_temp": {
+        "name": "光伏级温度"
+      },
+      "leakage_current_raw": {
+        "name": "漏电流（原始值）"
+      },
+      "work_mode": {
+        "name": "工作模式"
+      },
+      "work_state": {
+        "name": "工作状态"
+      },
+      "last_update": {
+        "name": "最近一次收到的测量"
+      },
+      "data_age": {
+        "name": "数据时长"
+      },
+      "energy_solar_today": {
+        "name": "今日光伏发电量"
+      },
+      "energy_solar_total": {
+        "name": "光伏累计发电量"
+      },
+      "energy_grid_import_today": {
+        "name": "今日电网取电量"
+      },
+      "energy_grid_import_total": {
+        "name": "电网累计取电量"
+      },
+      "energy_grid_export_today": {
+        "name": "今日上网电量"
+      },
+      "energy_grid_export_total": {
+        "name": "累计上网电量"
+      },
+      "energy_load_today": {
+        "name": "今日家庭用电量"
+      },
+      "energy_load_total": {
+        "name": "家庭累计用电量"
+      },
+      "energy_battery_charge_today": {
+        "name": "今日电池充电量"
+      },
+      "energy_battery_charge_total": {
+        "name": "电池累计充电量"
+      },
+      "energy_battery_discharge_today": {
+        "name": "今日电池放电量"
+      },
+      "energy_battery_discharge_total": {
+        "name": "电池累计放电量"
+      },
+      "setting_dod": {
+        "name": "并网放电深度（DOD）设置"
+      },
+      "setting_hysteresis": {
+        "name": "回差设置"
+      },
+      "setting_charge_current": {
+        "name": "充电电流设置"
+      },
+      "setting_discharge_power": {
+        "name": "放电功率设置"
+      },
+      "setting_export_power": {
+        "name": "上网功率设置"
+      },
+      "setting_charge1_start": {
+        "name": "充电时段 1：开始"
+      },
+      "setting_charge1_end": {
+        "name": "充电时段 1：结束"
+      },
+      "event_count": {
+        "name": "已记录事件"
+      },
+      "installation": {
+        "name": "安装",
+        "state": {
+          "a_configurer": "待配置",
+          "en_simulation": "模拟中",
+          "en_service": "运行中",
+          "a_verifier": "待检查"
+        }
+      }
+    },
+    "binary_sensor": {
+      "cloud_connection": {
+        "name": "UCANESS 云连接"
+      },
+      "battery_fault": {
+        "name": "电池故障或告警"
+      },
+      "battery_temp_out_of_charge_range": {
+        "name": "电池温度超出充电范围（0–50 °C）"
+      }
+    },
+    "number": {
+      "capacite": {
+        "name": "电池：容量"
+      },
+      "plancher": {
+        "name": "电池：SOC 下限"
+      },
+      "rendement": {
+        "name": "电池：效率"
+      },
+      "puissance_charge": {
+        "name": "电池：充电功率"
+      },
+      "marge": {
+        "name": "电池：安全余量"
+      },
+      "conso_journaliere": {
+        "name": "电池：默认日用电量"
+      },
+      "prix_hp": {
+        "name": "电价：峰时电价（或单一电价）"
+      },
+      "prix_hc": {
+        "name": "电价：谷时电价"
+      },
+      "prix_injection": {
+        "name": "电价：余电上网价格"
+      }
+    },
+    "switch": {
+      "solaire": {
+        "name": "安装：已连接光伏板"
+      },
+      "hc_jours_non_ouvres": {
+        "name": "电价：周末和法定节假日按谷时计费"
+      }
+    },
+    "select": {
+      "type_tarif": {
+        "name": "电价：合同类型",
+        "state": {
+          "hphc": "峰谷电价",
+          "base": "单一电价"
+        }
+      }
+    },
+    "time": {
+      "hc_debut": {
+        "name": "电价：谷时开始"
+      },
+      "hc_fin": {
+        "name": "电价：谷时结束"
+      }
+    }
+  },
+  "exceptions": {
+    "appareil_introuvable": {
+      "message": "未找到 UCANESS 设备或设备不唯一（请指定 config_entry_id）"
+    },
+    "ecriture_desactivee": {
+      "message": "已禁用向逆变器写入（UCANESS 集成的“允许写入”选项）"
+    },
+    "consigne_refusee": {
+      "message": "指令被安全保护拒绝：{detail}"
+    },
+    "plages_non_envoyees": {
+      "message": "指令未发送（充电时段 {plages}）：{detail}"
+    },
+    "mode_non_envoye": {
+      "message": "指令未发送（模式 {mode}）：{detail}"
+    },
+    "plages_non_confirmees": {
+      "message": "充电时段 {plages}：指令已发送，但逆变器未确认（{ecarts}）"
+    },
+    "mode_non_confirme": {
+      "message": "模式 {mode}：指令已发送，但逆变器未确认（{ecarts}）"
+    },
+    "plages_relecture_impossible": {
+      "message": "充电时段 {plages}：指令已发送，但逆变器未确认（无法回读）"
+    },
+    "mode_relecture_impossible": {
+      "message": "模式 {mode}：指令已发送，但逆变器未确认（无法回读）"
+    },
+    "api_tierce": {
+      "message": "UCANESS 第三方 API：{detail}"
+    },
+    "donnees_refusees": {
+      "message": "数据被拒绝：{detail}"
+    },
+    "puissance_actuelle_manquante": {
+      "message": "请填写当前签约功率（puissance_actuelle_kva）。"
+    },
+    "aucune_mesure_horaire": {
+      "message": "过去 {jours} 天内没有 {entite} 的逐小时测量数据。"
+    },
+    "reglage_inconnu": {
+      "message": "设置被拒绝：未知设置（{reglage}）"
+    },
+    "reglage_hors_bornes": {
+      "message": "设置被拒绝：{reglage}：{valeur} 超出范围 {mini} 至 {maxi}"
+    },
+    "reglage_choix_impossible": {
+      "message": "设置被拒绝：{reglage}：{valeur} 不是可选项"
+    },
+    "reglage_heure_invalide": {
+      "message": "设置被拒绝：{reglage}：{valeur} 不是有效时间（HH:MM）"
+    },
+    "reglage_ni_vrai_ni_faux": {
+      "message": "设置被拒绝：{reglage}：{valeur} 既不是真也不是假"
+    }
+  }
+}
