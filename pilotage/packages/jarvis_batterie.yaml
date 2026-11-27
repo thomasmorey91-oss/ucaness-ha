@@ -56,7 +56,7 @@
 #   sensor.uhome_soc, sensor.uhome_temperature_batterie, sensor.uhome_mode,
 #   sensor.uhome_puissance_maison, binary_sensor.uhome_temperature_hors_plage,
 #   sensor.uhome_puissance_mppt_1, sensor.uhome_puissance_mppt_2, sensor.uhome_puissance_reseau,
-#   sensor.uhome_soutirage_reseau_total (UCANESS)
+#   sensor.uhome_soutirage_reseau_total, sensor.uhome_injection_reseau_totale (UCANESS)
 #   sensor.solcast_pv_forecast_prevision_demain, sensor.solcast_pv_forecast_prevision_aujourdhui,
 #   sensor.solcast_pv_forecast_derniere_interrogation_de_l_api, sensor.solcast_pv_forecast_limite_api,
 #   sensor.solcast_pv_forecast_api_utilisee (Solcast, noms français)
@@ -462,7 +462,12 @@ template:
   # l'imprécision de la simulation horaire. Recalcul manuel : événement « jarvis_calcul_gain ».
   # Statistiques utilisées : sensor.uhome_puissance_maison, sensor.uhome_puissance_mppt_1 et _2,
   # sensor.uhome_puissance_reseau (moyennes horaires), sensor.uhome_soc (stock en début et fin de
-  # fenêtre), sensor.uhome_soutirage_reseau_total (soutirage par heure).
+  # fenêtre), sensor.uhome_soutirage_reseau_total (soutirage par heure),
+  # sensor.uhome_injection_reseau_totale (injection par heure, compteur de l'onduleur).
+  # Injection : le compteur de l'onduleur quand il a une valeur pour l'heure ; sinon, estimation
+  # soutirage - puissance réseau moyenne (repli). L'estimation surévalue l'injection quand la
+  # puissance réseau est « inconnue » une partie de l'heure (batterie à l'arrêt au plancher)
+  # et compte alors une injection fictive.
   # ---------------------------------------------------------------------------
   - triggers:
       - trigger: time
@@ -509,7 +514,7 @@ template:
         data:
           start_time: "{{ debut_fenetre }}"
           end_time: "{{ fin_fenetre }}"
-          statistic_ids: [sensor.uhome_soutirage_reseau_total]
+          statistic_ids: [sensor.uhome_soutirage_reseau_total, sensor.uhome_injection_reseau_totale]
           period: hour
           types: [change]
         response_variable: compteurs
@@ -545,18 +550,20 @@ template:
             {% set rR = st.get('sensor.uhome_puissance_reseau', []) %}
             {% set rS = st.get('sensor.uhome_soc', []) %}
             {% set rI = sc.get('sensor.uhome_soutirage_reseau_total', []) %}
+            {% set rE = sc.get('sensor.uhome_injection_reseau_totale', []) %}
             {% set mL = dict(zip(rL | map(attribute='start') | map('as_timestamp') | map('int') | list, rL | map(attribute='mean') | list)) %}
             {% set m1 = dict(zip(r1 | map(attribute='start') | map('as_timestamp') | map('int') | list, r1 | map(attribute='mean') | list)) %}
             {% set m2 = dict(zip(r2 | map(attribute='start') | map('as_timestamp') | map('int') | list, r2 | map(attribute='mean') | list)) %}
             {% set mR = dict(zip(rR | map(attribute='start') | map('as_timestamp') | map('int') | list, rR | map(attribute='mean') | list)) %}
             {% set mS = dict(zip(rS | map(attribute='start') | map('as_timestamp') | map('int') | list, rS | map(attribute='mean') | list)) %}
             {% set mI = dict(zip(rI | map(attribute='start') | map('as_timestamp') | map('int') | list, rI | map(attribute='change') | list)) %}
+            {% set mE = dict(zip(rE | map(attribute='start') | map('as_timestamp') | map('int') | list, rE | map(attribute='change') | list)) %}
             {% set soc0 = mS.get(t0 - 3600) %}
             {% set soc1 = mS.get(t0 + 3600 * (n - 1)) %}
             {% set s_reel0 = [0, ((soc0 if soc0 is number else plancher) - plancher) / 100 * cap_brute] | max %}
             {% set s_reel1 = [0, ((soc1 if soc1 is number else plancher) - plancher) / 100 * cap_brute] | max %}
             {% set ns = namespace(ok=0, s=s_reel0, cout_reel=0, cout_auto=0, achat=0, achat_hp=0, injection=0,
-                                  achat_auto=0, achat_hp_auto=0, injection_auto=0) %}
+                                  achat_auto=0, achat_hp_auto=0, injection_auto=0, inj_compteur=0) %}
             {% for i in range(n) %}
               {% set ts = t0 + 3600 * i %}
               {% set loc = ts | timestamp_custom('%Y-%m-%d %H', true) %}
@@ -575,13 +582,19 @@ template:
               {% set p2 = m2.get(ts) %}
               {% set I = mI.get(ts) %}
               {% set R = mR.get(ts) %}
+              {% set Ec = mE.get(ts) %}
               {# La nuit, l'onduleur n'envoie pas de puissance MPPT : une heure sans valeur compte pour 0. #}
               {% if L is number and I is number %}
                 {% set ns.ok = ns.ok + 1 %}
                 {% set L = [0, L] | max / 1000 %}
                 {% set P = ([0, p1 if p1 is number else 0] | max + [0, p2 if p2 is number else 0] | max) / 1000 %}
                 {% set I = [0, I] | max %}
-                {% set E = [0, I - R / 1000] | max if R is number else 0 %}
+                {% if Ec is number %}
+                  {% set E = [0, Ec] | max %}
+                  {% set ns.inj_compteur = ns.inj_compteur + 1 %}
+                {% else %}
+                  {% set E = [0, I - R / 1000] | max if R is number else 0 %}
+                {% endif %}
                 {% set ns.cout_reel = ns.cout_reel + I * prix - E * inj %}
                 {% set ns.achat = ns.achat + I %}
                 {% set ns.achat_hp = ns.achat_hp + I * (0 if base else 1 - frac) %}
@@ -619,6 +632,8 @@ template:
               'soutirage_kwh': ns.achat | round(1),
               'soutirage_hp_kwh': ns.achat_hp | round(1),
               'injection_kwh': ns.injection | round(1),
+              'injection_source': 'compteur' if ns.inj_compteur == ns.ok and ns.ok > 0
+                                  else ('estimée' if ns.inj_compteur == 0 else 'compteur ' ~ ns.inj_compteur ~ ' h sur ' ~ ns.ok),
               'soutirage_autoconsommation_kwh': ns.achat_auto | round(1),
               'soutirage_hp_autoconsommation_kwh': ns.achat_hp_auto | round(1),
               'injection_autoconsommation_kwh': ns.injection_auto | round(1),
@@ -645,6 +660,7 @@ template:
           soutirage_kwh: "{{ gain.soutirage_kwh }}"
           soutirage_hp_kwh: "{{ gain.soutirage_hp_kwh }}"
           injection_kwh: "{{ gain.injection_kwh }}"
+          injection_source: "{{ gain.injection_source }}"
           soutirage_autoconsommation_kwh: "{{ gain.soutirage_autoconsommation_kwh }}"
           soutirage_hp_autoconsommation_kwh: "{{ gain.soutirage_hp_autoconsommation_kwh }}"
           injection_autoconsommation_kwh: "{{ gain.injection_autoconsommation_kwh }}"
@@ -1026,6 +1042,12 @@ automation:
       nuit quand une recharge est programmée. Chaque mise à jour n'est lancée que s'il reste au
       moins 2 appels dans le quota du jour. Exemple : 2 toitures et 10 appels = 3 mises à jour de
       jour (6) + 1 de nuit (2) + valeurs réelles estimées de minuit pour l'amortissement automatique (2).
+      Solcast compte son quota par journée UTC (minuit UTC = 1h en hiver, 2h en été à Paris) :
+      avant minuit UTC, les mises à jour de jour et les valeurs réelles de minuit ont déjà épuisé le
+      quota, et Solcast refuse la mise à jour de nuit. Elle n'est donc lancée qu'après minuit UTC :
+      si elle tombe avant, elle est reportée à 00h02 UTC quand la réévaluation a lieu entre 00h07
+      et 00h20 UTC, sinon la réévaluation garde la prévision du soir (datée du jour préparé).
+      Le journal n'annonce une mise à jour que si l'heure de dernière interrogation a changé.
     mode: queued
     triggers:
       - trigger: sun
@@ -1044,26 +1066,87 @@ automation:
           entity_id: input_datetime.jarvis_batterie_reevaluation
           offset: "-00:20:00"
         id: nuit
+      # Report de la mise à jour de nuit juste après le changement de journée UTC du quota.
+      - trigger: template
+        value_template: "{{ utcnow().hour == 0 and utcnow().minute == 2 }}"
+        id: nuit_utc
     conditions:
       - condition: state
         entity_id: input_boolean.jarvis_solcast_pilote
         state: "on"
       - condition: template
-        value_template: >
-          {{ states('sensor.solcast_pv_forecast_limite_api') | int(0)
-             - states('sensor.solcast_pv_forecast_api_utilisee') | int(99) >= 2 }}
-      - condition: template
         value_template: "{{ trigger.id == 'jour' or is_state('input_boolean.jarvis_batterie_plan_actif', 'on') }}"
+      # Report : seulement si la réévaluation tombe 5 à 18 min plus tard (sinon la mise à jour de
+      # nuit a déjà eu lieu après minuit UTC, ou elle n'a plus le temps de servir).
+      - condition: template
+        value_template: >
+          {% if trigger.id != 'nuit_utc' %}true
+          {% else %}
+            {% set r = states('input_datetime.jarvis_batterie_reevaluation') %}
+            {% set t = today_at(r) if r | regex_match('^\\d\\d:\\d\\d') else none %}
+            {% set m = ((t - now()).total_seconds() / 60) if t is not none else -1 %}
+            {{ 5 <= m < 18 }}
+          {% endif %}
     actions:
+      - variables:
+          capteur_maj: sensor.solcast_pv_forecast_derniere_interrogation_de_l_api
+          avant: "{{ states('sensor.solcast_pv_forecast_derniere_interrogation_de_l_api') }}"
+          quand: >
+            {{ 'avant la réévaluation de nuit' if trigger.id in ['nuit', 'nuit_utc'] else 'mise à jour de jour' }}
+          prevision_gardee: >
+            {% set d = as_datetime(avant) if avant not in ['unknown', 'unavailable', 'none', ''] else none %}
+            {{ as_local(d).strftime('%d/%m %Hh%M') if d is not none else 'inconnue' }}
+      # Avant minuit UTC, le quota du jour est épuisé : pas d'appel (report ou prévision gardée).
+      - if:
+          - condition: template
+            value_template: "{{ trigger.id == 'nuit' and utcnow().hour >= 12 }}"
+        then:
+          - action: logbook.log
+            data:
+              name: "Jarvis batterie"
+              entity_id: sensor.jarvis_recharge_reseau_prevue
+              message: >
+                {% set r = today_at(states('input_datetime.jarvis_batterie_reevaluation')) %}
+                {% set r = r if r > now() else r + timedelta(days=1) %}
+                {% set minuit_utc = as_local(utcnow().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)) %}
+                {% set ecart = ((r - minuit_utc).total_seconds() / 60) | round(0) %}
+                Mise à jour Solcast de nuit {{ 'reportée à ' ~ (minuit_utc + timedelta(minutes=2)).strftime('%Hh%M') if 7 <= ecart < 20 else 'non lancée' }} :
+                avant minuit UTC ({{ minuit_utc.strftime('%Hh%M') }}), le quota Solcast du jour est épuisé.
+                {% if not (7 <= ecart < 20) %}La réévaluation utilisera la prévision du {{ prevision_gardee }}.{% endif %}
+          - stop: "Mise à jour de nuit avant minuit UTC"
+      - if:
+          - condition: template
+            value_template: >
+              {{ states('sensor.solcast_pv_forecast_limite_api') | int(0)
+                 - states('sensor.solcast_pv_forecast_api_utilisee') | int(99) < 2 }}
+        then:
+          - action: logbook.log
+            data:
+              name: "Jarvis batterie"
+              entity_id: sensor.jarvis_recharge_reseau_prevue
+              message: >
+                Mise à jour Solcast non lancée ({{ quand }}) : quota insuffisant
+                ({{ states('sensor.solcast_pv_forecast_api_utilisee') }} / {{ states('sensor.solcast_pv_forecast_limite_api') }}) ;
+                prévision du {{ prevision_gardee }} gardée.
+          - stop: "Quota Solcast insuffisant"
       - action: solcast_solar.update_forecasts
         continue_on_error: true
+      # La réponse de Solcast arrive après l'appel : on attend que l'heure de dernière interrogation change.
+      - wait_template: "{{ states(capteur_maj) != avant }}"
+        timeout: "00:01:00"
+        continue_on_timeout: true
       - action: logbook.log
         data:
           name: "Jarvis batterie"
           entity_id: sensor.jarvis_recharge_reseau_prevue
           message: >
-            Prévision Solcast mise à jour ({{ 'avant la réévaluation de nuit' if trigger.id == 'nuit' else 'mise à jour de jour' }}) ;
+            {% if states(capteur_maj) != avant and states(capteur_maj) not in ['unknown', 'unavailable'] %}
+            Prévision Solcast mise à jour ({{ quand }}) ;
             appels utilisés {{ states('sensor.solcast_pv_forecast_api_utilisee') }} / {{ states('sensor.solcast_pv_forecast_limite_api') }}.
+            {% else %}
+            Mise à jour Solcast refusée ou sans réponse ({{ quand }}) : prévision du {{ prevision_gardee }} gardée ;
+            appels utilisés {{ states('sensor.solcast_pv_forecast_api_utilisee') }} / {{ states('sensor.solcast_pv_forecast_limite_api') }}.
+            {% endif %}
 
 script:
   jarvis_batterie_appliquer:
