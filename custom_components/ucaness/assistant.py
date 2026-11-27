@@ -15,12 +15,11 @@ from homeassistant.helpers import issue_registry as ir
 
 from . import installation, reglages
 from .const import (
-    CONF_APP_KEY,
-    CONF_APP_SECRET,
     CONF_WRITE_ENABLED,
     DOMAIN,
     ENTITES_PILOTAGE,
 )
+from .cle_application import cle_effective
 from .coordinator import UcanessConfigEntry
 
 # Entrées des packages de pilotage (pilotage/packages/*.yaml).
@@ -73,7 +72,7 @@ def construire_contexte(hass: HomeAssistant, entry: UcanessConfigEntry) -> dict[
         # True = simulation, False = mode réel, None = inconnu (jamais pris pour le mode réel).
         "simulation": None if simulation is None else simulation == "on",
         "ecriture": bool(
-            options.get(CONF_WRITE_ENABLED) and options.get(CONF_APP_KEY) and options.get(CONF_APP_SECRET)
+            options.get(CONF_WRITE_ENABLED) and cle_effective(options)[2]
         ),
     }
 

@@ -464,7 +464,8 @@ async def test_diagnostics_masquent_secrets_et_identifiants(hass, cloud):
     # Ce qui sert au diagnostic reste lisible.
     assert diag["donnees"]["valeurs"]["soc"] == pytest.approx(41.0)
     assert diag["entree"]["options"]["scan_interval"] == 60
-    assert diag["client"] == {"session_ouverte": True, "cle_application_presente": True, "ecriture_autorisee": True}
+    assert diag["client"] == {"session_ouverte": True, "cle_application_presente": True,
+                              "origine_cle_application": "personnelle", "ecriture_autorisee": True}
 
 
 # --- Tarif dynamique : actions de calcul (rien n'est envoyé) -------------------------------------
@@ -806,3 +807,81 @@ async def test_reglage_solaire_suit_le_choix_du_pilotage(hass, fake_client):
     await hass.async_block_till_done()
     assert hass.states.get("input_select.jarvis_solaire").state == "Avec panneaux"
     assert hass.states.get("switch.ucaness_solaire").state == "on"
+
+
+# ------------------------------------------------------------------ clé d'application livrée
+@pytest.fixture
+def cle_livree(monkeypatch):
+    """Clé livrée avec l'intégration (valeurs INVENTÉES)."""
+    from custom_components.ucaness import cle_application
+
+    monkeypatch.setattr(cle_application, "CLE_LIVREE", "cle-livree-essai")
+    monkeypatch.setattr(cle_application, "SECRET_LIVRE", "secret-livre-essai")
+
+
+@pytest.mark.parametrize(("options", "attendu"), [
+    ({}, ("cle-livree-essai", "secret-livre-essai", "livree")),
+    ({"app_key": "perso", "app_secret": "s-perso"}, ("perso", "s-perso", "personnelle")),
+    ({"app_key": "perso", "app_secret": ""}, ("cle-livree-essai", "secret-livre-essai", "livree")),   # clé incomplète
+    ({"app_key": "", "app_secret": "s-perso"}, ("cle-livree-essai", "secret-livre-essai", "livree")),  # champ de clé vidé
+    ({"app_key": "  ", "app_secret": " "}, ("cle-livree-essai", "secret-livre-essai", "livree")),
+])
+def test_cle_effective(cle_livree, options, attendu):
+    from custom_components.ucaness.cle_application import cle_effective
+
+    assert cle_effective(options) == attendu
+
+
+def test_cle_effective_sans_cle_livree():
+    """Dépôt sans clé livrée : seule une clé personnelle complète sert."""
+    from custom_components.ucaness.cle_application import cle_effective
+
+    assert cle_effective({}) == ("", "", None)
+    assert cle_effective({"app_key": "perso", "app_secret": "s"}) == ("perso", "s", "personnelle")
+
+
+async def test_cle_livree_transmise_au_client(hass, fake_client, cle_livree):
+    """Aucune clé saisie : le client reçoit la clé livrée et l'écriture fonctionne."""
+    FakeClient.instances.clear()
+    await _entry_with_options(hass, write_enabled=True)
+    assert FakeClient.instances[-1].app_key == "cle-livree-essai"
+    resp = await hass.services.async_call(DOMAIN, "tester_api", {}, blocking=True, return_response=True)
+    assert resp["inverter_model"] == "mr"
+
+
+async def test_cle_personnelle_passe_avant_la_cle_livree(hass, fake_client, cle_livree):
+    FakeClient.instances.clear()
+    await _entry_with_options(hass, app_key="perso", app_secret="s-perso", write_enabled=True)
+    assert FakeClient.instances[-1].app_key == "perso"
+
+
+async def test_assistant_en_service_avec_la_cle_livree(hass, cloud, fast_readback, cle_livree):
+    """Mode réel, écriture autorisée, aucune clé saisie : l'installation est « en service »."""
+    for entite, valeur in (
+        ("input_boolean.jarvis_mode_simulation", "off"), ("input_number.jarvis_batterie_capacite", "10.24"),
+        ("input_select.jarvis_type_tarif", "Base"), ("input_number.jarvis_prix_hp", "0.25"),
+        ("binary_sensor.workday_sensor", "on"),
+    ):
+        hass.states.async_set(entite, valeur)
+    hass.states.async_set("sensor.solcast_pv_forecast_prevision_aujourdhui", "8", {"detailedHourly": [{"pv_estimate": 1.0}]})
+    await _entry_with_options(hass, write_enabled=True)
+    await _relire(hass)
+    assert hass.states.get("sensor.ucaness_installation").state == "en_service"
+
+
+async def test_diagnostics_origine_de_la_cle_sans_la_cle(hass, cloud, cle_livree):
+    from custom_components.ucaness.diagnostics import async_get_config_entry_diagnostics
+
+    entry = await _entry_with_options(hass, write_enabled=True)
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert diag["client"]["origine_cle_application"] == "livree"
+    texte = json.dumps(diag, default=str)
+    assert "cle-livree-essai" not in texte and "secret-livre-essai" not in texte
+
+
+def test_fichier_de_cle_livree_coherent():
+    """Le fichier livré contient la clé ET le secret, ou ni l'un ni l'autre (jamais à moitié)."""
+    from custom_components.ucaness import cle_application as c
+
+    assert isinstance(c.CLE_LIVREE, str) and isinstance(c.SECRET_LIVRE, str)
+    assert bool(c.CLE_LIVREE.strip()) == bool(c.SECRET_LIVRE.strip())

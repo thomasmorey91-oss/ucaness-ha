@@ -16,11 +16,10 @@ from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.typing import ConfigType
 
 from . import assistant
+from .cle_application import cle_effective
 from .reglages import CONF_REGLAGES
 from .api import UcanessClient
 from .const import (
-    CONF_APP_KEY,
-    CONF_APP_SECRET,
     CONF_DEVICE_CODE,
     CONF_PASSWORD_MD5,
     CONF_SCAN_INTERVAL,
@@ -47,8 +46,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: UcanessConfigEntry) -> b
         async_get_clientsession(hass),
         entry.data[CONF_EMAIL],
         entry.data[CONF_PASSWORD_MD5],
-        app_key=entry.options.get(CONF_APP_KEY),
-        app_secret=entry.options.get(CONF_APP_SECRET),
+        # Clé personnelle des options si elle est complète, sinon celle livrée avec l'intégration.
+        app_key=cle_effective(entry.options)[0],
+        app_secret=cle_effective(entry.options)[1],
         write_log=write_log,
     )
     scan = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)

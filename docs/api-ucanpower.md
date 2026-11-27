@@ -62,10 +62,20 @@ Les mesures de l'intégration passent par les chemins du portail web (`/device/d
 | Plancher | Avec un DOD de 90 % et une hystérésis de 10 %, l'onduleur ne descend pas sous 13 % et se recharge seul jusqu'à 16 %, y compris en heures pleines |
 | Application du téléphone | Affiche « Arbitrage horaire » par défaut quand le mode n'est pas stocké : ne pas valider ce formulaire sans corriger le mode |
 
+## Clé d'application dédiée à Home Assistant (réponses d'UCanpower, 27/11/2026)
+
+| Question | Réponse |
+|---|---|
+| Rôle de la paire AppKey / AppSecret | Elle distingue les intégrateurs et fixe les fonctions de l'API autorisées ; l'accès aux appareils passe par la connexion de chaque utilisateur |
+| Paire dédiée « HA use » limitée aux fonctions utilisées (connexion, liste, configuration, état, écriture des réglages) | Oui |
+| Filtrage, côté UCanpower, des réglages écrits (mode et plages seulement) | Pas encore possible |
+| Diffusion publique de la paire avec l'intégration | Confirmée par écrit |
+| Limite d'appels | Aucune |
+| Renouvellement | Manuel seulement |
+
 ## Points encore ouverts
 
 | Point | Nature |
 |---|---|
 | Recharges automatiques sous le plancher, y compris en heures pleines (DOD et hystérésis, réglages de l'installateur) | Réglage de fond |
-| Clé d'application de production : à demander à UCanpower (la documentation fournit une clé de test) | Accès à l'API |
-| Limites d'appel de l'API (aucun chiffre publié) | Accès à l'API |
+| Filtrage des réglages écrits côté UCanpower (mode et plages seulement) : « pas encore possible » (réponse du 27/11/2026) ; le filtrage reste celui du client | Accès à l'API |
