@@ -16,7 +16,7 @@
     locale: { language: 'fr' },
     language: 'fr',
     states: {
-      'sun.sun': s('above_horizon', null, { elevation: 32, rising: false }),
+      'sun.sun': s('above_horizon', null, { elevation: 32, azimuth: 150, rising: false }),
       'weather.maison': s('sunny', null, { temperature: 14.2, temperature_unit: '°C' }),
       'sensor.uhome_puissance_solaire': s(1240, 'W'),
       'sensor.uhome_tension_solaire': s(352.4, 'V'),
@@ -71,11 +71,13 @@
   // Vue 3D de la maison d'exemple : mêmes positions que dashboards/ucaness-home-assistant.yaml.
   window.scene = {
     type: 'custom:ucaness-flow-card', scene: '3d', image: '../www/ucaness/maison-exemple.svg',
+    vivant: new URLSearchParams(location.search).get('vivant') === '1', calibration: new URLSearchParams(location.search).get('cal') === '1',
+    ucan: { x: 1.5, y: 22, w: 6 }, lights: [[[31.6, 40.5], [38.6, 46.5], [38.6, 56], [31.6, 49.5]], [[40, 39.5], [43.6, 42.5], [43.6, 47.5], [40, 44.5]]],
     mode_entity: 'sensor.uhome_mode', battery_path: '/batterie',
     ev: { entity: 'sensor.borne_puissance_de_charge', state_entity: 'sensor.borne_description_de_l_etat', x: 61, y: 49, route: [[36, 70], [55, 70], [58.5, 63.5]], borne: { x: 56.8, y: 55, w: 3 } },
     nodes: {
       solar: { x: 40, y: 7, routes: [[[44.9, 41], [44.9, 55], [32, 55], [32, 58]]], glow: [[44, 32.5, 10, 3.6, 33]], leader: [[38.5, 19], [42, 29]], details: ['sensor.uhome_tension_solaire'] },
-      grid: { x: 87.5, y: 22, route: [[85.5, 39], [85.5, 94], [32, 94], [32, 83]] },
+      grid: { x: 87.5, y: 22, limit_kw: 6, route: [[85.5, 39], [85.5, 94], [32, 94], [32, 83]] },
       battery: { x: 26.5, y: 60, uhome: { x: 28, y: 58, w: 8 } },
       home: { x: 70, y: 80, route: [[36, 76], [71, 76]], bulb: { x: 71, y: 70.5, w: 5.5 } },
     },
@@ -112,6 +114,15 @@
     });
   }
   document.body.appendChild(root);
+  window.racine = root;
+  // Démo : window.regler({'sensor.uhome_puissance_batterie': -900}) change des mesures inventées.
+  window.regler = (valeurs, attributs) => {
+    const st = Object.assign({}, window.fakeHass.states);
+    for (const [k, v] of Object.entries(valeurs || {})) st[k] = Object.assign({}, st[k], { state: String(v), last_updated: new Date().toISOString() });
+    for (const [k, a] of Object.entries(attributs || {})) st[k] = Object.assign({}, st[k], { attributes: Object.assign({}, st[k].attributes, a) });
+    window.fakeHass = Object.assign({}, window.fakeHass, { states: st });
+    root.hass = window.fakeHass;
+  };
   root.hass = window.fakeHass;
   setTimeout(() => { root.hass = window.fakeHass; document.body.dataset.ready = '1'; }, 300);
 </script>

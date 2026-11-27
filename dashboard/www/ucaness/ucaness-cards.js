@@ -22,6 +22,10 @@
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
  *
+ * 0.8.0 (27/11/2026) : scène vivante de la maison en direct (vivant: true) : néons et particules, modules de l'UHome
+ *   qui s'allument, étiquette et carte de niveau, bandeau d'événement, Ucan dans la scène, soleil et lune, oiseaux,
+ *   étoile filante, arc-en-ciel, neige, panneaux dorés à 100 % d'autonomie, seuil réseau ; lueur des chiffres clés.
+ *
  * 0.7.0 (27/11/2026) : carte du véhicule électrique (custom:ucaness-vehicle-card).
  *
  * 0.5.5 (27/11/2026) : « Et si… » dans la bulle Ucan (option simulateur, action ucaness.simuler).
@@ -47,7 +51,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.7.0';
+const UC_VERSION = '0.8.0';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -226,7 +230,24 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_erreur": "Échec : {e}",
   "carte_vehicle_nom": "UCANESS : véhicule",
   "carte_vehicle_desc": "Votre voiture électrique, sa charge et le plan de recharge.",
-  "veh_photo_ajouter": "Ajouter la photo de ma voiture"
+  "veh_photo_ajouter": "Ajouter la photo de ma voiture",
+  "ban_charge": "La batterie se recharge",
+  "ban_decharge": "La batterie alimente la maison",
+  "ban_veille": "Batterie en veille",
+  "ban_achat": "Achat au réseau",
+  "ban_injection": "Surplus envoyé au réseau",
+  "ban_fin_reseau": "Plus rien n'est pris au réseau",
+  "ban_voiture": "Recharge de la voiture lancée",
+  "ban_voiture_fin": "Recharge de la voiture terminée",
+  "ban_soleil": "Les panneaux produisent",
+  "ucan_nuit": "Zzz… bonne nuit !",
+  "ucan_charge_soleil": "Je fais le plein de soleil",
+  "ucan_charge": "Je me recharge",
+  "ucan_tient": "À ce rythme, je tiens jusqu'à {h} (≈ {n} h)",
+  "ucan_tient_long": "À ce rythme, je tiens plus de 24 h",
+  "ucan_repos": "Tout roule",
+  "autonome": "100 % autonome",
+  "seuil_reseau": "Seuil réseau {v} kW"
  },
  "en": {
   "meteo": "Weather: {etat}",
@@ -401,7 +422,24 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_erreur": "Failed: {e}",
   "carte_vehicle_nom": "UCANESS: vehicle",
   "carte_vehicle_desc": "Your electric car, its charge and the charging plan.",
-  "veh_photo_ajouter": "Add a photo of my car"
+  "veh_photo_ajouter": "Add a photo of my car",
+  "ban_charge": "The battery is charging",
+  "ban_decharge": "The battery is powering the house",
+  "ban_veille": "Battery on standby",
+  "ban_achat": "Buying from the grid",
+  "ban_injection": "Surplus sent to the grid",
+  "ban_fin_reseau": "Nothing taken from the grid any more",
+  "ban_voiture": "Car charging started",
+  "ban_voiture_fin": "Car charging finished",
+  "ban_soleil": "The panels are producing",
+  "ucan_nuit": "Zzz… good night!",
+  "ucan_charge_soleil": "Filling up on sunshine",
+  "ucan_charge": "Recharging",
+  "ucan_tient": "At this rate, I last until {h} (≈ {n} h)",
+  "ucan_tient_long": "At this rate, I last more than 24 h",
+  "ucan_repos": "All good",
+  "autonome": "100 % self-sufficient",
+  "seuil_reseau": "Grid limit {v} kW"
  },
  "zh-Hans": {
   "meteo": "天气：{etat}",
@@ -576,7 +614,24 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_erreur": "失败：{e}",
   "carte_vehicle_nom": "UCANESS：车辆",
   "carte_vehicle_desc": "您的电动汽车、电量和充电计划。",
-  "veh_photo_ajouter": "添加我的汽车照片"
+  "veh_photo_ajouter": "添加我的汽车照片",
+  "ban_charge": "电池正在充电",
+  "ban_decharge": "电池正在为房屋供电",
+  "ban_veille": "电池待机",
+  "ban_achat": "正在从电网购电",
+  "ban_injection": "余电已送入电网",
+  "ban_fin_reseau": "不再从电网取电",
+  "ban_voiture": "汽车开始充电",
+  "ban_voiture_fin": "汽车充电结束",
+  "ban_soleil": "光伏板正在发电",
+  "ucan_nuit": "Zzz… 晚安！",
+  "ucan_charge_soleil": "正在吸收阳光充电",
+  "ucan_charge": "正在充电",
+  "ucan_tient": "按此速度，我能撑到 {h}（约 {n} 小时）",
+  "ucan_tient_long": "按此速度，我能撑 24 小时以上",
+  "ucan_repos": "一切正常",
+  "autonome": "100 % 自给",
+  "seuil_reseau": "电网上限 {v} kW"
  },
  "de": {
   "meteo": "Wetter: {etat}",
@@ -751,7 +806,24 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_erreur": "Fehlgeschlagen: {e}",
   "carte_vehicle_nom": "UCANESS: Fahrzeug",
   "carte_vehicle_desc": "Ihr Elektroauto, sein Ladestand und der Ladeplan.",
-  "veh_photo_ajouter": "Foto meines Autos hinzufügen"
+  "veh_photo_ajouter": "Foto meines Autos hinzufügen",
+  "ban_charge": "Die Batterie lädt",
+  "ban_decharge": "Die Batterie versorgt das Haus",
+  "ban_veille": "Batterie im Ruhezustand",
+  "ban_achat": "Bezug aus dem Netz",
+  "ban_injection": "Überschuss ins Netz eingespeist",
+  "ban_fin_reseau": "Kein Netzbezug mehr",
+  "ban_voiture": "Laden des Autos gestartet",
+  "ban_voiture_fin": "Laden des Autos beendet",
+  "ban_soleil": "Die Module produzieren",
+  "ucan_nuit": "Zzz… gute Nacht!",
+  "ucan_charge_soleil": "Ich tanke Sonne",
+  "ucan_charge": "Ich lade mich auf",
+  "ucan_tient": "Bei diesem Tempo halte ich bis {h} (≈ {n} h)",
+  "ucan_tient_long": "Bei diesem Tempo halte ich über 24 h",
+  "ucan_repos": "Alles läuft",
+  "autonome": "100 % autark",
+  "seuil_reseau": "Netzgrenze {v} kW"
  },
  "it": {
   "meteo": "Meteo: {etat}",
@@ -926,7 +998,24 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_erreur": "Errore: {e}",
   "carte_vehicle_nom": "UCANESS: veicolo",
   "carte_vehicle_desc": "La tua auto elettrica, la sua carica e il piano di ricarica.",
-  "veh_photo_ajouter": "Aggiungi la foto della mia auto"
+  "veh_photo_ajouter": "Aggiungi la foto della mia auto",
+  "ban_charge": "La batteria si ricarica",
+  "ban_decharge": "La batteria alimenta la casa",
+  "ban_veille": "Batteria in standby",
+  "ban_achat": "Acquisto dalla rete",
+  "ban_injection": "Surplus immesso in rete",
+  "ban_fin_reseau": "Nessun prelievo dalla rete",
+  "ban_voiture": "Ricarica dell'auto avviata",
+  "ban_voiture_fin": "Ricarica dell'auto terminata",
+  "ban_soleil": "I pannelli producono",
+  "ucan_nuit": "Zzz… buonanotte!",
+  "ucan_charge_soleil": "Faccio il pieno di sole",
+  "ucan_charge": "Mi ricarico",
+  "ucan_tient": "A questo ritmo reggo fino alle {h} (≈ {n} h)",
+  "ucan_tient_long": "A questo ritmo reggo più di 24 h",
+  "ucan_repos": "Tutto bene",
+  "autonome": "100 % autonoma",
+  "seuil_reseau": "Soglia rete {v} kW"
  },
  "es": {
   "meteo": "Tiempo: {etat}",
@@ -1101,7 +1190,24 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_erreur": "Error: {e}",
   "carte_vehicle_nom": "UCANESS: vehículo",
   "carte_vehicle_desc": "Su coche eléctrico, su carga y el plan de carga.",
-  "veh_photo_ajouter": "Añadir la foto de mi coche"
+  "veh_photo_ajouter": "Añadir la foto de mi coche",
+  "ban_charge": "La batería se está cargando",
+  "ban_decharge": "La batería alimenta la casa",
+  "ban_veille": "Batería en reposo",
+  "ban_achat": "Compra a la red",
+  "ban_injection": "Excedente enviado a la red",
+  "ban_fin_reseau": "Ya no se toma nada de la red",
+  "ban_voiture": "Carga del coche iniciada",
+  "ban_voiture_fin": "Carga del coche terminada",
+  "ban_soleil": "Los paneles producen",
+  "ucan_nuit": "Zzz… ¡buenas noches!",
+  "ucan_charge_soleil": "Me lleno de sol",
+  "ucan_charge": "Me estoy cargando",
+  "ucan_tient": "A este ritmo aguanto hasta las {h} (≈ {n} h)",
+  "ucan_tient_long": "A este ritmo aguanto más de 24 h",
+  "ucan_repos": "Todo en orden",
+  "autonome": "100 % autónoma",
+  "seuil_reseau": "Límite de red {v} kW"
  },
  "pt": {
   "meteo": "Meteorologia: {etat}",
@@ -1276,7 +1382,24 @@ const UC_I18N = /* I18N-DEBUT */{
   "veh_erreur": "Falha: {e}",
   "carte_vehicle_nom": "UCANESS: veículo",
   "carte_vehicle_desc": "O seu carro elétrico, a sua carga e o plano de carregamento.",
-  "veh_photo_ajouter": "Adicionar a foto do meu carro"
+  "veh_photo_ajouter": "Adicionar a foto do meu carro",
+  "ban_charge": "A bateria está a carregar",
+  "ban_decharge": "A bateria alimenta a casa",
+  "ban_veille": "Bateria em repouso",
+  "ban_achat": "Compra à rede",
+  "ban_injection": "Excedente enviado para a rede",
+  "ban_fin_reseau": "Já nada é tirado da rede",
+  "ban_voiture": "Carregamento do carro iniciado",
+  "ban_voiture_fin": "Carregamento do carro terminado",
+  "ban_soleil": "Os painéis estão a produzir",
+  "ucan_nuit": "Zzz… boa noite!",
+  "ucan_charge_soleil": "Estou a encher-me de sol",
+  "ucan_charge": "Estou a carregar",
+  "ucan_tient": "A este ritmo aguento até às {h} (≈ {n} h)",
+  "ucan_tient_long": "A este ritmo aguento mais de 24 h",
+  "ucan_repos": "Tudo bem",
+  "autonome": "100 % autónoma",
+  "seuil_reseau": "Limite da rede {v} kW"
  }
 }/* I18N-FIN */;
 let UC_LANG_VUE = null;   // dernière langue vue, pour les appels sans hass (configuration, sélecteur de cartes)
@@ -2318,7 +2441,13 @@ class UcanessFlowCard extends HTMLElement {
       return { gap: p > 2400 ? 7 : p > 1000 ? 12 : 17, dur: Math.max(0.35, Math.round(600 / (30 + p * 0.04)) / 10) };
     };
     const halo = Math.max(0.6, (charging ? 2.6 : 2.2) - Math.min(1.6, Math.abs(bat || 0) / 2600));
-    const sig = JSON.stringify([sunOn && pace(pv), charging, discharging, homeOn && pace(home), (gridIn || gridOut) && [gridIn, pace(grid)], evOn && pace(ev), soc === null ? null : Math.round(soc / 5), uhColor, Math.round(halo * 5)]);
+    // Scène vivante (0.8.0, option vivant: true) : néons et particules, modules qui s'allument, étiquette et carte
+    // de niveau, bandeau d'événement, Ucan, soleil et lune, oiseaux, étoile filante, arc-en-ciel, neige.
+    const V = !!c.vivant;
+    const anime = V && !UC_LIGHT && !UC_REDUCED;
+    const amb = V ? ucAmbiance(hass, c) : null;
+    const autonome = V && sunOn && homeOn && !gridIn;
+    const sig = JSON.stringify([V && [amb.night, autonome], sunOn && pace(pv), charging, discharging, homeOn && pace(home), (gridIn || gridOut) && [gridIn, pace(grid)], evOn && pace(ev), soc === null ? null : Math.round(soc / 5), uhColor, Math.round(halo * 5)]);
     const glow = UC_LIGHT ? '' : 'filter: drop-shadow(0 0 4px VAR);';
     const flow = (pts, base, dash, glowColor, w, reverse) => {
       const d = D(pts);
@@ -2327,6 +2456,25 @@ class UcanessFlowCard extends HTMLElement {
       return `<path d="${d}" fill="none" stroke="${base}" stroke-width="4.5" stroke-opacity="0.75" stroke-linejoin="round"/>`
         + `<path class="uc-flow" d="${d}" fill="none" stroke="${dash}" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round" style="stroke-dasharray: 4.5 ${p.gap * 1.5}; animation-duration: ${p.dur}s;${reverse ? ' animation-direction: reverse;' : ''} ${glow.replace('VAR', glowColor)}"/>`;
     };
+    // Néon : halo large, tube coloré, filet clair, et des points de lumière qui suivent le trajet (plus nombreux et
+    // plus rapides avec la puissance). Mode allégé ou moins de mouvement : tirets habituels.
+    const tirets = flow;
+    const neon = (pts, base, dash, glowColor, w, reverse) => {
+      if (!anime) return tirets(pts, base, dash, glowColor, w, reverse);
+      const d = D(pts);
+      if (!d) return '';
+      const pw = Math.abs(w || 0);
+      const n = pw > 2400 ? 5 : pw > 1000 ? 3 : 2;
+      const T = Math.max(2.2, 7 - pw / 600);
+      const sens = reverse ? ' keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : '';
+      let pts2 = '';
+      for (let i = 0; i < n; i++) pts2 += `<circle r="5.5" fill="${dash}" style="filter: drop-shadow(0 0 5px ${glowColor})"><animateMotion dur="${T.toFixed(1)}s" begin="-${(i * T / n).toFixed(2)}s" repeatCount="indefinite" path="${d}"${sens}/></circle>`;
+      return `<path d="${d}" fill="none" stroke="${base}" stroke-width="13" stroke-opacity="0.2" stroke-linecap="round" stroke-linejoin="round"/>`
+        + `<path d="${d}" fill="none" stroke="${base}" stroke-width="5.5" stroke-opacity="0.92" stroke-linecap="round" stroke-linejoin="round"/>`
+        + `<path d="${d}" fill="none" stroke="${dash}" stroke-width="1.6" stroke-opacity="0.95" stroke-linecap="round" stroke-linejoin="round"/>${pts2}`;
+    };
+    const F = V ? neon : tirets;
+    const contour = (pts, color) => (V && Array.isArray(pts) && pts.length >= 3 ? `<path class="${anime ? 'uc-live' : ''}" d="${D(pts)} Z" fill="none" stroke="${color}" stroke-width="3" stroke-opacity="0.85" stroke-linejoin="round" style="filter: drop-shadow(0 0 6px ${color})"/>` : '');
     const idle = (pts) => { const d = D(pts); return d ? `<path d="${d}" fill="none" stroke="#9AA7B5" stroke-width="3.8" stroke-dasharray="9 9" stroke-opacity="0.7" stroke-linejoin="round"/>` : ''; };
     const many = (list, fn) => (Array.isArray(list) && Array.isArray(list[0]) && Array.isArray(list[0][0]) ? list : (list ? [list] : [])).map(fn).join('');
     const solarRoutes = N.solar.routes || (N.solar.route ? [N.solar.route] : []);
@@ -2338,16 +2486,18 @@ class UcanessFlowCard extends HTMLElement {
     const evLed = evOn ? '#2ED198' : '#6FD6F5';
     const art = () => `
       <svg class="ov" viewBox="0 0 ${W} ${H.toFixed(1)}" preserveAspectRatio="none" aria-hidden="true">
-        ${sunOn && Array.isArray(N.solar.glow) ? `<g class="uc-live" style="mix-blend-mode: screen">${N.solar.glow.map((g) => `<ellipse cx="${(g[0] * W / 100).toFixed(1)}" cy="${(g[1] * H / 100).toFixed(1)}" rx="${(g[2] * W / 100).toFixed(1)}" ry="${(g[3] * W / 100).toFixed(1)}" transform="rotate(${Number(g[4]) || 0} ${(g[0] * W / 100).toFixed(1)} ${(g[1] * H / 100).toFixed(1)})" fill="rgba(255,210,122,0.22)"/>`).join('')}</g>` : ''}
-        ${solarRoutes.map((r) => (sunOn ? flow(r, '#F39C12', '#FFE7B0', 'rgba(243,156,18,0.9)', pv) : idle(r))).join('')}
-        ${gridIn || gridOut ? `${UC_LIGHT || !pole ? '' : `<circle class="uc-wave" cx="${(pole[0] * W / 100).toFixed(1)}" cy="${(pole[1] * H / 100).toFixed(1)}" r="11" fill="none" stroke="#F7B248" stroke-width="3" style="animation-duration: 1.6s"/>`}${flow(N.grid.route, '#F39C12', '#FFE7B0', 'rgba(243,156,18,0.9)', grid, gridOut)}` : idle(N.grid.route)}
-        ${homeOn ? flow(N.home.route, '#2ED198', '#D9FFE9', 'rgba(46,209,152,0.9)', home) : idle(N.home.route)}
-        ${E ? (evOn ? flow(E.route, '#2AB7E2', '#D6F6FF', 'rgba(42,183,226,0.9)', ev) : idle(E.route)) : ''}
+        ${sunOn && Array.isArray(N.solar.glow) ? `<g class="uc-live" style="mix-blend-mode: screen">${N.solar.glow.map((g) => `<ellipse cx="${(g[0] * W / 100).toFixed(1)}" cy="${(g[1] * H / 100).toFixed(1)}" rx="${(g[2] * W / 100).toFixed(1)}" ry="${(g[3] * W / 100).toFixed(1)}" transform="rotate(${Number(g[4]) || 0} ${(g[0] * W / 100).toFixed(1)} ${(g[1] * H / 100).toFixed(1)})" fill="${autonome ? 'rgba(255,205,60,0.5)' : 'rgba(255,210,122,0.22)'}"/>`).join('')}</g>` : ''}
+        ${V && amb.night && Array.isArray(c.lights) ? `<g style="mix-blend-mode: screen">${c.lights.map((q) => `<path d="${D(q)} Z" fill="rgba(255,196,90,0.62)" style="filter: drop-shadow(0 0 7px rgba(255,190,80,0.9))"/>`).join('')}</g>` : ''}
+        ${homeOn ? contour(N.home.outline, '#2ED198') : ''}${E && evOn ? contour(E.outline, '#2AB7E2') : ''}
+        ${solarRoutes.map((r) => (sunOn ? F(r, '#F39C12', '#FFE7B0', 'rgba(243,156,18,0.9)', pv) : idle(r))).join('')}
+        ${gridIn || gridOut ? `${UC_LIGHT || !pole ? '' : `<circle class="uc-wave" cx="${(pole[0] * W / 100).toFixed(1)}" cy="${(pole[1] * H / 100).toFixed(1)}" r="11" fill="none" stroke="#F7B248" stroke-width="3" style="animation-duration: 1.6s"/>`}${F(N.grid.route, '#F39C12', '#FFE7B0', 'rgba(243,156,18,0.9)', grid, gridOut)}` : idle(N.grid.route)}
+        ${homeOn ? F(N.home.route, '#2ED198', '#D9FFE9', 'rgba(46,209,152,0.9)', home) : idle(N.home.route)}
+        ${E ? (evOn ? F(E.route, '#2AB7E2', '#D6F6FF', 'rgba(42,183,226,0.9)', ev) : idle(E.route)) : ''}
         ${(charging || discharging) && !UC_LIGHT ? `<circle class="uc-wave" cx="${((uh.x + uh.w / 2) * W / 100).toFixed(1)}" cy="${((uh.y + uhH / 2) * H / 100).toFixed(1)}" r="${(uh.w * 0.72 * W / 100).toFixed(1)}" fill="none" stroke="${uhColor}" stroke-width="3.8" style="animation-duration: ${halo.toFixed(1)}s"/>` : ''}
         ${N.solar.leader ? `<path d="${D(N.solar.leader)}" fill="none" stroke="#F7B248" stroke-width="1.5" stroke-dasharray="3 4.5" stroke-opacity="0.8"/>` : ''}
       </svg>
       ${borne ? `<svg class="borne" style="left:${borne.x}%;top:${borne.y}%;width:${borne.w}%" viewBox="0 0 19 33" aria-hidden="true"><polygon points="0,8.5 16,0 16,24.5 0,33" fill="#1B2130" stroke="#6FD6F5" stroke-width="1.3" stroke-linejoin="round"/><polygon points="16,0 19,1.5 19,26 16,24.5" fill="#11151F" stroke="#6FD6F5" stroke-width="0.8"/><circle cx="8" cy="15" r="4" fill="none" stroke="${evLed}" stroke-width="1.8"/>${evOn && !UC_LIGHT ? `<circle class="uc-wave" cx="8" cy="15" r="4" fill="none" stroke="${evLed}" stroke-width="1.8" style="animation-duration: 1.6s"/>` : ''}</svg>` : ''}
-      <button type="button" class="uh" style="left:${uh.x}%;top:${uh.y}%;width:${uh.w}%" aria-label="${esc(ucT(hass, 'uhome_batterie_a', { soc: soc === null ? '—' : Math.round(soc), etat: etatBat }) + (c.battery_path ? '. ' + ucT(hass, 'ouvrir_page_batterie') : ''))}">
+      <button type="button" class="uh${V ? (charging || discharging ? ' actif' : ' veille') : ''}" style="left:${uh.x}%;top:${uh.y}%;width:${uh.w}%" aria-label="${esc(ucT(hass, 'uhome_batterie_a', { soc: soc === null ? '—' : Math.round(soc), etat: etatBat }) + (c.battery_path ? '. ' + ucT(hass, 'ouvrir_page_batterie') : ''))}">
         <svg viewBox="0 0 60 126" aria-hidden="true">
           <defs><linearGradient id="uhm" x1="0" x2="1"><stop offset="0" stop-color="#2B2E34"/><stop offset=".55" stop-color="#34373E"/><stop offset="1" stop-color="#24262B"/></linearGradient>
           <linearGradient id="uht" x1="0" x2="1"><stop offset="0" stop-color="#30333A"/><stop offset=".55" stop-color="#3A3D45"/><stop offset="1" stop-color="#2A2D33"/></linearGradient></defs>
@@ -2357,7 +2507,7 @@ class UcanessFlowCard extends HTMLElement {
           <path d="M1 42 V8 a7 7 0 0 1 7 -7 H49 a7 7 0 0 1 7 7 V42 Z" fill="url(#uht)"/>
           <path d="M13 4 V20 a14 14 0 0 0 28 0 V4" fill="none" stroke="#50555F"/>
           <rect x="20" y="13" width="16" height="13" rx="5" fill="#15171B" stroke="${uhColor}" stroke-width="2"/>
-          ${[42, 68, 94].map((y, i) => `<rect x="1" y="${y}" width="55" height="25" fill="url(#uhm)"/><path d="M1 ${y} H56" stroke="#15171B"/><rect class="uc-slit" x="17" y="${y + 11}" width="22" height="2.5" rx="1.2" fill="${uhColor}" style="animation-delay: ${i * 250}ms"/>`).join('')}
+          ${[42, 68, 94].map((y, i) => `<g class="uc-mod" style="animation-delay: ${(2 - i) * 180}ms"><rect x="1" y="${y}" width="55" height="25" fill="url(#uhm)"/><path d="M1 ${y} H56" stroke="#15171B"/><rect class="uc-slit" x="17" y="${y + 11}" width="22" height="2.5" rx="1.2" fill="${uhColor}" style="animation-delay: ${i * 250}ms"/></g>`).join('')}
           <rect x="50" y="44" width="3" height="72" rx="1.5" fill="#15171B"/>
           <rect x="50" y="${(116 - 72 * Math.max(0.03, Math.min(1, (soc || 0) / 100))).toFixed(1)}" width="3" height="${(72 * Math.max(0.03, Math.min(1, (soc || 0) / 100))).toFixed(1)}" rx="1.5" fill="${uhColor}"/>
           <rect x="4" y="120" width="12" height="5" rx="1.5" fill="#15171B"/><rect x="41" y="120" width="12" height="5" rx="1.5" fill="#15171B"/>
@@ -2420,6 +2570,42 @@ class UcanessFlowCard extends HTMLElement {
           .uc-live { animation: ucPulse 1.6s ease-in-out infinite; }
           @keyframes ucSlit { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
           .uc-slit { animation: ucSlit 1.6s ease-in-out infinite; }
+          .sky2, .fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+          .sky2 > * { position: absolute; }
+          .astre { width: 5.5%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); transition: left 1.4s ease, top 1.4s ease; }
+          .astre.soleil { background: radial-gradient(circle, #FFF6D6 0%, #FFD27A 38%, rgba(243,156,18,0.55) 62%, rgba(243,156,18,0) 72%); filter: drop-shadow(0 0 2.2cqw rgba(255,196,64,0.75)); }
+          .astre.lune { width: 4.2%; background: radial-gradient(circle at 38% 36%, #FFFFFF 0%, #DCE8F7 55%, #9FB6D2 100%); filter: drop-shadow(0 0 1.6cqw rgba(190,215,255,0.7)); }
+          .arc { left: 8%; top: 6%; width: 84%; height: auto; opacity: .55; }
+          .oiseaux { left: 0; top: 9%; width: 9%; height: auto; opacity: .75; animation: ucVol 46s linear infinite; }
+          @keyframes ucVol { 0% { transform: translate(-120%, 0); } 45%, 100% { transform: translate(1250%, -60%); } }
+          .filante { left: 62%; top: 6%; width: 9%; height: 2px; border-radius: 1px; background: linear-gradient(90deg, rgba(255,255,255,0), #FFFFFF); opacity: 0; transform: rotate(152deg); animation: ucFilante 23s linear infinite; }
+          @keyframes ucFilante { 0%, 92% { opacity: 0; transform: rotate(152deg) translateX(0); } 93% { opacity: 1; } 97% { opacity: 0; transform: rotate(152deg) translateX(260%); } 100% { opacity: 0; } }
+          .flocon { top: -3%; width: .7%; aspect-ratio: 1; border-radius: 50%; background: #FFFFFF; opacity: .85; animation: ucNeige linear infinite; }
+          @keyframes ucNeige { to { transform: translate(3cqw, 72cqw); } }
+          .tag { position: absolute; transform: translate(-50%, -100%); padding: .3cqw .8cqw; border: 1px solid var(--uc-card-border); border-radius: 1cqw; background: rgba(8,22,46,0.86); font: 700 max(9px, 1.5cqw) / 1.25 var(--uc-font); color: #E6ECF5; white-space: nowrap; text-align: center; }
+          .tag i { display: block; height: .45cqw; margin: .25cqw 0; border-radius: .3cqw; background: #16365F; overflow: hidden; }
+          .tag i u { display: block; height: 100%; border-radius: .3cqw; }
+          .niv { position: absolute; left: 1.5%; bottom: 2.5%; display: flex; align-items: center; gap: 1.2cqw; padding: 1cqw 1.4cqw; border: 1px solid var(--uc-card-border); border-radius: 1.4cqw; background: linear-gradient(180deg, rgba(20,52,94,0.92) 0%, rgba(12,32,62,0.92) 100%); box-shadow: var(--uc-card-shadow); transform: translateY(140%); opacity: 0; transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .4s ease; }
+          .niv.on { transform: none; opacity: 1; }
+          .niv .n { font-size: max(9px, 1.4cqw); color: #9CC9F5; text-transform: uppercase; letter-spacing: .4px; }
+          .niv b { display: block; font: 700 max(15px, 3.4cqw) / 1 var(--uc-font); color: #FFFFFF; }
+          .niv .p { font: 700 max(10px, 1.7cqw) var(--uc-font); }
+          .niv .seg { display: flex; flex-direction: column-reverse; gap: .25cqw; }
+          .niv .seg i { width: 1.5cqw; height: .7cqw; border-radius: .2cqw; background: #16365F; }
+          .ban { position: absolute; left: 50%; top: 4%; max-width: 86%; padding: .7cqw 1.6cqw; border: 1px solid rgba(42,183,226,0.5); border-radius: 1.2cqw; background: rgba(8,22,46,0.9); box-shadow: 0 4px 14px rgba(0,0,0,.4), 0 0 14px rgba(0,209,214,.25); font: 700 max(12px, 2.1cqw) var(--uc-font); color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: translate(-50%, -160%); opacity: 0; transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .35s ease; }
+          .ban.on { transform: translate(-50%, 0); opacity: 1; }
+          .pastilles { position: absolute; right: 1%; top: 1%; display: flex; flex-direction: column; align-items: flex-end; gap: .5cqw; }
+          .pastille { padding: .3cqw 1cqw; border: 1px solid var(--uc-tab-border); border-radius: 1.2cqw; background: rgba(8,22,46,0.86); font: 700 max(9px, 1.4cqw) var(--uc-font); color: #CFE6FF; white-space: nowrap; }
+          .pastille.or { border-color: #C9A227; color: #FFD86B; box-shadow: 0 0 10px rgba(255,205,60,.35); }
+          .pastille.warn { border-color: #F39C12; color: #FFD08A; background: rgba(243,156,18,0.18); }
+          .ucan { position: absolute; display: flex; align-items: flex-end; gap: .6cqw; }
+          .ucan svg { flex: 0 0 auto; height: auto; animation: ucBob 4.2s ease-in-out infinite; }
+          @keyframes ucBob { 50% { transform: translateY(-4%); } }
+          .ucan .bulle { margin-bottom: 55%; padding: .5cqw 1cqw; border: 1px solid var(--uc-card-border); border-radius: 1.2cqw 1.2cqw 1.2cqw .2cqw; background: rgba(8,22,46,0.9); font: 400 max(10px, 1.55cqw) / 1.25 var(--uc-font); color: #E6ECF5; white-space: nowrap; }
+          .uh.veille svg { filter: brightness(.74) saturate(.6); }
+          .uh.veille .uc-slit { animation: none; opacity: .25; }
+          @keyframes ucLift { 0% { transform: translateY(7px); opacity: .45; } 60% { transform: translateY(-2px); opacity: 1; } 100% { transform: none; } }
+          .uh.actif .uc-mod { animation: ucLift .7s cubic-bezier(.2,.8,.2,1) backwards; }
           .uh { position: absolute; padding: 0; border: 0; background: none; cursor: pointer; filter: drop-shadow(0 8px 10px rgba(0,0,0,0.5)); }
           .uh svg { display: block; width: 100%; height: auto; }
           .borne { position: absolute; height: auto; overflow: visible; }
@@ -2437,12 +2623,14 @@ class UcanessFlowCard extends HTMLElement {
           .cal.h { left: 0; right: 0; height: 1px; }
           .cal span { position: absolute; font: 11px monospace; color: #FF8080; left: 2px; top: 2px; }
           /* Petite largeur (téléphone) : seulement le nom et les chiffres principaux. */
-          @container (max-width: 520px) { .lb .o { display: none; } .lb.g { left: auto !important; right: 0; text-align: right; } }
+          @container (max-width: 520px) { .tag { display: none; } .lb .o { display: none; } .lb.g { left: auto !important; right: 0; text-align: right; } }
         </style>
         <div class="stage scene" role="img">
+          ${V ? '<div class="sky2" aria-hidden="true"></div>' : ''}
           <img class="house" src="${esc(c.image)}" alt="">
           <div class="art"></div>
           <div class="lbls"></div>
+          ${V ? '<div class="fx"><div class="fxc"></div><div class="ban" role="status"></div></div>' : ''}
           ${cal}
         </div>`;
       root.querySelector('.art').addEventListener('click', (ev) => {
@@ -2467,6 +2655,106 @@ class UcanessFlowCard extends HTMLElement {
     }
     root.querySelector('.lbls').innerHTML = labels;
     ucCount(this, root.querySelector('.lbls'), hass);
+    if (V) this._vivant({ amb, anime, uh, uhColor, soc, bat, grid, charging, discharging, sunOn, gridIn, gridOut, evOn, autonome });
+  }
+
+  /** Scène vivante : ciel (soleil, lune, oiseaux, étoile filante, arc-en-ciel, neige), étiquette et carte de niveau
+   *  de l'UHome, Ucan et sa bulle, pastilles, bandeau d'événement. Chaque calque n'est redessiné que s'il change. */
+  _vivant(e) {
+    const c = this._config;
+    const hass = this._hass || { states: {} };
+    const root = this.shadowRoot;
+    const N = c.nodes;
+    const effet = (() => { try { return new URLSearchParams(window.location.search).get('effet'); } catch (x) { return null; } })();
+    // --- ciel
+    const sun = hass.states[e.amb.sunId];
+    const a = (sun && sun.attributes) || {};
+    const now = new Date();
+    const hh = now.getHours() + now.getMinutes() / 60;
+    let sx, sy;
+    const tj = Math.max(0, Math.min(1, (hh - 7) / 12));
+    const num = (v) => (v === undefined || v === null || v === '' ? NaN : Number(v));
+    sx = Number.isFinite(num(a.azimuth)) ? 8 + 84 * Math.max(0, Math.min(1, (num(a.azimuth) - 60) / 240)) : 8 + 84 * tj;
+    sy = Number.isFinite(num(a.elevation)) ? 30 - 26 * Math.max(0, Math.min(1, num(a.elevation) / 62)) : 30 - 24 * Math.sin(Math.PI * tj);
+    const tn = ((hh - 19 + 24) % 24) / 12;
+    const mx = 10 + 80 * Math.min(1, tn), my = 24 - 18 * Math.sin(Math.PI * Math.min(1, tn));
+    const etat = e.amb.weather ? e.amb.weather.state : '';
+    const neige = effet === 'neige' || etat === 'snowy' || etat === 'snowy-rainy';
+    const arc = effet === 'arcenciel' || (!e.amb.night && e.amb.meteo === 2 && Number(a.elevation) > 3 && Number(a.elevation) < 42);
+    const cielSig = JSON.stringify([e.amb.night, e.amb.meteo, neige, arc, Math.round(sx), Math.round(sy), Math.round(mx), e.anime]);
+    if (this._cielSig !== cielSig) {
+      this._cielSig = cielSig;
+      const bandes = ['#E5484D', '#F39C12', '#FFD86B', '#2ED198', '#2AB7E2', '#7A6BE0'];
+      let h = e.amb.night
+        ? `<div class="astre lune" style="left:${mx.toFixed(1)}%;top:${my.toFixed(1)}%"></div>`
+        : (e.amb.meteo <= 1 ? `<div class="astre soleil" style="left:${sx.toFixed(1)}%;top:${sy.toFixed(1)}%"></div>` : '');
+      if (arc) h += `<svg class="arc" viewBox="0 0 400 200">${bandes.map((col, i) => `<path d="M${20 + i * 5},200 A${180 - i * 5},${180 - i * 5} 0 0 1 ${380 - i * 5},200" fill="none" stroke="${col}" stroke-width="5"/>`).join('')}</svg>`;
+      if (e.anime) {
+        if (!e.amb.night && e.amb.meteo <= 1 && !neige) h += `<svg class="oiseaux" viewBox="0 0 60 24" fill="none" stroke="#DCE8F7" stroke-width="1.6" stroke-linecap="round"><path d="M2 12q4-5 7 0q3-5 7 0M24 5q3-4 6 0q3-4 6 0M40 15q3-4 6 0q3-4 6 0"/></svg>`;
+        if (e.amb.night && e.amb.meteo === 0) h += '<div class="filante"></div>';
+        if (neige) for (let i = 0; i < 26; i++) h += `<i class="flocon" style="left:${(i * 37) % 100}%;animation-duration:${7 + (i * 13) % 6}s;animation-delay:-${(i * 1.7) % 9}s;${i % 3 ? '' : 'width:.45%;'}"></i>`;
+      }
+      root.querySelector('.sky2').innerHTML = h;
+    }
+    // --- UHome : étiquette, carte de niveau ; Ucan ; pastilles
+    const actif = e.charging || e.discharging;
+    const kw = e.bat === null ? null : Math.abs(e.bat) / 1000;
+    const fleche = e.charging ? '▲' : e.discharging ? '▼' : '';
+    const pct = e.soc === null ? null : Math.max(0, Math.min(100, e.soc));
+    const plancher = c.floor !== undefined ? Number(c.floor) : ucNum(hass, N.battery.floor_entity || 'input_number.jarvis_batterie_plancher');
+    const capacite = c.capacity !== undefined ? Number(c.capacity) : ucNum(hass, N.battery.capacity_entity || 'input_number.jarvis_batterie_capacite');
+    let bulle = ucT(hass, 'ucan_repos');
+    let humeur = 'content';
+    if (e.amb.night && !actif) { bulle = ucT(hass, 'ucan_nuit'); humeur = 'dort'; }
+    else if (e.charging) bulle = ucT(hass, e.sunOn ? 'ucan_charge_soleil' : 'ucan_charge');
+    else if (e.discharging && pct !== null && plancher !== null && capacite && kw > 0) {
+      const heures = capacite * Math.max(0, pct - plancher) / 100 / kw;
+      if (heures >= 24) bulle = ucT(hass, 'ucan_tient_long');
+      else {
+        const fin = new Date(Date.now() + heures * 3600000);
+        bulle = ucT(hass, 'ucan_tient', { h: fin.toLocaleTimeString(ucLang(hass), { hour: '2-digit', minute: '2-digit' }), n: ucNumber(hass, heures, heures < 10 ? 1 : 0) });
+      }
+    }
+    const limite = Number(N.grid.limit_kw) || null;
+    const proche = limite && e.gridIn && e.grid / 1000 >= 0.8 * limite;
+    const U = c.ucan || null;
+    const fxSig = JSON.stringify([actif, fleche, pct === null ? null : Math.round(pct), kw === null ? null : Math.round(kw * 50), e.uhColor, bulle, humeur, e.autonome, proche]);
+    if (this._fxSig !== fxSig) {
+      this._fxSig = fxSig;
+      const nom = N.battery.label || 'UHome';
+      const segs = 8, pleins = pct === null ? 0 : Math.round(pct / 100 * segs);
+      const puissance = kw === null || !actif ? '' : `${fleche} ${esc(ucNumber(hass, kw, 2))} kW`;
+      root.querySelector('.fxc').innerHTML = `
+        <div class="tag" style="left:${(e.uh.x + e.uh.w / 2).toFixed(1)}%;top:${(e.uh.y - 1.2).toFixed(1)}%">${esc(nom)}<i><u style="width:${pct === null ? 0 : pct}%;background:${e.uhColor}"></u></i><span style="color:${e.uhColor}">${puissance || esc(ucT(hass, 'au_repos'))}</span></div>
+        <div class="niv${actif ? ' on' : ''}"><div><span class="n">${esc(nom)}</span><b>${pct === null ? '—' : esc(ucNumber(hass, Math.round(pct), 0))} %</b><span class="p" style="color:${e.uhColor}">${puissance}</span></div><div class="seg">${Array.from({ length: segs }, (x, i) => `<i${i < pleins ? ` style="background:${e.uhColor};box-shadow:0 0 6px ${e.uhColor}"` : ''}></i>`).join('')}</div></div>
+        ${U ? `<div class="ucan" style="left:${Number(U.x)}%;top:${Number(U.y)}%"><span style="width:${Number(U.w) || 6}cqw;display:block">${ucUcanSvg(humeur, pct === null ? 0 : pct, U.couleur)}</span><span class="bulle">${esc(bulle)}</span></div>` : ''}
+        <div class="pastilles">${e.autonome ? `<span class="pastille or">${esc(ucT(hass, 'autonome'))}</span>` : ''}${limite ? `<span class="pastille${proche ? ' warn' : ''}">${esc(ucT(hass, 'seuil_reseau', { v: ucNumber(hass, limite, 1) }))}</span>` : ''}</div>`;
+    }
+    // --- bandeau d'événement : ce qui vient de changer, 6 s
+    const etats = { bat: e.charging ? 'charge' : e.discharging ? 'decharge' : 'veille', res: e.gridIn ? 'achat' : e.gridOut ? 'injection' : 'rien', ev: e.evOn, sol: e.sunOn };
+    const avant = this._etats;
+    this._etats = e.bat === null ? undefined : etats;      // pas d'annonce tant que les mesures ne sont pas là
+    let msg = null;
+    if (avant) {
+      if (avant.bat !== etats.bat) msg = ucT(hass, etats.bat === 'charge' ? 'ban_charge' : etats.bat === 'decharge' ? 'ban_decharge' : 'ban_veille');
+      else if (avant.res !== etats.res) msg = ucT(hass, etats.res === 'achat' ? 'ban_achat' : etats.res === 'injection' ? 'ban_injection' : 'ban_fin_reseau');
+      else if (avant.ev !== etats.ev) msg = ucT(hass, etats.ev ? 'ban_voiture' : 'ban_voiture_fin');
+      else if (avant.sol !== etats.sol && etats.sol) msg = ucT(hass, 'ban_soleil');
+    }
+    const be = c.banner_entity && hass.states[c.banner_entity] ? hass.states[c.banner_entity].state : null;
+    if (be !== null && this._banEtat !== undefined && be !== this._banEtat && !['unknown', 'unavailable', ''].includes(be)) msg = be;
+    this._banEtat = be;
+    if (msg) this.annoncer(msg);
+  }
+
+  /** Affiche un texte dans le bandeau de la scène pendant 6 s. */
+  annoncer(texte) {
+    const ban = this.shadowRoot && this.shadowRoot.querySelector('.ban');
+    if (!ban) return;
+    ban.textContent = texte;
+    ban.classList.add('on');
+    clearTimeout(this._banT);
+    this._banT = setTimeout(() => ban.classList.remove('on'), 6000);
   }
 }
 
@@ -3048,7 +3336,7 @@ class UcanessStatsCard extends HTMLElement {
         .grid { display: grid; grid-template-columns: repeat(${cols}, minmax(0, 1fr)); gap: 8px; }
         button { min-height: 76px; box-sizing: border-box; padding: 8px 10px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; border: 1px solid var(--uc-card-border); border-radius: 12px; background: var(--uc-card-bg); box-shadow: var(--uc-card-shadow); color: var(--uc-text); font: inherit; text-align: left; cursor: pointer; min-width: 0; }
         .n { font-size: 12px; color: #9CC9F5; text-transform: uppercase; letter-spacing: .4px; }
-        .v { font: 700 21px var(--uc-font); color: var(--uc-value); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .v { font: 700 21px var(--uc-font); color: var(--uc-value); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;${UC_LIGHT ? '' : ' text-shadow: 0 0 12px color-mix(in srgb, currentColor 55%, transparent);'} }
         .s { font-size: 12px; color: #9CC9F5; }
       </style>
       <div class="grid">${c.items.map((it, i) => {
@@ -3625,8 +3913,8 @@ class UcanessHoursCard extends HTMLElement {
  */
 const UC_UCAN_POS = 'ucaness-ucan-position';
 
-function ucUcanSvg(humeur, charge) {
-  const lum = humeur === 'alerte' ? '#F39C12' : '#00D1D6';
+function ucUcanSvg(humeur, charge, couleur) {
+  const lum = humeur === 'alerte' ? '#F39C12' : (/^#[0-9a-f]{6}$/i.test(couleur || '') ? couleur : '#00D1D6');
   const off = '#1B2230';
   const c = Number.isFinite(charge) ? charge : 0;
   const bar = (seuil) => (c > seuil ? lum : off);

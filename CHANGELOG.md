@@ -4,6 +4,10 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 27/11/2026
 
+### Cartes 0.8.0 : scène vivante
+- Vue 3D de la maison en direct, option **`vivant: true`** : flux en néon avec points de lumière, modules de l'UHome qui se soulèvent et s'éteignent en veille, étiquette et carte de niveau, bandeau d'événement, Ucan dans la scène (bulle, autonomie estimée, couleur au choix), soleil et lune, oiseaux, étoile filante, arc-en-ciel, neige, fenêtres éclairées la nuit, panneaux dorés et pastille « 100 % autonome », pastille « Seuil réseau ». Rien ne change sans l'option.
+- Lueur colorée des chiffres clés.
+
 ### Intégration 0.7.0 et cartes 0.7.0 : véhicule électrique
 - **Options « Configurer votre véhicule »** : marque, modèle et version choisis dans le catalogue OpenEV Data (CDLA-Permissive-2.0, `donnees/vehicules.json`, 1 157 versions depuis 2018, `tools/vehicules/construire_catalogue.py`), caractéristiques proposées puis confirmées ou corrigées ; les dix modèles les plus vendus du pays (FR, DE, IT, ES, PT) en tête de liste ; silhouette, couleur, charge visée, puissance de la borne, entité de charge transmise par la voiture. Capteur `sensor.ucaness_vehicule`.
 - **`ucaness.planifier_recharge_vehicule`** (calcul seul) : énergie à prendre, puissance la plus faible de la borne et du véhicule, surplus solaire d'abord puis heures les moins chères avant le départ ; plages à réseau marquées pour tenir la batterie de la maison (`vehicules.py`).
