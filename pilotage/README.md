@@ -90,9 +90,17 @@ Les listes de prix et de plans sont longues : pour alléger la base de données,
 
 ## Conseils d'Ucan (facultatif)
 
-`ucan_conseils.yaml` donne à la carte `custom:ucaness-ucan-card` (dossier `dashboard/`) le conseil du moment, tiré des mesures de la maison : un seul à la fois, recalculé chaque matin à 7h30. Premier conseil, « machines » : la veille, un jour ouvré, les achats en heures pleines ont dépassé « Ucan : achats en heures pleines à partir desquels conseiller » (3 kWh si 0). Le gain affiché est la borne haute : ces kWh au prix des heures creuses. Il faut aussi que ce gain atteigne « Ucan : gain minimal d'un conseil » (0,20 € si 0).
+`ucan_conseils.yaml` donne à la carte `custom:ucaness-ucan-card` (dossier `dashboard/`) le conseil du moment, tiré des mesures de la maison : un seul à la fois, recalculé chaque matin à 7h30, dans cet ordre de priorité.
 
-« Pas maintenant » écarte le conseil du jour ; deux fois de suite, ou « Ne plus proposer », et il n'est plus proposé pendant 30 jours. « Je le fais » note la date (pour mesurer l'effet ensuite). Chaque réponse est inscrite au journal sous le nom « Ucan ». Notification sur le téléphone : seulement si « Ucan : me prévenir sur le téléphone » est allumé, au plus une par jour (`script.jarvis_notifier`, `jarvis_alertes.yaml`). Le package ne modifie aucun réglage du pilotage.
+| Conseil | Déclencheur | Gain affiché |
+|---|---|---|
+| Machines | La veille, un jour ouvré, achats en heures pleines au-dessus de « Ucan : achats en heures pleines à partir desquels conseiller » (3 kWh si 0) | Ces kWh au prix des heures creuses (borne haute) |
+| Lavage | La veille, un cycle du lave-linge a pris au moins 1,5 fois l'énergie d'un cycle ordinaire de la maison (médiane des cycles précédents, 5 au moins) et 0,4 kWh de plus | L'écart au prix des heures pleines, par cycle |
+| Veilles | Talon de nuit (plus petite puissance moyenne horaire de la maison entre 2h et 5h) des 7 dernières nuits supérieur d'au moins 20 % et 30 W à celui des 7 d'avant, ou à « Ucan : talon de nuit au-delà duquel conseiller » (désactivé si 0) | L'écart sur une année, au prix moyen HP/HC |
+
+Un conseil n'est proposé que si son gain atteint « Ucan : gain minimal d'un conseil » (0,20 € si 0). Le conseil « lavage » demande une prise mesurée : indiquer les identifiants de ses capteurs dans « Ucan : puissance du lave-linge » (W) et « Ucan : énergie du lave-linge » (kWh cumulés). Chaque cycle (début au-dessus de 20 W, fin après 10 min sous 20 W) est noté dans « Ucan cycles du lave-linge ».
+
+« Pas maintenant » écarte le conseil du jour ; deux fois de suite, ou « Ne plus proposer », et il n'est plus proposé pendant 30 jours. « Je le fais » note la date ; « lavage » et « veilles » laissent ensuite 14 jours pour que l'effet se voie dans les mesures. Chaque réponse est inscrite au journal sous le nom « Ucan ». Notification sur le téléphone : seulement si « Ucan : me prévenir sur le téléphone » est allumé, au plus une par jour (`script.jarvis_notifier`, `jarvis_alertes.yaml`). Le package ne modifie aucun réglage du pilotage.
 
 Prérequis : `jarvis_batterie.yaml` (gain réel) et `jarvis_tarif.yaml` (prix).
 
