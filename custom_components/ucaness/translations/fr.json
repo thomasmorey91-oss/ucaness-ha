@@ -171,7 +171,7 @@
       "fields": {
         "offres": {
           "name": "Offres",
-          "description": "Liste de {nom, fournisseur, formule (base ou hphc), abonnement_eur_an {kVA: € TTC}, prix_kwh {base} ou {hp, hc} en € TTC, plages_hc [{debut, fin}], weekend_hc, source, date_prix}."
+          "description": "Liste d'offres ; chaque offre donne : nom, fournisseur, formule (base ou hphc), abonnement_eur_an (€ TTC par puissance en kVA), prix_kwh (base, ou hp et hc, en € TTC), plages_hc (liste de début et fin), weekend_hc, source, date_prix."
         },
         "contrat_actuel": {
           "name": "Contrat actuel",

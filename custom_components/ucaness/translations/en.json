@@ -171,7 +171,7 @@
       "fields": {
         "offres": {
           "name": "Offers",
-          "description": "List of {nom, fournisseur, formule (base or hphc), abonnement_eur_an {kVA: € incl. tax}, prix_kwh {base} or {hp, hc} in € incl. tax, plages_hc [{debut, fin}], weekend_hc, source, date_prix}."
+          "description": "List of offers; each offer gives: nom, fournisseur, formule (base or hphc), abonnement_eur_an (€ incl. tax per power in kVA), prix_kwh (base, or hp and hc, in € incl. tax), plages_hc (list of start and end), weekend_hc, source, date_prix."
         },
         "contrat_actuel": {
           "name": "Current contract",
