@@ -1006,3 +1006,42 @@ async def test_simuler_contrat_et_puissance(hass, cloud):
     assert p["question"] == "puissance" and p["pointe_mesuree_kva"] == 3.5 and p["conseil"] == "baisser"
     assert p["puissance_recommandee_kva"] == 6 and p["sur"] is False
     assert cloud.updates == []
+
+
+async def test_simuler_selon_le_pays(hass, cloud):
+    """Portugal : offres réglementées de l'ERSE ; Espagne : pas d'offre de référence, la raison est dite."""
+    import datetime as dt
+    from unittest.mock import MagicMock
+    from homeassistant.util import dt as dt_util
+
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
+    fin = dt_util.now().replace(minute=0, second=0, microsecond=0)
+    heures = [fin - dt.timedelta(hours=h) for h in range(1, 24 * 30 + 1)]
+
+    def stats(_hass, debut, fin_, ids, period, units, types):
+        (eid,) = ids
+        if "change" in types:
+            return {eid: [{"start": h.timestamp(), "change": 0.5} for h in heures]}
+        return {eid: [{"start": h.timestamp(), "max": 3200.0} for h in heures]}
+
+    instance = MagicMock()
+    instance.async_add_executor_job = hass.async_add_executor_job
+    with patch("homeassistant.components.recorder.get_instance", return_value=instance), \
+         patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=stats):
+        hass.config.country = "PT"
+        pt = await hass.services.async_call(DOMAIN, "simuler", {"question": "contrat"}, blocking=True, return_response=True)
+        p = await hass.services.async_call(DOMAIN, "simuler", {"question": "puissance", "puissance_actuelle_kva": 6.9},
+                                           blocking=True, return_response=True)
+        hass.config.country = "ES"
+        es = await hass.services.async_call(DOMAIN, "simuler", {"question": "contrat"}, blocking=True, return_response=True)
+        es_offres = await hass.services.async_call(DOMAIN, "simuler", {"question": "contrat", "offres": [
+            {"nom": "Tres periodos", "formule": "plages", "structure": "es_2.0td", "abonnement_eur_an": {"4.6": 160},
+             "prix_kwh": {"punta": 0.26, "llano": 0.18, "valle": 0.14}, "taxes_comprises": False}]},
+            blocking=True, return_response=True)
+    assert pt["pays"] == "PT" and pt["puissance_kva"] == 6.9
+    assert {l["nom"] for l in pt["classement"]} == {
+        "Simples (tarifa regulada)", "Bi-horária, ciclo diário (tarifa regulada)", "Tri-horária, ciclo diário (tarifa regulada)"}
+    assert all(any("hors TVA" in r for r in l["remarques"]) for l in pt["classement"])
+    assert p["pays"] == "PT" and p["puissance_recommandee_kva"] == 4.6
+    assert es["pays"] == "ES" and es["classement"] == [] and "es_2.0td" in es["limites"][0]
+    assert es_offres["classement"][0]["nom"] == "Tres periodos" and es_offres["classement"][0]["formule"] == "plages"

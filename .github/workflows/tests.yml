@@ -43,6 +43,8 @@ jobs:
         run: pytest -p no:homeassistant -p no:socket tests/test_installation.py
       - name: Évaluation des offres d'électricité
         run: pytest -p no:homeassistant -p no:socket tests/test_tarifs.py
+      - name: Grilles et offres de référence par pays
+        run: pytest -p no:homeassistant -p no:socket tests/test_catalogues.py
       - name: Moteur du tarif dynamique
         run: pytest -p no:homeassistant tests/test_optimiseur.py
       - name: Dimensionnement

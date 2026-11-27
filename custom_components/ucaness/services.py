@@ -106,8 +106,8 @@ OFFRE = vol.Schema(
         vol.Required("nom"): cv.string,
         vol.Optional("fournisseur", default=""): cv.string,
         vol.Required("formule"): cv.string,
-        # Abonnement annuel TTC par puissance souscrite : {"6": 150.0, "9": 190.0}.
-        vol.Required("abonnement_eur_an"): vol.Schema({vol.Coerce(int): vol.All(vol.Coerce(float), vol.Range(min=0))}),
+        # Abonnement annuel TTC par puissance souscrite : {"6": 150.0, "9": 190.0} (ou {"3.45": 70.0}).
+        vol.Required("abonnement_eur_an"): vol.Schema({vol.Coerce(float): vol.All(vol.Coerce(float), vol.Range(min=0))}),
         vol.Required("prix_kwh"): vol.Schema({cv.string: PRIX}),
         vol.Optional("plages_hc", default=list): vol.All(cv.ensure_list, [WINDOW]),
         vol.Optional("weekend_hc", default=False): cv.boolean,
@@ -115,6 +115,9 @@ OFFRE = vol.Schema(
         vol.Optional("date_prix"): vol.Any(None, cv.date),
         # Tempo : jours de chaque couleur dans l'année (300 bleus, 43 blancs, 22 rouges par défaut).
         vol.Optional("jours_tempo"): vol.Any(None, vol.Schema({vol.In(tarifs.COULEURS): vol.All(vol.Coerce(int), vol.Range(min=0, max=366))})),
+        # Formule « plages » (autres pays) : grille horaire du catalogue, prix par niveau (prix_kwh).
+        vol.Optional("structure"): vol.In(list(catalogue.STRUCTURES)),
+        vol.Optional("taxes_comprises", default=True): cv.boolean,
     }
 )
 OFFRES_SCHEMA = vol.Schema(
@@ -122,7 +125,7 @@ OFFRES_SCHEMA = vol.Schema(
         vol.Required("offres"): vol.All(cv.ensure_list, [OFFRE]),
         vol.Optional("contrat_actuel"): vol.Any(None, OFFRE),
         vol.Required("soutirage"): vol.All(cv.ensure_list, [dict]),
-        vol.Required("puissance_kva"): vol.All(vol.Coerce(int), vol.Range(min=1, max=36)),
+        vol.Required("puissance_kva"): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=50)),
         vol.Optional("jours_non_ouvres", default=list): vol.All(cv.ensure_list, [cv.date]),
         vol.Optional("puissances_max_kva", default=list): vol.All(cv.ensure_list, [vol.Any(None, vol.Coerce(float))]),
         vol.Optional("mesure_fine", default=False): cv.boolean,
@@ -147,7 +150,7 @@ SIMULER_SCHEMA = vol.Schema(
         vol.Optional(ATTR_ENTRY): cv.string,
         vol.Required("question"): vol.In(["contrat", "puissance"]),
         vol.Optional("jours", default=30): vol.All(vol.Coerce(int), vol.Range(min=1, max=400)),
-        vol.Optional("puissance_actuelle_kva"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=36))),
+        vol.Optional("puissance_actuelle_kva"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0.5, max=50))),
         vol.Optional("abonnement_actuel_eur_an"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0))),
         vol.Optional("offres"): vol.All(cv.ensure_list, [dict]),
         vol.Optional("soutirage", default="sensor.uhome_soutirage_reseau_total"): cv.entity_id,
@@ -349,12 +352,22 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             v = v.replace(":", "")
             return f"{v[:2]}:{v[2:]}"
 
+        if d["formule"] == tarifs.PLAGES:
+            if not d.get("structure"):
+                raise ServiceValidationError(translation_domain=DOMAIN, translation_key="donnees_refusees",
+                                             translation_placeholders={"detail": f"{d['nom']} : formule plages sans structure"})
+            return catalogue.offre_plages(
+                d["nom"], d["structure"], dict(d["abonnement_eur_an"]), dict(d["prix_kwh"]),
+                fournisseur=d["fournisseur"], source=d["source"], date_prix=d.get("date_prix"),
+                taxes_comprises=d["taxes_comprises"],
+            )
         return tarifs.Offre(
             nom=d["nom"], fournisseur=d["fournisseur"], formule=d["formule"],
             abonnement_eur_an=dict(d["abonnement_eur_an"]), prix_kwh=dict(d["prix_kwh"]),
             plages_hc=tuple((hhmm(p["debut"]), hhmm(p["fin"])) for p in d["plages_hc"]),
             weekend_hc=d["weekend_hc"], source=d["source"], date_prix=d.get("date_prix"),
             jours_tempo=dict(d["jours_tempo"]) if d.get("jours_tempo") else None,
+            taxes_comprises=d["taxes_comprises"],
         )
 
     async def evaluer_offres(call: ServiceCall) -> ServiceResponse:
@@ -422,6 +435,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         réseau chaque jour (relevée par l'onduleur, donc estimée)."""
         d = call.data
         entry = _entry(hass, call)
+        pays = (hass.config.country or "FR").upper()
         kva = d.get("puissance_actuelle_kva")
         if d["question"] == "puissance":
             if not kva:
@@ -431,8 +445,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             for debut_h, w in maxi:
                 if isinstance(w, (int, float)):
                     par_jour[debut_h.date()] = max(par_jour.get(debut_h.date(), 0.0), w / 1000)
-            r = tarifs.analyser_puissance(list(par_jour.values()), kva)
-            return {"question": "puissance", **r}
+            r = tarifs.analyser_puissance(list(par_jour.values()), kva, paliers=catalogue.paliers(pays))
+            return {"question": "puissance", "pays": pays, **r}
         valeur = lambda cle: reglages.valeur(hass, entry, cle)  # noqa: E731
         hc_d, hc_f = valeur("hc_debut"), valeur("hc_fin")
         actuel = None
@@ -445,8 +459,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 weekend_hc=bool(valeur("hc_jours_non_ouvres")) and not base,
                 source="Réglages du tarif dans Home Assistant", date_prix=dt_util.now().date(),
             )
-        offres = [_offre(OFFRE(o)) for o in d["offres"]] if d.get("offres") else list(catalogue.OFFRES_REFERENCE)
-        cible = kva or 9
+        offres = [_offre(OFFRE(o)) for o in d["offres"]] if d.get("offres") else list(catalogue.offres_reference(pays))
+        cible = kva or catalogue.puissance_defaut(pays)
         ramenees = [tarifs.a_la_puissance(o, cible)[0] for o in offres]
         mesures = [(h, k) for h, k in await _statistiques(d["soutirage"], d["jours"], "change") if k is not None]
         if not mesures:
@@ -460,7 +474,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             )
         )
         resultat["question"] = "contrat"
+        resultat["pays"] = pays
         resultat["puissance_kva"] = cible
+        if not offres:
+            resultat["limites"].insert(0, catalogue.POURQUOI_SANS_OFFRE.get(
+                pays, f"Pas d'offre de référence pour ce pays ({pays}) : passez vos offres (champ « offres »)."))
         resultat["jours_demandes"] = d["jours"]
         if actuel is None:
             resultat["limites"].append("Contrat actuel non comparé : indiquez la puissance souscrite et l'abonnement annuel.")

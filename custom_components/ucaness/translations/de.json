@@ -171,7 +171,7 @@
       "fields": {
         "offres": {
           "name": "Angebote",
-          "description": "Liste von Angeboten; jedes Angebot enthält: nom, fournisseur, formule (base oder hphc), abonnement_eur_an (€ brutto je Leistung in kVA), prix_kwh (base, oder hp und hc, in € brutto), plages_hc (Liste aus Beginn und Ende), weekend_hc, source, date_prix; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo optional."
+          "description": "Liste von Angeboten; jedes Angebot enthält: nom, fournisseur, formule (base oder hphc), abonnement_eur_an (€ brutto je Leistung in kVA), prix_kwh (base, oder hp und hc, in € brutto), plages_hc (Liste aus Beginn und Ende), weekend_hc, source, date_prix; Tempo: formule tempo, prix_kwh bleu_hp, bleu_hc, blanc_hp, blanc_hc, rouge_hp, rouge_hc, jours_tempo optional. Andere Länder: formule plages, structure (es_2.0td, it_f1f2f3, it_f1f23, pt_bi_diario, pt_tri_diario), ein Preis je Stufe in prix_kwh, taxes_comprises (false bei Preisen ohne Steuern)."
         },
         "contrat_actuel": {
           "name": "Aktueller Vertrag",
@@ -217,7 +217,7 @@
     },
     "simuler": {
       "name": "Simulieren (was wäre, wenn…)",
-      "description": "Nur Berechnung mit den Messwerten des Hauses, nichts wird angewendet. „contrat“: geschätzte Jahreskosten des aktuellen Vertrags und der Referenzangebote (regulierte Tarife, einschließlich Tempo) oder übergebener Angebote; „puissance“: Passt die vertragliche Leistung?",
+      "description": "Nur Berechnung mit den Messwerten des Hauses, nichts wird angewendet. „contrat“: geschätzte Jahreskosten des aktuellen Vertrags und der Referenzangebote (regulierte Tarife, einschließlich Tempo) oder übergebener Angebote; „puissance“: Passt die vertragliche Leistung? Referenzangebote je nach in Home Assistant eingestelltem Land: Frankreich (regulierte EDF-Tarife), Portugal (regulierte ERSE-Tarife); Spanien und Italien: eigene Angebote übergeben.",
       "fields": {
         "question": {
           "name": "Frage",

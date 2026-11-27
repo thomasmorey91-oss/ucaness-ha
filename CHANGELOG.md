@@ -4,6 +4,14 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 27/11/2026
 
+### Intégration 0.6.0 : offres par pays
+- **Formule « plages »** dans le moteur d'offres (`tarifs.py`) : plusieurs niveaux de prix, plages horaires par type de jour (ouvré, samedi, dimanche et férié) et par heure légale (été, hiver) ; recharge réseau estimée dans le niveau le moins cher ; prix hors taxes signalés ; grille datée signalée une fois périmée ; puissances non entières (3,45 kVA).
+- **Catalogue par pays** (`catalogue.py`), choisi d'après le pays réglé dans Home Assistant :
+  - Espagne : grille 2.0TD (pointe 10h-14h et 18h-22h, plein 8h-10h, 14h-18h et 22h-24h, vallée 0h-8h ; week-end et fériés en vallée) ;
+  - Italie : tranches F1, F2, F3 et F1, F23 de l'ARERA ;
+  - Portugal : cycle quotidien bi- et tri-horaire (été et hiver), valable jusqu'au 30/06/2027, et tarifs réglementés transitoires de l'ERSE en vigueur depuis le 01/10/2026 (simple, bi-horaire, tri-horaire, 3,45 à 20,7 kVA, hors TVA).
+- `ucaness.simuler` : offres de référence, puissance par défaut et paliers de puissance du pays ; réponse avec `pays`.
+
 ### Intégration 0.4.1 → 0.5.4
 - **0.4.1** : clé d'application livrée avec l'intégration (fournie par UCanpower) ; une clé personnelle, si vous en avez une, passe avant (#14, #16). Texte de l'action `evaluer_offres` lisible par Home Assistant (#17).
 - **Offres** : formule **Tempo** dans le moteur d'offres (`tarifs.py`), jours de 6h à 6h, couleurs du jour passées à `evaluer_offres` (`couleurs_tempo`) ou année type 300 bleus, 43 blancs, 22 rouges (#19).

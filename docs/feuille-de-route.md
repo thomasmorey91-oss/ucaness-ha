@@ -43,4 +43,6 @@ Modèle d'offre unique : jusqu'à 4 niveaux de prix, plusieurs plages par jour, 
 | Pays-Bas | Fin de la compensation de l'injection (01/01/2027) : priorité à l'autoconsommation |
 | Chine | Prix par province, vallée possible à midi |
 
+Fait en 0.6.0 (évaluation des offres et simulateur seulement, pas encore le pilotage) : grilles 2.0TD (Espagne), F1, F2, F3 (Italie), bi- et tri-horaire en cycle quotidien (Portugal) ; tarifs réglementés du Portugal. Reste : deux puissances souscrites (Espagne), cycle hebdomadaire et plages de 2027 (Portugal), offres du Portale Offerte (Italie), limite du compteur de 3 kW.
+
 Les règles de chaque pays sont à confirmer par un professionnel local avant leur mise en service.
