@@ -342,6 +342,29 @@ def test_ucan_en_bulle_en_bas_a_droite(cartes):
     assert etat["ferme"]
 
 
+def test_ucan_bulle_deplacable(cartes):
+    etat = cartes.evaluate("""() => {
+      const hote = document.querySelector('body > .ucaness-ucan-bulle');
+      const fab = () => hote.shadowRoot.querySelector('.fab');
+      const r0 = fab().getBoundingClientRect();
+      const ev = (t, x, y) => fab().dispatchEvent(new PointerEvent(t, { clientX: x, clientY: y, pointerId: 1, bubbles: true }));
+      ev('pointerdown', r0.x + 30, r0.y + 30);
+      ev('pointermove', r0.x - 170, r0.y - 170);
+      ev('pointerup', r0.x - 170, r0.y - 170);
+      const pos = JSON.parse(localStorage.getItem('ucaness-ucan-position'));
+      const ferme = !hote.shadowRoot.querySelector('.panneau');
+      fab().click();
+      const replacer = !!hote.shadowRoot.querySelector('.replacer');
+      hote.shadowRoot.querySelector('.replacer').click();
+      const apres = { stocke: localStorage.getItem('ucaness-ucan-position'), bas: getComputedStyle(hote).bottom };
+      hote.shadowRoot.querySelector('.fermer').click();
+      return { pos, ferme, replacer, apres };
+    }""")
+    assert etat["pos"]["droite"] == 220 and etat["pos"]["bas"] == 284, etat["pos"]   # 20 + 200, 84 + 200
+    assert etat["ferme"], "un glissement n'ouvre pas la fenêtre"
+    assert etat["replacer"] and etat["apres"] == {"stocke": None, "bas": "84px"}
+
+
 def test_texte_court_non_replie(cartes):
     st = note_state(cartes, "court")
     assert not st["cut"] and not st["more"] and not st["less"]
