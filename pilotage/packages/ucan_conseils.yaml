@@ -1,0 +1,183 @@
+# =============================================================================
+# Ucan, assistant de sobriété : conseils tirés des mesures de la maison (facultatif)
+# -----------------------------------------------------------------------------
+# Lu par la carte « custom:ucaness-ucan-card » (dashboard/www/ucaness/ucaness-cards.js).
+# Principes (claude/spec : révéler avant de conseiller, un geste à la fois, gain mesuré,
+# sans réponse rien ne change) :
+#   - un seul conseil à la fois, recalculé chaque matin à 7h30 ;
+#   - chaque conseil part d'une mesure de la maison et donne un gain chiffré ;
+#   - « Pas maintenant » écarte le conseil du jour ; deux fois de suite, ou « Ne plus proposer »,
+#     et ce conseil n'est plus proposé pendant 90 jours ;
+#   - notification sur le téléphone : seulement si « Ucan : me prévenir sur le téléphone » est
+#     allumé, au plus une par jour, par script.jarvis_notifier (jarvis_alertes.yaml).
+# Aucun réglage n'est modifié par ce package : il n'écrit que ses propres entrées.
+#
+# Premier conseil, « machines » : la veille (jour ouvré, fenêtre du gain réel), les achats en
+# heures pleines ont dépassé le seuil. Gain affiché : achats HP × (prix HP − prix HC), soit ce
+# qu'auraient coûté de moins ces kWh en heures creuses (borne haute : tout n'est pas déplaçable).
+# Entités lues : sensor.jarvis_gain_reel_du_jour (jarvis_batterie.yaml), input_number.jarvis_prix_hp
+# et jarvis_prix_hc (jarvis_tarif.yaml).
+# =============================================================================
+
+input_number:
+  ucan_seuil_hp_kwh:
+    name: "Ucan : achats en heures pleines à partir desquels conseiller (0 = 3 kWh)"
+    min: 0
+    max: 30
+    step: 0.5
+    unit_of_measurement: kWh
+    mode: box
+  ucan_gain_min:
+    name: "Ucan : gain minimal d'un conseil (0 = 0,20 €)"
+    min: 0
+    max: 5
+    step: 0.05
+    unit_of_measurement: "EUR"
+    mode: box
+
+input_boolean:
+  ucan_notifier:
+    name: "Ucan : me prévenir sur le téléphone"
+    icon: mdi:message-badge-outline
+
+input_text:
+  # Jour du dernier conseil auquel l'utilisateur a répondu (il n'est plus montré).
+  ucan_jour_traite:
+    name: "Ucan : jour du dernier conseil traité (interne)"
+    max: 32
+  # Réponses « Pas maintenant » de suite au conseil « machines » (interne).
+  ucan_refus_machines:
+    name: "Ucan : refus de suite du conseil machines (interne)"
+    max: 8
+
+input_datetime:
+  # Une date passée ou celle du jour (valeur par défaut d'une entrée neuve) : pas de pause.
+  ucan_pause_machines:
+    name: "Ucan : conseil machines en pause jusqu'au"
+    has_date: true
+    has_time: false
+  ucan_engagement_machines:
+    name: "Ucan : machines réparties depuis le"
+    has_date: true
+    has_time: false
+
+template:
+  - triggers:
+      - trigger: time
+        at: "07:30:00"
+      - trigger: homeassistant
+        event: start
+      - trigger: event
+        event_type: ucan_recalcul
+    sensor:
+      - name: "Ucan conseil"
+        unique_id: ucan_conseil
+        icon: mdi:battery-heart-variant
+        state: >
+          {% set g = 'sensor.jarvis_gain_reel_du_jour' %}
+          {% set jour = state_attr(g, 'jour') | string %}
+          {% set hp = state_attr(g, 'soutirage_hp_kwh') | float(0) %}
+          {% set s = states('input_number.ucan_seuil_hp_kwh') | float(0) %}
+          {% set seuil = s if s > 0 else 3 %}
+          {% set m = states('input_number.ucan_gain_min') | float(0) %}
+          {% set gmin = m if m > 0 else 0.2 %}
+          {% set ecart = states('input_number.jarvis_prix_hp') | float(0) - states('input_number.jarvis_prix_hc') | float(0) %}
+          {% set pause = states('input_datetime.ucan_pause_machines') %}
+          {% set en_pause = pause | regex_match('^\\d{4}-\\d{2}-\\d{2}') and pause[:10] > now().date() | string %}
+          {% if state_attr(g, 'calcul_valide') == true and state_attr(g, 'jour_ouvre') == true
+                and jour | regex_match('^\\d{4}-\\d{2}-\\d{2}$') and jour >= (now().date() - timedelta(days=1)) | string
+                and hp >= seuil and hp * ecart >= gmin and not en_pause
+                and states('input_text.ucan_jour_traite') != jour %}machines{% else %}aucun{% endif %}
+        attributes:
+          jour: "{{ state_attr('sensor.jarvis_gain_reel_du_jour', 'jour') }}"
+          achats_hp_kwh: "{{ state_attr('sensor.jarvis_gain_reel_du_jour', 'soutirage_hp_kwh') | float(0) | round(1) }}"
+          gain_eur: >
+            {% set hp = state_attr('sensor.jarvis_gain_reel_du_jour', 'soutirage_hp_kwh') | float(0) %}
+            {{ (hp * (states('input_number.jarvis_prix_hp') | float(0) - states('input_number.jarvis_prix_hc') | float(0))) | round(2) }}
+          titre: "Les machines d'hier"
+          constat: >
+            {% set j = state_attr('sensor.jarvis_gain_reel_du_jour', 'jour') | string %}
+            {% set jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] %}
+            {% set d = j | as_datetime(none) %}
+            {% set hp = state_attr('sensor.jarvis_gain_reel_du_jour', 'soutirage_hp_kwh') | float(0) %}
+            {{ ('Le ' ~ jours[d.weekday()] ~ ' ' ~ d.strftime('%d/%m') if d else 'Hier') ~ ', ' ~ ('%.1f' | format(hp)) | replace('.', ',') ~ ' kWh ont été achetés en heures pleines.' }}
+          geste: "Répartir les machines sur la semaine, de préférence après le début des heures creuses ou à midi les jours de soleil."
+          gain: >
+            {% set hp = state_attr('sensor.jarvis_gain_reel_du_jour', 'soutirage_hp_kwh') | float(0) %}
+            {% set e = (hp * (states('input_number.jarvis_prix_hp') | float(0) - states('input_number.jarvis_prix_hc') | float(0))) %}
+            {{ "Jusqu'à " ~ ('%.2f' | format(e)) | replace('.', ',') ~ ' € de moins ce jour-là.' }}
+          avertissement: "Estimation sur vos mesures, pas une garantie."
+
+script:
+  ucan_conseil_reponse:
+    alias: "Ucan : réponse à un conseil"
+    description: "Réponse de l'utilisateur au conseil du moment : fait, plus_tard ou jamais."
+    mode: queued
+    fields:
+      reponse:
+        description: "fait, plus_tard ou jamais"
+        example: "fait"
+    sequence:
+      - variables:
+          conseil: "{{ states('sensor.ucan_conseil') }}"
+          jour: "{{ state_attr('sensor.ucan_conseil', 'jour') }}"
+          refus: "{{ states('input_text.ucan_refus_machines') | int(0) }}"
+          pause: "{{ reponse == 'jamais' or (reponse == 'plus_tard' and refus + 1 >= 2) }}"
+      - condition: template
+        value_template: "{{ conseil == 'machines' and reponse in ['fait', 'plus_tard', 'jamais'] }}"
+      - action: input_text.set_value
+        target: { entity_id: input_text.ucan_jour_traite }
+        data:
+          value: "{{ jour }}"
+      - action: input_text.set_value
+        target: { entity_id: input_text.ucan_refus_machines }
+        data:
+          value: "{{ 0 if (reponse == 'fait' or pause) else refus + 1 }}"
+      - if:
+          - condition: template
+            value_template: "{{ pause }}"
+        then:
+          - action: input_datetime.set_datetime
+            target: { entity_id: input_datetime.ucan_pause_machines }
+            data:
+              date: "{{ (now().date() + timedelta(days=90)) | string }}"
+      - if:
+          - condition: template
+            value_template: "{{ reponse == 'fait' }}"
+        then:
+          - action: input_datetime.set_datetime
+            target: { entity_id: input_datetime.ucan_engagement_machines }
+            data:
+              date: "{{ now().date() | string }}"
+      - action: logbook.log
+        data:
+          name: "Ucan"
+          entity_id: sensor.ucan_conseil
+          message: >
+            Conseil « machines » du {{ jour }} : {{ {'fait': 'accepté (machines réparties à partir d\'aujourd\'hui)',
+            'plus_tard': 'remis à plus tard', 'jamais': 'refusé'}[reponse] }}{{ ' ; plus proposé pendant 90 jours' if pause else '' }}.
+      - event: ucan_recalcul
+
+automation:
+  - id: ucan_conseil_notification
+    alias: "Ucan · Conseil du matin sur le téléphone"
+    description: "Au plus une notification par jour, seulement si « Ucan : me prévenir sur le téléphone » est allumé."
+    mode: single
+    triggers:
+      - trigger: time
+        at: "07:31:00"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.ucan_notifier
+        state: "on"
+      - condition: state
+        entity_id: sensor.ucan_conseil
+        state: "machines"
+    actions:
+      - action: script.jarvis_notifier
+        data:
+          niveau: info
+          titre: "Ucan : {{ state_attr('sensor.ucan_conseil', 'titre') }}"
+          message: >
+            {{ state_attr('sensor.ucan_conseil', 'constat') }} {{ state_attr('sensor.ucan_conseil', 'geste') }}
+            {{ state_attr('sensor.ucan_conseil', 'gain') }}

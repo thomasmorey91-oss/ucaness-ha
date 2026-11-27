@@ -125,6 +125,15 @@ views:
                 #   y: 49
                 #   route: [[36, 70], [55, 70], [58.5, 63.5]]
                 #   borne: {x: 56.8, y: 55, w: 3}
+              # Ucan (cartes 0.5.1) : l'avatar et le conseil du moment (pilotage/packages/ucan_conseils.yaml).
+              - type: custom:ucaness-panel-card
+                title: Ucan
+                cards:
+                  - type: custom:ucaness-ucan-card
+                    compact: true
+                    alert_entities:
+                      - binary_sensor.uhome_defaut_batterie
+                      - binary_sensor.uhome_temperature_hors_plage
               - type: custom:ucaness-panel-card
                 title: Appareils
                 cards:

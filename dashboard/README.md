@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.5.0`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.5.1`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -159,6 +159,10 @@ Conventions de signe de l'intégration : batterie positive en charge, réseau po
 | `custom:ucaness-hours-card` | Graphique de la journée heure par heure, avec un choix en haut : `tabs` (`name`, `statistic`, `stat_type`, `kind: line`, `unit`, `color`, `digits`, `min`, `max`, `hours: auto`, `total_label`, `forecast_entity` et `forecast_attribute`, `forecast_key`, `forecast_label`, `floor_entity`). Les barres poussent en cascade, la courbe se trace avec un dégradé dessous ; un appui sur une heure affiche sa valeur dans une bulle |
 
 `custom:ucaness-soc-card` accepte aussi `compact: true` (petit anneau, réserve et énergie utilisable à droite), avec `title`, `mode_entity` et `simulation_entity`.
+
+### `custom:ucaness-ucan-card` (0.5.1)
+
+Ucan, la batterie UHome avec un visage, et son conseil du moment (package `pilotage/packages/ucan_conseils.yaml`). L'écran du module du haut change d'expression : orange « à surveiller » si une alerte de `alert_entities` est en cours, « un conseil » si `sensor.ucan_conseil` en propose un, yeux fermés quand le soleil est couché (`sun.sun`), sourire sinon. Les barres des trois modules s'allument avec la charge (`soc`, `sensor.uhome_soc` par défaut : au-dessus de 0, 33 et 66 %). Le conseil s'affiche dans une bulle (constat, geste, gain, avertissement) avec trois boutons : « Je le fais », « Pas maintenant », « Ne plus proposer », envoyés à `script.ucan_conseil_reponse`. Options : `conseil`, `soc`, `script`, `alert_entities`, `compact: true` (petit avatar, pour une colonne de 300 px ou le téléphone).
 
 ### `custom:ucaness-note-card`
 
