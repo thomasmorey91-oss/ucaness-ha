@@ -909,3 +909,41 @@ def test_fichier_de_cle_livree_coherent():
 
     assert isinstance(c.CLE_LIVREE, str) and isinstance(c.SECRET_LIVRE, str)
     assert bool(c.CLE_LIVREE.strip()) == bool(c.SECRET_LIVRE.strip())
+
+
+# ------------------------------------------------------------------ simulateur « et si »
+async def test_simuler_contrat_et_puissance(hass, cloud):
+    import datetime as dt
+    from unittest.mock import MagicMock
+    from homeassistant.util import dt as dt_util
+
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=True)
+    for e, v in (("input_number.jarvis_prix_hp", "0.30638"), ("input_number.jarvis_prix_hc", "0.1729"),
+                 ("input_select.jarvis_type_tarif", "Heures pleines / heures creuses"),
+                 ("input_datetime.jarvis_hc_debut", "23:00:00"), ("input_datetime.jarvis_hc_fin", "06:00:00"),
+                 ("input_boolean.jarvis_hc_jours_non_ouvres", "on"), ("input_boolean.jarvis_mode_simulation", "off")):
+        hass.states.async_set(e, v)
+    fin = dt_util.now().replace(minute=0, second=0, microsecond=0)
+    heures = [fin - dt.timedelta(hours=h) for h in range(1, 24 * 30 + 1)]
+
+    def stats(_hass, debut, fin_, ids, period, units, types):
+        (eid,) = ids
+        if "change" in types:
+            return {eid: [{"start": h.timestamp(), "change": 1.0 if 7 <= h.hour < 22 else 0.4} for h in heures]}
+        return {eid: [{"start": h.timestamp(), "max": 3500.0 if h.hour == 19 else 800.0} for h in heures]}
+
+    instance = MagicMock()
+    instance.async_add_executor_job = hass.async_add_executor_job
+    with patch("homeassistant.components.recorder.get_instance", return_value=instance), \
+         patch("homeassistant.components.recorder.statistics.statistics_during_period", side_effect=stats):
+        r = await hass.services.async_call(DOMAIN, "simuler", {
+            "question": "contrat", "puissance_actuelle_kva": 10, "abonnement_actuel_eur_an": 267}, blocking=True, return_response=True)
+        p = await hass.services.async_call(DOMAIN, "simuler", {
+            "question": "puissance", "puissance_actuelle_kva": 12}, blocking=True, return_response=True)
+    noms = [l["nom"] for l in r["classement"]]
+    assert "Tempo (tarif réglementé) (12 kVA)" in noms and "Heures creuses (tarif réglementé) (9 kVA)" in noms
+    assert r["contrat_actuel"]["nom"] == "Contrat actuel" and r["contrat_actuel"]["jours_mesures"] == 30
+    assert r["puissance_kva"] == 10 and r["question"] == "contrat"
+    assert p["question"] == "puissance" and p["pointe_mesuree_kva"] == 3.5 and p["conseil"] == "baisser"
+    assert p["puissance_recommandee_kva"] == 6 and p["sur"] is False
+    assert cloud.updates == []

@@ -16,6 +16,7 @@ Chaque envoi est journalisé puis relu : si l'onduleur ne reflète pas la consig
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 import logging
 from typing import Any
 
@@ -46,7 +47,7 @@ from .const import (
     READBACK_DELAY_S,
 )
 from .coordinator import UcanessConfigEntry, UcanessCoordinator
-from . import optimiseur, tarifs
+from . import catalogue, optimiseur, reglages, tarifs
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ SERVICE_MODE = "definir_mode"
 SERVICE_OPTIMISER = "optimiser_charge"
 SERVICE_PLAN = "plages_depuis_plan"
 SERVICE_OFFRES = "evaluer_offres"
+SERVICE_SIMULER = "simuler"
 
 ATTR_ENTRY = "config_entry_id"
 HHMM = vol.All(cv.string, vol.Match(r"^([01]\d|2[0-3]):?[0-5]\d$"))
@@ -136,6 +138,20 @@ MODE_SCHEMA = vol.Schema(
     {
         vol.Optional(ATTR_ENTRY): cv.string,
         vol.Required("mode"): vol.In(list(WORK_MODES)),
+    }
+)
+
+
+SIMULER_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_ENTRY): cv.string,
+        vol.Required("question"): vol.In(["contrat", "puissance"]),
+        vol.Optional("jours", default=30): vol.All(vol.Coerce(int), vol.Range(min=1, max=400)),
+        vol.Optional("puissance_actuelle_kva"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=36))),
+        vol.Optional("abonnement_actuel_eur_an"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0))),
+        vol.Optional("offres"): vol.All(cv.ensure_list, [dict]),
+        vol.Optional("soutirage", default="sensor.uhome_soutirage_reseau_total"): cv.entity_id,
+        vol.Optional("puissance_reseau", default="sensor.uhome_puissance_reseau"): cv.entity_id,
     }
 )
 
@@ -371,6 +387,82 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(
         DOMAIN, SERVICE_OFFRES, evaluer_offres, schema=OFFRES_SCHEMA, supports_response=SupportsResponse.ONLY
+    )
+
+    async def _statistiques(entite: str, jours: int, type_: str) -> list[tuple[Any, float | None]]:
+        """Statistiques horaires de l'enregistreur (« change » ou « max ») des derniers jours."""
+        from homeassistant.components.recorder import get_instance
+        from homeassistant.components.recorder.statistics import statistics_during_period
+
+        fin = dt_util.now().replace(minute=0, second=0, microsecond=0)
+        debut = fin - timedelta(days=jours)
+        lignes = await get_instance(hass).async_add_executor_job(
+            statistics_during_period, hass, debut, fin, {entite}, "hour", None, {type_}
+        )
+        fuseau = dt_util.get_default_time_zone()
+        out = []
+        for r in lignes.get(entite, []):
+            debut_h = r.get("start")
+            if isinstance(debut_h, (int, float)):
+                debut_h = dt_util.utc_from_timestamp(debut_h)
+            out.append((debut_h.astimezone(fuseau), r.get(type_)))
+        return out
+
+    async def simuler(call: ServiceCall) -> ServiceResponse:
+        """Simulateur « et si » : calcul seul sur les mesures de la maison, rien n'est appliqué.
+
+        contrat : coût annuel estimé du contrat actuel (réglages du tarif) et des offres de référence
+        (catalogue.py) ou passées, sur le soutirage horaire des derniers jours ;
+        puissance : la puissance souscrite convient-elle, d'après la puissance maximale prise au
+        réseau chaque jour (relevée par l'onduleur, donc estimée)."""
+        d = call.data
+        entry = _entry(hass, call)
+        kva = d.get("puissance_actuelle_kva")
+        if d["question"] == "puissance":
+            if not kva:
+                raise ServiceValidationError("Indiquez la puissance souscrite actuelle (puissance_actuelle_kva).")
+            maxi = await _statistiques(d["puissance_reseau"], d["jours"], "max")
+            par_jour: dict[Any, float] = {}
+            for debut_h, w in maxi:
+                if isinstance(w, (int, float)):
+                    par_jour[debut_h.date()] = max(par_jour.get(debut_h.date(), 0.0), w / 1000)
+            r = tarifs.analyser_puissance(list(par_jour.values()), kva)
+            return {"question": "puissance", **r}
+        valeur = lambda cle: reglages.valeur(hass, entry, cle)  # noqa: E731
+        hc_d, hc_f = valeur("hc_debut"), valeur("hc_fin")
+        actuel = None
+        if kva and d.get("abonnement_actuel_eur_an") is not None and valeur("prix_hp"):
+            base = valeur("type_tarif") == reglages.TARIF_BASE
+            actuel = tarifs.Offre(
+                "Contrat actuel", tarifs.BASE if base else tarifs.HPHC, {kva: d["abonnement_actuel_eur_an"]},
+                {"base": valeur("prix_hp")} if base else {"hp": valeur("prix_hp"), "hc": valeur("prix_hc") or 0},
+                plages_hc=() if base or not (hc_d and hc_f) else ((str(hc_d)[:5], str(hc_f)[:5]),),
+                weekend_hc=bool(valeur("hc_jours_non_ouvres")) and not base,
+                source="Réglages du tarif dans Home Assistant", date_prix=dt_util.now().date(),
+            )
+        offres = [_offre(OFFRE(o)) for o in d["offres"]] if d.get("offres") else list(catalogue.OFFRES_REFERENCE)
+        cible = kva or 9
+        ramenees = [tarifs.a_la_puissance(o, cible)[0] for o in offres]
+        mesures = [(h, k) for h, k in await _statistiques(d["soutirage"], d["jours"], "change") if k is not None]
+        if not mesures:
+            raise ServiceValidationError(f"Aucune mesure horaire de {d['soutirage']} sur les {d['jours']} derniers jours.")
+        simulation = hass.states.get("input_boolean.jarvis_mode_simulation")
+        resultat = await hass.async_add_executor_job(
+            lambda: tarifs.classer(
+                ramenees, mesures, cible, contrat_actuel=actuel,
+                aujourdhui=dt_util.now().date(),
+                recharge_deja_active=simulation is None or simulation.state == "off",
+            )
+        )
+        resultat["question"] = "contrat"
+        resultat["puissance_kva"] = cible
+        resultat["jours_demandes"] = d["jours"]
+        if actuel is None:
+            resultat["limites"].append("Contrat actuel non comparé : indiquez la puissance souscrite et l'abonnement annuel.")
+        return resultat
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SIMULER, simuler, schema=SIMULER_SCHEMA, supports_response=SupportsResponse.ONLY
     )
     hass.services.async_register(
         DOMAIN, SERVICE_OPTIMISER, optimiser_charge, schema=OPTIMISER_SCHEMA, supports_response=SupportsResponse.ONLY

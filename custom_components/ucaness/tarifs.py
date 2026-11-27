@@ -37,7 +37,7 @@ Une donnée absente ne donne jamais un prix : l'offre est écartée, avec la rai
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from typing import Any, Iterable
 
@@ -416,6 +416,18 @@ def classer(
             "Estimation à vérifier sur la grille du fournisseur avant toute souscription.",
         ],
     }
+
+
+def a_la_puissance(offre: Offre, puissance_kva: int) -> tuple[Offre, int]:
+    """L'offre ramenée à la puissance demandée : son abonnement à la plus petite puissance publiée
+    qui la couvre (ou à la plus grande), sous la clé demandée, pour la comparer aux autres.
+    Renvoie aussi la puissance réellement retenue."""
+    paliers = sorted(offre.abonnement_eur_an)
+    if not paliers:
+        return offre, puissance_kva
+    retenue = next((k for k in paliers if k >= puissance_kva), paliers[-1])
+    nom = offre.nom if retenue == puissance_kva else f"{offre.nom} ({retenue} kVA)"
+    return replace(offre, nom=nom, abonnement_eur_an={puissance_kva: offre.abonnement_eur_an[retenue]}), retenue
 
 
 def analyser_puissance(

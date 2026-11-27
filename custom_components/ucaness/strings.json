@@ -214,6 +214,40 @@
           "description": "Colour of each measured Tempo day (6 am to 6 am): date then bleu, blanc or rouge. Without it, each colour uses the average day."
         }
       }
+    },
+    "simuler": {
+      "name": "Simulate (what if…)",
+      "description": "Calculation only on the home's measurements, nothing is applied. \"contrat\": estimated yearly cost of the current contract and of the reference offers (regulated tariffs, including Tempo) or given offers; \"puissance\": is the subscribed power right.",
+      "fields": {
+        "question": {
+          "name": "Question",
+          "description": "contrat or puissance."
+        },
+        "jours": {
+          "name": "Days of data",
+          "description": "Number of days of hourly measurements to use (30 by default)."
+        },
+        "puissance_actuelle_kva": {
+          "name": "Current subscribed power",
+          "description": "In kVA."
+        },
+        "abonnement_actuel_eur_an": {
+          "name": "Current subscription",
+          "description": "Yearly subscription of the current contract, incl. tax, in €."
+        },
+        "offres": {
+          "name": "Offers",
+          "description": "Optional: offers to compare, in the evaluer_offres format. Without them: reference offers."
+        },
+        "soutirage": {
+          "name": "Grid import",
+          "description": "Energy meter of the power taken from the grid (cumulative kWh)."
+        },
+        "puissance_reseau": {
+          "name": "Grid power",
+          "description": "Power taken from the grid (W)."
+        }
+      }
     }
   },
   "selector": {

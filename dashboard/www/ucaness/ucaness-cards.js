@@ -21,6 +21,8 @@
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
  *
+ * 0.5.5 (27/11/2026) : « Et si… » dans la bulle Ucan (option simulateur, action ucaness.simuler).
+ *
  * 0.5.4 (27/11/2026) : bulle Ucan déplaçable (glisser, position gardée sur l'appareil, « Replacer »).
  *
  * 0.5.3 (27/11/2026) : Ucan en bulle de discussion en bas à droite (floating: true).
@@ -42,7 +44,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.5.4';
+const UC_VERSION = '0.5.5';
 
 /* Dossier où se trouve ce fichier (en général /local/ucaness/). */
 const UC_BASE = (() => {
@@ -2349,6 +2351,8 @@ class UcanessHoursCard extends HTMLElement {
  *   conseil: sensor.ucan_conseil (pilotage/packages/ucan_conseils.yaml) ; soc: sensor.uhome_soc ;
  *   alert_entities: [...] (comme ucaness-status-card) ; script: script.ucan_conseil_reponse ;
  *   compact: true (téléphone : petit avatar à côté de la bulle) ;
+ *   simulateur: {puissance_actuelle_kva, abonnement_actuel_eur_an, jours} (0.5.5) : boutons « Et si… » dans la
+ *   fenêtre (contrat, puissance), calcul seul par ucaness.simuler ;
  *   floating: true (0.5.3) : Ucan en bouton rond en bas à droite, devant les cartes ; un appui ouvre la
  *   conversation ; pastille et léger battement quand un conseil attend ; offset_bottom, offset_right (px).
  * Expression : « à surveiller » (lumière orange) si une alerte est en cours, « un conseil » si un
@@ -2508,8 +2512,57 @@ class UcanessUcanCard extends HTMLElement {
     return `<p class="t">Tout va bien. Je vous ferai signe quand un geste en vaudra la peine.</p>`;
   }
 
+  /* Simulateur « et si » (option simulateur: {puissance_actuelle_kva, abonnement_actuel_eur_an, jours}) :
+     calcul seul par l'action ucaness.simuler, réponse affichée comme un message d'Ucan. */
+  _etsiHtml() {
+    const c = this._config;
+    if (!c.simulateur) return '';
+    const s = this._simu;
+    const eur = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`;
+    let rep = '';
+    if (s && s.charge) rep = '<p class="t">Je calcule avec vos mesures…</p>';
+    else if (s && s.erreur) rep = `<p class="t">Calcul impossible : ${esc(s.erreur)}</p>`;
+    else if (s && s.r && s.r.question === 'contrat') {
+      const r = s.r;
+      const act = r.contrat_actuel;
+      const lignes = (r.classement || []).slice(0, 3).map((l) => `<li>${esc(l.nom)} : ${eur(l.cout_annuel_eur)} par an${typeof l.ecart_avec_contrat_actuel_eur_an === 'number' ? ` (${l.ecart_avec_contrat_actuel_eur_an <= 0 ? '' : '+'}${eur(l.ecart_avec_contrat_actuel_eur_an)})` : ''}</li>`).join('');
+      const fiab = { fiable: 'fiable', indicatif: 'indicative', insuffisant: 'insuffisante' }[r.fiabilite] || r.fiabilite;
+      rep = `<p class="t">Sur vos ${esc(act ? act.jours_mesures : r.jours_demandes)} derniers jours de mesures (estimation ${esc(fiab)}) :</p>
+        ${act ? `<p class="t">Contrat actuel : ${eur(act.cout_annuel_eur)} par an.</p>` : ''}<ul class="t">${lignes}</ul>
+        <p class="n">${esc((r.limites || [])[0] || '')} Prix à vérifier chez le fournisseur avant de changer.</p>`;
+    } else if (s && s.r && s.r.question === 'puissance') {
+      const r = s.r;
+      const verbe = { garder: 'convient', baisser: 'pourrait baisser', augmenter: 'est trop juste', inconnu: 'reste à mesurer' }[r.conseil] || r.conseil;
+      rep = r.conseil === 'inconnu' ? `<p class="t">${esc(r.raison || '')}</p>`
+        : `<p class="t">Pointe prise au réseau : ${esc(String(r.pointe_mesuree_kva).replace('.', ','))} kVA sur ${esc(r.jours_mesures)} jours. Votre puissance de ${esc(r.puissance_souscrite_kva)} kVA ${verbe} : ${esc(r.puissance_recommandee_kva)} kVA suffiraient avec ${esc(r.marge_pct)} % de marge.</p>
+          ${(r.remarques || []).map((x) => `<p class="n">${esc(x)}</p>`).join('')}`;
+    }
+    return `<div class="etsi"><p class="k">Et si…</p><div class="btns">
+        <button type="button" class="uc-key s" data-q="contrat">je changeais de contrat ?</button>
+        <button type="button" class="uc-key s" data-q="puissance">je changeais de puissance ?</button></div>
+        ${rep ? `<div class="msg">${rep}</div>` : ''}</div>`;
+  }
+
+  async _simuler(question) {
+    const c = this._config;
+    const sim = c.simulateur || {};
+    this._simu = { charge: true };
+    this._render();
+    try {
+      const data = { question, jours: sim.jours || 30 };
+      if (sim.puissance_actuelle_kva) data.puissance_actuelle_kva = sim.puissance_actuelle_kva;
+      if (sim.abonnement_actuel_eur_an != null) data.abonnement_actuel_eur_an = sim.abonnement_actuel_eur_an;
+      const rep = await this._hass.connection.sendMessagePromise({ type: 'call_service', domain: 'ucaness', service: 'simuler', service_data: data, return_response: true });
+      this._simu = { r: rep && rep.response };
+    } catch (err) {
+      this._simu = { erreur: (err && err.message) || 'erreur inconnue' };
+    }
+    this._render();
+  }
+
   _boutons(root) {
     const c = this._config;
+    root.querySelectorAll('button[data-q]').forEach((b) => b.addEventListener('click', () => this._simuler(b.dataset.q)));
     root.querySelectorAll('button[data-r]').forEach((b) => b.addEventListener('click', () => {
       const [dom, svc] = String(c.script).split('.');
       if (this._hass && dom && svc) this._hass.callService(dom, svc, { reponse: b.dataset.r });
@@ -2557,6 +2610,9 @@ class UcanessUcanCard extends HTMLElement {
           .tete h2 { margin: 0; font: 400 19px var(--uc-font); flex: 1; }
           .replacer { min-height: 36px; padding: 0 10px; border: 1px solid var(--uc-tab-border); border-radius: 18px; background: transparent; color: #9CC9F5; font: 400 14px var(--uc-font); cursor: pointer; }
           .fermer { width: 44px; height: 44px; border: 0; background: transparent; color: var(--uc-text); cursor: pointer; border-radius: 22px; }
+          .etsi { margin: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+          .etsi .msg { margin: 4px 0 0; }
+          .etsi ul { margin: 0; padding-left: 18px; }
           .msg { margin: 14px; padding: 14px 16px; border: 1px solid var(--uc-card-border); border-radius: 4px 14px 14px 14px; background: var(--uc-card-bg); display: flex; flex-direction: column; gap: 8px; }
           ${cssBulle}
         </style>
@@ -2564,7 +2620,7 @@ class UcanessUcanCard extends HTMLElement {
           <div class="tete"><div class="av">${ucUcanSvg(humeur, soc)}</div><h2>Ucan</h2>
             ${this._deplace ? '<button type="button" class="replacer">Replacer</button>' : ''}
             <button type="button" class="fermer" aria-label="Fermer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-          <div class="msg">${this._corps(conseil, alertes)}</div></section>` : ''}
+          <div class="msg">${this._corps(conseil, alertes)}</div>${this._etsiHtml()}</section>` : ''}
         <button type="button" class="fab uc-tap${attente && !this._ouvert && !UC_REDUCED && !UC_LIGHT ? ' appel' : ''}" aria-label="${label}" aria-expanded="${this._ouvert ? 'true' : 'false'}">
           ${ucUcanSvg(humeur, soc).replace('viewBox="0 0 220 300"', 'viewBox="30 4 160 118"')}${attente && !this._ouvert ? '<span class="pastille" aria-hidden="true"></span>' : ''}
         </button>`;
