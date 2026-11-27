@@ -23,7 +23,7 @@ class EntiteReglage(CoordinatorEntity[UcanessCoordinator]):
         self._entry = entry
         self._reglage = reglage
         self._attr_unique_id = f"{entry.data[CONF_DEVICE_CODE]}_reglage_{reglage.cle}"
-        self._attr_name = reglage.nom
+        self._attr_translation_key = reglage.cle
         self._attr_icon = reglage.icone
         self._attr_device_info = device_info(entry, coordinator)
         self.entity_id = f"{reglage.type}.ucaness_{reglage.cle}"

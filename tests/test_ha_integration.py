@@ -128,6 +128,8 @@ async def test_config_flow_bad_credentials(hass, fake_client):
 
 
 async def test_entities_created_with_values(hass, fake_client):
+    # Home Assistant en français : noms et identifiants identiques à ceux d'avant les traductions (0.4.2).
+    hass.config.language = "fr"
     await _create_entry(hass)
     await hass.async_block_till_done()
 
@@ -299,6 +301,22 @@ async def test_write_refused_when_option_disabled(hass, fake_client, fast_readba
     with pytest.raises(ServiceValidationError):
         await hass.services.async_call(DOMAIN, "definir_mode", {"mode": "arbitrage_horaire"}, blocking=True)
     assert all(c.writes == [] for c in FakeClient.instances)
+
+
+async def test_textes_traduits_en_anglais(hass, fake_client, fast_readback):
+    """Home Assistant en anglais : noms d'entités, états et messages d'erreur en anglais."""
+    hass.config.language = "en"
+    await _entry_with_options(hass, app_key="k", app_secret="s", write_enabled=False)
+    assert hass.states.get("sensor.uhome_soc").attributes["friendly_name"].endswith("Battery charge (SOC)")
+    assert hass.states.get("sensor.maison_test_on_grid_dod_setting") is not None     # identifiant tiré du nom anglais
+    with pytest.raises(ServiceValidationError, match="Writing to the inverter is disabled") as erreur:
+        await hass.services.async_call(DOMAIN, "definir_mode", {"mode": "arbitrage_horaire"}, blocking=True)
+    assert erreur.value.translation_key == "ecriture_desactivee"
+    from custom_components.ucaness import reglages
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    with pytest.raises(ServiceValidationError, match="outside the range 0 to 40") as erreur:
+        await reglages.async_definir(hass, entry, {"capacite": 99})
+    assert erreur.value.translation_placeholders["reglage"] == "Battery: capacity"
 
 
 async def test_backup_mode_is_not_offered(hass, fake_client, fast_readback):
@@ -567,13 +585,13 @@ async def test_reglage_enregistre_sans_recharger_l_integration(hass, fake_client
     entry = await _entry_with_options(hass)
     coordinateur = entry.runtime_data
     await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
-    await hass.services.async_call("select", "select_option", {"entity_id": "select.ucaness_type_tarif", "option": "Base"}, blocking=True)
+    await hass.services.async_call("select", "select_option", {"entity_id": "select.ucaness_type_tarif", "option": "base"}, blocking=True)
     await hass.services.async_call("time", "set_value", {"entity_id": "time.ucaness_hc_debut", "time": "23:00:00"}, blocking=True)
     await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.ucaness_hc_jours_non_ouvres"}, blocking=True)
     await hass.async_block_till_done()
     assert entry.options["reglages"] == {"capacite": 10.24, "type_tarif": "Base", "hc_debut": "23:00:00", "hc_jours_non_ouvres": True}
     assert float(hass.states.get("number.ucaness_capacite").state) == pytest.approx(10.24)
-    assert hass.states.get("select.ucaness_type_tarif").state == "Base"
+    assert hass.states.get("select.ucaness_type_tarif").state == "base"      # clé traduite ; l'entrée garde « Base »
     assert hass.states.get("time.ucaness_hc_debut").state == "23:00:00"
     assert hass.states.get("switch.ucaness_hc_jours_non_ouvres").state == "on"
     assert entry.runtime_data is coordinateur            # pas de rechargement, pas de nouvelle connexion
@@ -599,7 +617,7 @@ async def test_reglage_et_entree_du_package_une_seule_valeur(hass, fake_client):
     entry = await _entry_with_options(hass)
     await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)
     await hass.services.async_call("time", "set_value", {"entity_id": "time.ucaness_hc_fin", "time": "06:00:00"}, blocking=True)
-    await hass.services.async_call("select", "select_option", {"entity_id": "select.ucaness_type_tarif", "option": "Base"}, blocking=True)
+    await hass.services.async_call("select", "select_option", {"entity_id": "select.ucaness_type_tarif", "option": "base"}, blocking=True)
     await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.ucaness_hc_jours_non_ouvres"}, blocking=True)
     await hass.async_block_till_done()
     assert float(hass.states.get("input_number.jarvis_batterie_capacite").state) == pytest.approx(10.24)
@@ -679,6 +697,7 @@ async def test_question_batterie(hass, fake_client):
     ({"type_tarif": "Base", "prix_hp": 0.25}, "bilan_base", "0,0"),
 ])
 async def test_question_contrat(hass, fake_client, reponses, ecran_attendu, gain):
+    hass.config.language = "fr"     # gain affiché avec une virgule
     await _entrees_du_pilotage(hass)
     await _create_entry(hass)
     await hass.services.async_call("number", "set_value", {"entity_id": "number.ucaness_capacite", "value": 10.24}, blocking=True)

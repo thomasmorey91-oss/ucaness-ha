@@ -17,6 +17,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import translation
 
 from .const import DOMAIN
 from .coordinator import UcanessConfigEntry
@@ -31,15 +32,15 @@ INCONNU = (None, "", "unknown", "unavailable")
 
 @dataclass(frozen=True)
 class Reglage:
-    cle: str
-    nom: str
+    cle: str                        # aussi clé de traduction (translations/*.json, entity.<type>)
     type: str                       # number, select, time, switch
     entree: str                     # entrée du package de pilotage (référence tant qu'elle existe)
     unite: str | None = None
     mini: float | None = None
     maxi: float | None = None
     pas: float | None = None
-    options: tuple[str, ...] = ()
+    options: tuple[str, ...] = ()      # valeurs des entrées du package (textes en français)
+    cles_options: tuple[str, ...] = ()  # clés de traduction des options, dans le même ordre (états de l'entité)
     icone: str | None = None
     # Réglage oui / non dont l'entrée du package est une liste de choix : (choix « oui », choix « non »).
     # Tout autre choix de la liste (détection automatique) laisse la valeur enregistrée ici.
@@ -48,23 +49,23 @@ class Reglage:
 
 REGLAGES: tuple[Reglage, ...] = (
     # Batterie (bornes de pilotage/packages/jarvis_batterie.yaml)
-    Reglage("capacite", "Batterie : capacité", NUMBER, "input_number.jarvis_batterie_capacite", "kWh", 0, 40, 0.01, icone="mdi:battery"),
-    Reglage("plancher", "Batterie : SOC plancher", NUMBER, "input_number.jarvis_batterie_plancher", "%", 0, 60, 1, icone="mdi:battery-low"),
-    Reglage("rendement", "Batterie : rendement", NUMBER, "input_number.jarvis_batterie_rendement", "%", 0, 100, 0.5, icone="mdi:percent"),
-    Reglage("puissance_charge", "Batterie : puissance de charge", NUMBER, "input_number.jarvis_batterie_puissance_charge", "kW", 0.5, 10, 0.1, icone="mdi:flash"),
-    Reglage("marge", "Batterie : marge de sécurité", NUMBER, "input_number.jarvis_batterie_marge", "%", 0, 50, 1, icone="mdi:shield-half-full"),
-    Reglage("conso_journaliere", "Batterie : consommation journalière par défaut", NUMBER, "input_number.jarvis_conso_journaliere", "kWh", 0, 200, 0.1, icone="mdi:home-lightning-bolt"),
+    Reglage("capacite", NUMBER, "input_number.jarvis_batterie_capacite", "kWh", 0, 40, 0.01, icone="mdi:battery"),
+    Reglage("plancher", NUMBER, "input_number.jarvis_batterie_plancher", "%", 0, 60, 1, icone="mdi:battery-low"),
+    Reglage("rendement", NUMBER, "input_number.jarvis_batterie_rendement", "%", 0, 100, 0.5, icone="mdi:percent"),
+    Reglage("puissance_charge", NUMBER, "input_number.jarvis_batterie_puissance_charge", "kW", 0.5, 10, 0.1, icone="mdi:flash"),
+    Reglage("marge", NUMBER, "input_number.jarvis_batterie_marge", "%", 0, 50, 1, icone="mdi:shield-half-full"),
+    Reglage("conso_journaliere", NUMBER, "input_number.jarvis_conso_journaliere", "kWh", 0, 200, 0.1, icone="mdi:home-lightning-bolt"),
     # Installation (pilotage/packages/jarvis_batterie.yaml : « Batterie : panneaux solaires »)
-    Reglage("solaire", "Installation : panneaux solaires raccordés", SWITCH, "input_select.jarvis_solaire",
+    Reglage("solaire", SWITCH, "input_select.jarvis_solaire",
             icone="mdi:solar-power", choix_oui_non=("Avec panneaux", "Sans panneaux")),
     # Contrat (pilotage/packages/jarvis_tarif.yaml)
-    Reglage("type_tarif", "Tarif : type de contrat", SELECT, "input_select.jarvis_type_tarif", options=(TARIF_HPHC, TARIF_BASE), icone="mdi:cash-clock"),
-    Reglage("prix_hp", "Tarif : prix heures pleines (ou Base)", NUMBER, "input_number.jarvis_prix_hp", "EUR/kWh", 0, 1, 0.00001, icone="mdi:currency-eur"),
-    Reglage("prix_hc", "Tarif : prix heures creuses", NUMBER, "input_number.jarvis_prix_hc", "EUR/kWh", 0, 1, 0.00001, icone="mdi:currency-eur"),
-    Reglage("prix_injection", "Tarif : prix de revente du surplus", NUMBER, "input_number.jarvis_prix_injection", "EUR/kWh", 0, 1, 0.00001, icone="mdi:currency-eur"),
-    Reglage("hc_debut", "Tarif : début des heures creuses", TIME, "input_datetime.jarvis_hc_debut", icone="mdi:clock-start"),
-    Reglage("hc_fin", "Tarif : fin des heures creuses", TIME, "input_datetime.jarvis_hc_fin", icone="mdi:clock-end"),
-    Reglage("hc_jours_non_ouvres", "Tarif : week-end et jours fériés en heures creuses", SWITCH, "input_boolean.jarvis_hc_jours_non_ouvres", icone="mdi:calendar-weekend"),
+    Reglage("type_tarif", SELECT, "input_select.jarvis_type_tarif", options=(TARIF_HPHC, TARIF_BASE), cles_options=("hphc", "base"), icone="mdi:cash-clock"),
+    Reglage("prix_hp", NUMBER, "input_number.jarvis_prix_hp", "EUR/kWh", 0, 1, 0.00001, icone="mdi:currency-eur"),
+    Reglage("prix_hc", NUMBER, "input_number.jarvis_prix_hc", "EUR/kWh", 0, 1, 0.00001, icone="mdi:currency-eur"),
+    Reglage("prix_injection", NUMBER, "input_number.jarvis_prix_injection", "EUR/kWh", 0, 1, 0.00001, icone="mdi:currency-eur"),
+    Reglage("hc_debut", TIME, "input_datetime.jarvis_hc_debut", icone="mdi:clock-start"),
+    Reglage("hc_fin", TIME, "input_datetime.jarvis_hc_fin", icone="mdi:clock-end"),
+    Reglage("hc_jours_non_ouvres", SWITCH, "input_boolean.jarvis_hc_jours_non_ouvres", icone="mdi:calendar-weekend"),
 )
 PAR_CLE = {r.cle: r for r in REGLAGES}
 
@@ -80,24 +81,52 @@ def _heure(valeur: Any) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
+class ReglageInvalide(ValueError):
+    """Valeur refusée pour un réglage. `raison` est la clé de traduction du message (exceptions.*)."""
+
+    def __init__(self, reglage: Reglage, raison: str, valeur: Any) -> None:
+        super().__init__(f"{reglage.cle} : {valeur} ({raison})")
+        self.reglage, self.raison, self.valeur = reglage, raison, valeur
+
+    def placeholders(self, nom: str) -> dict[str, str]:
+        return {"reglage": nom, "valeur": str(self.valeur), "mini": f"{self.reglage.mini:g}" if self.reglage.mini is not None else "",
+                "maxi": f"{self.reglage.maxi:g}" if self.reglage.maxi is not None else ""}
+
+
 def normaliser(reglage: Reglage, valeur: Any) -> Any:
-    """Valeur vérifiée et mise au format enregistré. ValueError si elle n'est pas acceptable."""
+    """Valeur vérifiée et mise au format enregistré. ReglageInvalide (ValueError) si elle n'est pas acceptable."""
     if reglage.type == NUMBER:
-        v = float(valeur)
+        try:
+            v = float(valeur)
+        except (TypeError, ValueError):
+            raise ReglageInvalide(reglage, "reglage_hors_bornes", valeur) from None
         if v != v or not (reglage.mini <= v <= reglage.maxi):
-            raise ValueError(f"{reglage.nom} : {valeur} hors des bornes {reglage.mini} à {reglage.maxi}")
+            raise ReglageInvalide(reglage, "reglage_hors_bornes", valeur)
         return v
     if reglage.type == SELECT:
         if valeur not in reglage.options:
-            raise ValueError(f"{reglage.nom} : {valeur} n'est pas un choix possible")
+            raise ReglageInvalide(reglage, "reglage_choix_impossible", valeur)
         return valeur
     if reglage.type == TIME:
-        return _heure(valeur)
+        try:
+            return _heure(valeur)
+        except (TypeError, ValueError):
+            raise ReglageInvalide(reglage, "reglage_heure_invalide", valeur) from None
     if isinstance(valeur, bool):
         return valeur
     if valeur in ("on", "off"):
         return valeur == "on"
-    raise ValueError(f"{reglage.nom} : {valeur} n'est ni vrai ni faux")
+    raise ReglageInvalide(reglage, "reglage_ni_vrai_ni_faux", valeur)
+
+
+def nom(hass: HomeAssistant, reglage: Reglage) -> str:
+    """Nom du réglage dans la langue de Home Assistant (traductions déjà chargées), sinon sa clé."""
+    cle = f"component.{DOMAIN}.entity.{reglage.type}.{reglage.cle}.name"
+    for langue in (hass.config.language, "en"):
+        texte = translation.async_get_cached_translations(hass, langue, "entity", DOMAIN).get(cle)
+        if texte:
+            return texte
+    return reglage.cle
 
 
 def valeur(hass: HomeAssistant, entry: UcanessConfigEntry, cle: str) -> Any:
@@ -119,10 +148,17 @@ def valeur(hass: HomeAssistant, entry: UcanessConfigEntry, cle: str) -> Any:
 
 async def async_definir(hass: HomeAssistant, entry: UcanessConfigEntry, valeurs: dict[str, Any]) -> None:
     """Enregistre un ou plusieurs réglages et les recopie dans les entrées du package présentes."""
+    inconnus = [cle for cle in valeurs if cle not in PAR_CLE]
+    if inconnus:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="reglage_inconnu", translation_placeholders={"reglage": ", ".join(inconnus)}
+        )
     try:
         propres = {cle: normaliser(PAR_CLE[cle], v) for cle, v in valeurs.items()}
-    except (KeyError, TypeError, ValueError) as err:
-        raise ServiceValidationError(f"Réglage refusé : {err}") from err
+    except ReglageInvalide as err:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key=err.raison, translation_placeholders=err.placeholders(nom(hass, err.reglage))
+        ) from err
     hass.config_entries.async_update_entry(
         entry, options={**entry.options, CONF_REGLAGES: {**(entry.options.get(CONF_REGLAGES) or {}), **propres}}
     )
@@ -150,4 +186,4 @@ def gain_cyclage_eur_kwh(prix_hp: float, prix_hc: float, rendement_pct: float) -
     return r * r * prix_hp - prix_hc
 
 
-__all__ = ["CONF_REGLAGES", "DOMAIN", "PAR_CLE", "REGLAGES", "Reglage", "async_definir", "gain_cyclage_eur_kwh", "normaliser", "valeur"]
+__all__ = ["CONF_REGLAGES", "DOMAIN", "PAR_CLE", "REGLAGES", "Reglage", "ReglageInvalide", "async_definir", "gain_cyclage_eur_kwh", "nom", "normaliser", "valeur"]

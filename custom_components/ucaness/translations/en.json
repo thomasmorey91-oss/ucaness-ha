@@ -256,6 +256,12 @@
         "autoconsommation": "Self-consumption",
         "arbitrage_horaire": "Time-of-use (peak shift)"
       }
+    },
+    "type_tarif": {
+      "options": {
+        "hphc": "Peak / off-peak hours",
+        "base": "Base (single price)"
+      }
     }
   },
   "issues": {
@@ -359,6 +365,293 @@
           "entree_absente": "This battery is no longer configured."
         }
       }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "solar_power": {
+        "name": "Solar power"
+      },
+      "pv1_power": {
+        "name": "MPPT 1 power"
+      },
+      "pv2_power": {
+        "name": "MPPT 2 power"
+      },
+      "battery_power": {
+        "name": "Battery power (charging > 0)"
+      },
+      "load_power": {
+        "name": "House power"
+      },
+      "grid_power": {
+        "name": "Estimated grid power (import > 0)"
+      },
+      "inverter_power": {
+        "name": "Inverter power"
+      },
+      "soc": {
+        "name": "Battery charge (SOC)"
+      },
+      "soh": {
+        "name": "Battery health (SOH)"
+      },
+      "battery_voltage": {
+        "name": "Battery voltage"
+      },
+      "battery_current": {
+        "name": "Battery current"
+      },
+      "battery_temp": {
+        "name": "Battery temperature"
+      },
+      "cell_temp_max": {
+        "name": "Max cell temperature"
+      },
+      "cell_temp_min": {
+        "name": "Min cell temperature"
+      },
+      "cell_voltage_max": {
+        "name": "Max cell voltage"
+      },
+      "cell_voltage_min": {
+        "name": "Min cell voltage"
+      },
+      "battery_modules": {
+        "name": "Number of battery modules"
+      },
+      "battery_alarm_code": {
+        "name": "Battery alarm code"
+      },
+      "battery_fault_code": {
+        "name": "Battery fault code"
+      },
+      "battery_pack_alarm_raw": {
+        "name": "Pack alarm code (raw, to be interpreted)"
+      },
+      "grid_voltage": {
+        "name": "Grid voltage"
+      },
+      "grid_frequency": {
+        "name": "Grid frequency"
+      },
+      "solar_voltage": {
+        "name": "Solar voltage"
+      },
+      "inverter_temp": {
+        "name": "Inverter temperature"
+      },
+      "ambient_temp": {
+        "name": "Inverter ambient temperature"
+      },
+      "pv_module_temp": {
+        "name": "PV stage temperature"
+      },
+      "leakage_current_raw": {
+        "name": "Leakage current (raw)"
+      },
+      "work_mode": {
+        "name": "Work mode"
+      },
+      "work_state": {
+        "name": "Work state"
+      },
+      "last_update": {
+        "name": "Last reading received"
+      },
+      "data_age": {
+        "name": "Data age"
+      },
+      "energy_solar_today": {
+        "name": "Solar production today"
+      },
+      "energy_solar_total": {
+        "name": "Total solar production"
+      },
+      "energy_grid_import_today": {
+        "name": "Grid import today"
+      },
+      "energy_grid_import_total": {
+        "name": "Total grid import"
+      },
+      "energy_grid_export_today": {
+        "name": "Grid export today"
+      },
+      "energy_grid_export_total": {
+        "name": "Total grid export"
+      },
+      "energy_load_today": {
+        "name": "House consumption today"
+      },
+      "energy_load_total": {
+        "name": "Total house consumption"
+      },
+      "energy_battery_charge_today": {
+        "name": "Battery charge today"
+      },
+      "energy_battery_charge_total": {
+        "name": "Total battery charge"
+      },
+      "energy_battery_discharge_today": {
+        "name": "Battery discharge today"
+      },
+      "energy_battery_discharge_total": {
+        "name": "Total battery discharge"
+      },
+      "setting_dod": {
+        "name": "On-grid DOD setting"
+      },
+      "setting_hysteresis": {
+        "name": "Hysteresis setting"
+      },
+      "setting_charge_current": {
+        "name": "Charge current setting"
+      },
+      "setting_discharge_power": {
+        "name": "Discharge power setting"
+      },
+      "setting_export_power": {
+        "name": "Export power setting"
+      },
+      "setting_charge1_start": {
+        "name": "Charge window 1: start"
+      },
+      "setting_charge1_end": {
+        "name": "Charge window 1: end"
+      },
+      "event_count": {
+        "name": "Recorded events"
+      },
+      "installation": {
+        "name": "Installation",
+        "state": {
+          "a_configurer": "To be configured",
+          "en_simulation": "Simulating",
+          "en_service": "In service",
+          "a_verifier": "To be checked"
+        }
+      }
+    },
+    "binary_sensor": {
+      "cloud_connection": {
+        "name": "UCANESS cloud connection"
+      },
+      "battery_fault": {
+        "name": "Battery fault or alarm"
+      },
+      "battery_temp_out_of_charge_range": {
+        "name": "Battery temperature outside charging range (0–50 °C)"
+      }
+    },
+    "number": {
+      "capacite": {
+        "name": "Battery: capacity"
+      },
+      "plancher": {
+        "name": "Battery: minimum SOC"
+      },
+      "rendement": {
+        "name": "Battery: efficiency"
+      },
+      "puissance_charge": {
+        "name": "Battery: charging power"
+      },
+      "marge": {
+        "name": "Battery: safety margin"
+      },
+      "conso_journaliere": {
+        "name": "Battery: default daily consumption"
+      },
+      "prix_hp": {
+        "name": "Tariff: peak price (or Base)"
+      },
+      "prix_hc": {
+        "name": "Tariff: off-peak price"
+      },
+      "prix_injection": {
+        "name": "Tariff: surplus export price"
+      }
+    },
+    "switch": {
+      "solaire": {
+        "name": "Installation: solar panels connected"
+      },
+      "hc_jours_non_ouvres": {
+        "name": "Tariff: weekends and public holidays off-peak"
+      }
+    },
+    "select": {
+      "type_tarif": {
+        "name": "Tariff: contract type",
+        "state": {
+          "hphc": "Peak / off-peak hours",
+          "base": "Base (single price)"
+        }
+      }
+    },
+    "time": {
+      "hc_debut": {
+        "name": "Tariff: off-peak start"
+      },
+      "hc_fin": {
+        "name": "Tariff: off-peak end"
+      }
+    }
+  },
+  "exceptions": {
+    "appareil_introuvable": {
+      "message": "UCANESS device not found or ambiguous (specify config_entry_id)"
+    },
+    "ecriture_desactivee": {
+      "message": "Writing to the inverter is disabled ('Write allowed' option of the UCANESS integration)"
+    },
+    "consigne_refusee": {
+      "message": "Command refused by the safeguard: {detail}"
+    },
+    "plages_non_envoyees": {
+      "message": "Command not sent (charge windows {plages}): {detail}"
+    },
+    "mode_non_envoye": {
+      "message": "Command not sent (mode {mode}): {detail}"
+    },
+    "plages_non_confirmees": {
+      "message": "Charge windows {plages}: command sent but not confirmed by the inverter ({ecarts})"
+    },
+    "mode_non_confirme": {
+      "message": "Mode {mode}: command sent but not confirmed by the inverter ({ecarts})"
+    },
+    "plages_relecture_impossible": {
+      "message": "Charge windows {plages}: command sent but not confirmed by the inverter (could not read back)"
+    },
+    "mode_relecture_impossible": {
+      "message": "Mode {mode}: command sent but not confirmed by the inverter (could not read back)"
+    },
+    "api_tierce": {
+      "message": "UCANESS third-party API: {detail}"
+    },
+    "donnees_refusees": {
+      "message": "Data refused: {detail}"
+    },
+    "puissance_actuelle_manquante": {
+      "message": "Enter the current subscribed power (puissance_actuelle_kva)."
+    },
+    "aucune_mesure_horaire": {
+      "message": "No hourly reading of {entite} over the last {jours} days."
+    },
+    "reglage_inconnu": {
+      "message": "Setting refused: unknown setting ({reglage})"
+    },
+    "reglage_hors_bornes": {
+      "message": "Setting refused: {reglage}: {valeur} outside the range {mini} to {maxi}"
+    },
+    "reglage_choix_impossible": {
+      "message": "Setting refused: {reglage}: {valeur} is not an available option"
+    },
+    "reglage_heure_invalide": {
+      "message": "Setting refused: {reglage}: {valeur} is not a time (HH:MM)"
+    },
+    "reglage_ni_vrai_ni_faux": {
+      "message": "Setting refused: {reglage}: {valeur} is neither true nor false"
     }
   }
 }

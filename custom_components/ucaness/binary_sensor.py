@@ -42,21 +42,15 @@ def _charge_temp_out_of_range(data: dict[str, Any]) -> bool | None:
 
 @dataclass(frozen=True)
 class Check:
-    key: str
-    name: str
+    key: str  # aussi clé de traduction (translations/*.json, entity.binary_sensor)
     device_class: BinarySensorDeviceClass
     fn: Callable[[dict[str, Any]], bool | None]
 
 
 CHECKS = (
-    Check("cloud_connection", "Connexion au cloud UCANESS", BinarySensorDeviceClass.CONNECTIVITY, _cloud_ok),
-    Check("battery_fault", "Défaut ou alarme batterie", BinarySensorDeviceClass.PROBLEM, _battery_fault),
-    Check(
-        "battery_temp_out_of_charge_range",
-        "Température batterie hors plage de charge (0–50 °C)",
-        BinarySensorDeviceClass.PROBLEM,
-        _charge_temp_out_of_range,
-    ),
+    Check("cloud_connection", BinarySensorDeviceClass.CONNECTIVITY, _cloud_ok),
+    Check("battery_fault", BinarySensorDeviceClass.PROBLEM, _battery_fault),
+    Check("battery_temp_out_of_charge_range", BinarySensorDeviceClass.PROBLEM, _charge_temp_out_of_range),
 )
 
 
@@ -74,7 +68,7 @@ class UcanessCheck(CoordinatorEntity[UcanessCoordinator], BinarySensorEntity):
         super().__init__(coordinator)
         self._check = check
         self._attr_unique_id = f"{entry.data[CONF_DEVICE_CODE]}_{check.key}"
-        self._attr_name = check.name
+        self._attr_translation_key = check.key
         self._attr_device_class = check.device_class
         self._attr_device_info = device_info(entry, coordinator)
         if check.key in OBJECT_IDS:

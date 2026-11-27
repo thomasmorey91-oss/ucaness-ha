@@ -35,6 +35,8 @@ jobs:
         run: pytest -p no:homeassistant -p no:socket tests/test_client_and_parser.py
       - name: Signature, garde-fous, écriture et relecture
         run: pytest -p no:homeassistant -p no:socket tests/test_pilotage.py
+      - name: Traductions (clés et paramètres identiques dans chaque langue)
+        run: pytest -p no:homeassistant -p no:socket tests/test_traductions.py
       - name: Intégration dans Home Assistant
         run: pytest tests/test_ha_integration.py
       - name: Assistant d'installation
