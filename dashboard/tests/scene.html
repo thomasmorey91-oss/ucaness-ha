@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Vue 3D, ciel et écran de téléphone (hors Home Assistant)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin: 0; background: #030B20; }
+  .stub { box-sizing: border-box; min-height: 44px; padding: 8px 10px; background: rgba(22,40,72,0.78); color: #FFFFFF; font: 14px 'Times New Roman', Tinos, serif; }
+</style>
+<script>
+  // Données inventées : aucune mesure réelle.
+  const now = new Date().toISOString();
+  const s = (state, unit, extra) => ({ state: String(state), attributes: Object.assign(unit ? { unit_of_measurement: unit } : {}, extra || {}), last_updated: now, last_changed: now });
+  window.fakeHass = {
+    locale: { language: 'fr' },
+    language: 'fr',
+    states: {
+      'sun.sun': s('above_horizon', null, { elevation: 32, rising: false }),
+      'weather.maison': s('sunny', null, { temperature: 14.2, temperature_unit: '°C' }),
+      'sensor.uhome_puissance_solaire': s(1240, 'W'),
+      'sensor.uhome_tension_solaire': s(352.4, 'V'),
+      'sensor.uhome_puissance_reseau': s(0, 'W'),
+      'sensor.uhome_tension_reseau': s(231.6, 'V'),
+      'sensor.uhome_frequence_reseau': s(50.0, 'Hz'),
+      'sensor.uhome_puissance_batterie': s(820, 'W'),
+      'sensor.uhome_puissance_maison': s(420, 'W'),
+      'sensor.uhome_soc': s(42, '%'),
+      'sensor.uhome_mode': s('Match Load Mode'),
+      'sensor.borne_puissance_de_charge': s(0, 'kW'),
+      'sensor.borne_description_de_l_etat': s('Ready'),
+      'sensor.production_du_jour': s(6.4, 'kWh'),
+      'input_number.jarvis_batterie_plancher': s(10, '%'),
+      'input_number.jarvis_batterie_capacite': s(10, 'kWh'),
+      'binary_sensor.uhome_defaut_batterie': s('off'),
+      'climate.seche_serviettes': s('heat'),
+    },
+    callWS: async (msg) => {
+      if (msg.type !== 'recorder/statistics_during_period') return [];
+      const out = {};
+      out[msg.statistic_ids[0]] = [...Array(14).keys()].map((h) => {
+        const d = new Date(); d.setHours(h, 0, 0, 0);
+        return { start: d.getTime(), change: Math.max(0, Math.sin((h - 6) / 12 * Math.PI)) * 1.6, mean: 30 + h * 3 };
+      });
+      return out;
+    },
+    connection: {
+      subscribeMessage: async (cb, msg) => {
+        const t = String(msg.template || '');
+        // Les modèles « DECISION » se rejouent avec window.annoncer('Recharge de 4,2 kWh').
+        if (t.includes('DECISION')) (window.decisions = window.decisions || []).push(cb);
+        setTimeout(() => cb({ result: t.includes('DECISION') ? 'Pas de recharge' : 'texte' }), 30);
+        return () => {};
+      },
+    },
+  };
+  window.annoncer = (texte) => (window.decisions || []).forEach((cb) => cb({ result: texte }));
+  window.loadCardHelpers = async () => ({
+    createCardElement(conf) {
+      if (String(conf.type).startsWith('custom:')) {
+        const card = document.createElement(conf.type.slice(7));
+        card.setConfig(conf);
+        return card;
+      }
+      const el = document.createElement('div');
+      el.className = 'stub';
+      el.textContent = conf.name || conf.type;
+      return el;
+    },
+  });
+  // Vue 3D de la maison d'exemple : mêmes positions que dashboards/ucaness-home-assistant.yaml.
+  window.scene = {
+    type: 'custom:ucaness-flow-card', scene: '3d', image: '../www/ucaness/maison-exemple.svg',
+    mode_entity: 'sensor.uhome_mode', battery_path: '/batterie',
+    ev: { entity: 'sensor.borne_puissance_de_charge', state_entity: 'sensor.borne_description_de_l_etat', x: 61, y: 49, route: [[36, 70], [55, 70], [58.5, 63.5]], borne: { x: 56.8, y: 55, w: 3 } },
+    nodes: {
+      solar: { x: 40, y: 7, routes: [[[44.9, 41], [44.9, 55], [32, 55], [32, 58]]], glow: [[44, 32.5, 10, 3.6, 33]], leader: [[38.5, 19], [42, 29]], details: ['sensor.uhome_tension_solaire'] },
+      grid: { x: 87.5, y: 22, route: [[85.5, 39], [85.5, 94], [32, 94], [32, 83]] },
+      battery: { x: 26.5, y: 60, uhome: { x: 28, y: 58, w: 8 } },
+      home: { x: 70, y: 80, route: [[36, 76], [71, 76]], bulb: { x: 71, y: 70.5, w: 5.5 } },
+    },
+  };
+</script>
+<script type="module">
+  import '../www/ucaness/ucaness-cards.js';
+  const tel = new URLSearchParams(location.search).get('ecran') === 'tel';
+  let root;
+  if (tel) {
+    root = document.createElement('ucaness-app-card');
+    root.setConfig({
+      site: 'Maison',
+      alert_entities: ['binary_sensor.uhome_defaut_batterie'],
+      nav: [{ title: 'Accueil', icon: 'mdi:home', path: '/tests/scene.html' }, { title: 'Énergie', icon: 'mdi:home-battery', path: '/energie' }],
+      cards: [
+        { type: 'custom:ucaness-soc-card', compact: true, mode_entity: 'sensor.uhome_mode' },
+        Object.assign({}, window.scene, { details: false }),
+        { type: 'custom:ucaness-detail-card', title: 'Cette nuit', headline_template: '{{ DECISION }}' },
+        { type: 'custom:ucaness-hours-card', tabs: [{ name: 'Soleil', statistic: 'sensor.production_totale', unit: 'kWh' }, { name: 'Batterie', statistic: 'sensor.uhome_soc', stat_type: 'mean', kind: 'line', unit: '%', min: 0, max: 100 }] },
+        { type: 'custom:ucaness-stats-card', items: [{ name: 'Soleil', entity: 'sensor.production_du_jour', digits: 1 }, { name: 'Batterie', entity: 'sensor.uhome_soc' }] },
+        { type: 'custom:ucaness-shortcuts-card', items: [{ name: 'Serviettes', icon: 'mdi:radiator', entity: 'climate.seche_serviettes' }, { name: 'Absent', icon: 'mdi:help', entity: 'switch.absent' }] },
+      ],
+    });
+  } else {
+    root = document.createElement('ucaness-layout-card');
+    root.setConfig({
+      header: { title: 'UCANESS HOME ASSISTANT', site: 'Maison', tabs: [{ title: 'Maison', path: '/tests/scene.html' }, { title: 'Batterie', path: '/batterie', entity: 'sensor.uhome_soc' }] },
+      columns: [
+        { width: '300px', cards: [{ type: 'custom:ucaness-panel-card', title: 'Batterie', cards: [{ type: 'custom:ucaness-soc-card' }] }] },
+        { width: '1fr', cards: [window.scene] },
+        { width: '300px', cards: [{ type: 'custom:ucaness-panel-card', title: 'Appareils', cards: [{ type: 'tile', name: 'Lave-linge' }] }] },
+      ],
+    });
+  }
+  document.body.appendChild(root);
+  root.hass = window.fakeHass;
+  setTimeout(() => { root.hass = window.fakeHass; document.body.dataset.ready = '1'; }, 300);
+</script>
+</head>
+<body></body>
+</html>

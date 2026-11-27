@@ -86,16 +86,45 @@ views:
           # ---- au centre : la maison en direct et les appareils
           - width: 1fr
             cards:
+              # Vue 3D (cartes 0.5.0) : la maison d'exemple avec la colonne UHome, l'ampoule et le poteau,
+              # chiffres écrits à côté des objets, flux sans flèches. Positions en % de la carte, calées sur
+              # maison-exemple.svg ; pour votre maison, voir dashboard/MAISON.md (calibration: true affiche
+              # une grille de calage). Sans « scene », la carte garde la vue à pastilles.
               - type: custom:ucaness-flow-card
-                # Votre maison (voir dashboard/MAISON.md) :
-                # image: /local/ucaness/ma-maison.png
-                # nodes:
-                #   solar:    {x: 44, y: 11.5}
-                #   inverter: {x: 44, y: 46}
-                #   grid:     {x: 65, y: 11.5}
-                #   battery:  {x: 20, y: 79}
-                #   home:     {x: 60, y: 79}
-                # calibration: true   # grille de calage, à retirer une fois les boules placées
+                scene: 3d
+                image: /local/ucaness/maison-exemple.svg
+                mode_entity: sensor.uhome_mode
+                battery_path: /ucaness-maison/batterie
+                nodes:
+                  solar:
+                    x: 40
+                    y: 7
+                    routes:
+                      - [[44.9, 41], [44.9, 55], [32, 55], [32, 58]]
+                    glow:
+                      - [44, 32.5, 10, 3.6, 33]
+                    leader: [[38.5, 19], [42, 29]]
+                  grid:
+                    x: 87.5
+                    y: 22
+                    route: [[85.5, 39], [85.5, 94], [32, 94], [32, 83]]
+                  battery:
+                    x: 26.5
+                    y: 60
+                    uhome: {x: 28, y: 58, w: 8}
+                  home:
+                    x: 70
+                    y: 80
+                    route: [[36, 76], [71, 76]]
+                    bulb: {x: 71, y: 70.5, w: 5.5}
+                # Borne de recharge (facultative) : dessinée sur le garage, flux bleu.
+                # ev:
+                #   entity: sensor.borne_puissance_de_charge          # EXEMPLE
+                #   state_entity: sensor.borne_description_de_l_etat  # EXEMPLE
+                #   x: 61
+                #   y: 49
+                #   route: [[36, 70], [55, 70], [58.5, 63.5]]
+                #   borne: {x: 56.8, y: 55, w: 3}
               - type: custom:ucaness-panel-card
                 title: Appareils
                 cards:
