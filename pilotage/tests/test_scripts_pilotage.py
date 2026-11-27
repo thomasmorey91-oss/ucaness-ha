@@ -4,6 +4,7 @@ Les actions ucaness.* sont remplacées par des fausses qui enregistrent les appe
 font évoluer le mode affiché ; aucune connexion à l'onduleur.
 Usage : python -m pytest -q test_scripts_pilotage.py
 """
+import json
 import pathlib
 
 import pytest
@@ -55,7 +56,7 @@ async def maison(hass):
         "jarvis_hc_debut": {"has_date": False, "has_time": True, "initial": "23:00"},
         "jarvis_hc_fin": {"has_date": False, "has_time": True, "initial": "06:00"},
     }})
-    assert await async_setup_component(hass, "input_text", {"input_text": alertes["input_text"]})
+    assert await async_setup_component(hass, "input_text", {"input_text": {**alertes["input_text"], **bat["input_text"]}})
     assert await async_setup_component(hass, "script", {"script": bat["script"]})
     await hass.async_block_till_done()
 
@@ -401,3 +402,21 @@ async def test_simulation_au_demarrage(hass, conserver, attendu):
     await hass.async_start()
     await hass.async_block_till_done()
     assert hass.states.get("input_boolean.jarvis_mode_simulation").state == attendu
+
+
+async def test_appliquer_note_le_suivi_de_calibration(hass, maison):
+    """La programmation garde le compteur de charge de départ et la recharge programmée."""
+    hass.states.async_set("sensor.uhome_charge_batterie_totale", "1234.5")
+    hass.states.async_set(
+        "sensor.jarvis_recharge_reseau_prevue", "7.08",
+        {"plages": [{"debut": "0400", "fin": "0545"}], "plan_fin": "0545", "maintien": True,
+         "facteur_duree": 1.1, "duree_limitee": False},
+    )
+    await hass.services.async_call("script", "jarvis_batterie_appliquer", {}, blocking=True, return_response=True)
+    suivi = json.loads(hass.states.get("input_text.jarvis_charge_suivi").state)
+    assert suivi["c"] == 1234.5 and suivi["r"] == 7.08 and suivi["k"] == 1.1 and suivi["l"] is False
+
+
+async def test_appliquer_sans_compteur_ne_note_rien(hass, maison):
+    await hass.services.async_call("script", "jarvis_batterie_appliquer", {}, blocking=True, return_response=True)
+    assert hass.states.get("input_text.jarvis_charge_suivi").state == ""
