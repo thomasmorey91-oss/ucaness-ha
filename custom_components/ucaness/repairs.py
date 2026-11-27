@@ -84,6 +84,11 @@ class EtapeBatterie(_Etape):
         )
 
 
+def _decimal(hass: HomeAssistant, nombre: str) -> str:
+    """Séparateur décimal de la langue de Home Assistant (virgule en français et en allemand, point sinon)."""
+    return nombre.replace(".", ",") if hass.config.language.split("-")[0] in ("fr", "de") else nombre
+
+
 class EtapeContrat(_Etape):
     def __init__(self, entry_id: str) -> None:
         super().__init__(entry_id)
@@ -93,7 +98,10 @@ class EtapeContrat(_Etape):
         if self._entry is None:
             return self.async_abort(reason="entree_absente")
         errors: dict[str, str] = {}
+        r = reglages.PAR_CLE["type_tarif"]
         if user_input is not None:
+            # Le formulaire renvoie la clé traduite (« hphc », « base ») ; on enregistre le texte de l'entrée du package.
+            user_input = {**user_input, "type_tarif": dict(zip(r.cles_options, r.options)).get(user_input["type_tarif"], user_input["type_tarif"])}
             base = user_input["type_tarif"] == reglages.TARIF_BASE
             if float(user_input["prix_hp"]) <= 0:
                 errors["prix_hp"] = "prix_nul"
@@ -102,9 +110,10 @@ class EtapeContrat(_Etape):
             else:
                 self._reponses = {k: v for k, v in user_input.items() if v is not None}
                 return await self.async_step_bilan()
-        r = reglages.PAR_CLE["type_tarif"]
         schema = vol.Schema({
-            self._champ("type_tarif"): selector.SelectSelector(selector.SelectSelectorConfig(options=list(r.options))),
+            self._champ("type_tarif", propose=dict(zip(r.options, r.cles_options)).get(self._connu("type_tarif"))): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=list(r.cles_options), translation_key="type_tarif")
+            ),
             self._champ("prix_hp"): _nombre("prix_hp"),
             self._champ("prix_hc", obligatoire=False): _nombre("prix_hc"),
             self._champ("hc_debut", obligatoire=False): selector.TimeSelector(),
@@ -129,7 +138,7 @@ class EtapeContrat(_Etape):
             verdict = "rentable" if gain > 0 else "non_rentable"
         return self.async_show_form(
             step_id=f"bilan_{verdict}" if verdict != "rentable" else "bilan", data_schema=vol.Schema({}),
-            description_placeholders={"gain": f"{abs(gain) * 100:.1f}".replace(".", ","), "rendement": f"{rendement:g}"},
+            description_placeholders={"gain": _decimal(self.hass, f"{abs(gain) * 100:.1f}"), "rendement": _decimal(self.hass, f"{rendement:g}")},
         )
 
     async_step_bilan_non_rentable = async_step_bilan

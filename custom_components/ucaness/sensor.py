@@ -59,7 +59,7 @@ class UcanessSensor(CoordinatorEntity[UcanessCoordinator], SensorEntity):
         super().__init__(coordinator)
         self._measure = measure
         self._attr_unique_id = f"{entry.data[CONF_DEVICE_CODE]}_{measure.key}"
-        self._attr_name = measure.name
+        self._attr_translation_key = measure.key
         self._attr_native_unit_of_measurement = measure.unit
         self._attr_device_class = DEVICE_CLASSES.get(measure.device_class or "")
         self._attr_state_class = STATE_CLASSES.get(measure.state_class or "")
@@ -90,7 +90,7 @@ class UcanessInstallation(CoordinatorEntity[UcanessCoordinator], SensorEntity):
     """Où en est l'installation, et quelle est l'étape suivante (assistant.py). Lecture seule."""
 
     _attr_has_entity_name = True
-    _attr_name = "Installation"
+    _attr_translation_key = "installation"
     _attr_icon = "mdi:clipboard-check-outline"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = list(installation.ETATS)

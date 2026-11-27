@@ -164,7 +164,7 @@ def _entry(hass: HomeAssistant, call: ServiceCall) -> UcanessConfigEntry:
         if e.state is ConfigEntryState.LOADED and (entry_id is None or e.entry_id == entry_id)
     ]
     if len(entries) != 1:
-        raise ServiceValidationError("Appareil UCANESS introuvable ou ambigu (préciser config_entry_id)")
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="appareil_introuvable")
     return entries[0]
 
 
@@ -174,23 +174,26 @@ def _coordinator(hass: HomeAssistant, entry: UcanessConfigEntry) -> UcanessCoord
 
 def _require_write(entry: UcanessConfigEntry) -> None:
     if not entry.options.get(CONF_WRITE_ENABLED, False):
-        raise ServiceValidationError(
-            "Écriture vers l'onduleur désactivée (option « Écriture autorisée » de l'intégration UCANESS)"
-        )
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="ecriture_desactivee")
 
 
 async def _write_and_verify(
-    hass: HomeAssistant, entry: UcanessConfigEntry, items: dict[int, int], label: str
+    hass: HomeAssistant, entry: UcanessConfigEntry, items: dict[int, int], sujet: str, valeur: str
 ) -> dict[str, Any]:
+    """Envoie, relit et confirme. `sujet` : « plages » ou « mode » (choisit les messages d'erreur traduits)."""
+    label = f"{'plages de charge' if sujet == 'plages' else 'mode'} {valeur}"     # journal (en français)
+    ph = {"plages" if sujet == "plages" else "mode": valeur}
+    suffixe = {"plages": ("plages_non_envoyees", "plages_non_confirmees", "plages_relecture_impossible"),
+               "mode": ("mode_non_envoye", "mode_non_confirme", "mode_relecture_impossible")}[sujet]
     coordinator = _coordinator(hass, entry)
     code = entry.data[CONF_DEVICE_CODE]
     mode_before = _telemetry_mode(coordinator)
     try:
         sent = await coordinator.client.update_settings(code, items)
     except UcanessWriteRefused as err:
-        raise ServiceValidationError(f"Consigne refusée par le garde-fou : {err}") from err
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="consigne_refusee", translation_placeholders={"detail": str(err)}) from err
     except UcanessError as err:
-        raise HomeAssistantError(f"Consigne non envoyée ({label}) : {err}") from err
+        raise HomeAssistantError(translation_domain=DOMAIN, translation_key=suffixe[0], translation_placeholders={**ph, "detail": str(err)}) from err
 
     mismatch: dict[int, Any] = {}
     settings: dict[str, Any] = {}
@@ -219,7 +222,9 @@ async def _write_and_verify(
     await coordinator.async_request_refresh()
     if mismatch or not settings:
         _LOGGER.warning("UCANESS : %s envoyé mais non confirmé par l'onduleur : %s", label, mismatch or "relecture impossible")
-        raise HomeAssistantError(f"{label} : consigne envoyée mais non confirmée par l'onduleur ({mismatch or 'relecture impossible'})")
+        if mismatch:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key=suffixe[1], translation_placeholders={**ph, "ecarts": str(mismatch)})
+        raise HomeAssistantError(translation_domain=DOMAIN, translation_key=suffixe[2], translation_placeholders=ph)
     _LOGGER.info("UCANESS : %s confirmé par l'onduleur", label)
     return {"envoye": sent, "confirme": True}
 
@@ -258,9 +263,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             device_id, model = await client.resolve_device_v1(code)
             settings = pcs_settings(await client.get_config_v1(code), model)
         except UcanessWriteRefused as err:
-            raise ServiceValidationError(str(err)) from err
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="donnees_refusees", translation_placeholders={"detail": str(err)}) from err
         except UcanessError as err:
-            raise HomeAssistantError(f"API tierce UCANESS : {err}") from err
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="api_tierce", translation_placeholders={"detail": str(err)}) from err
         windows = {
             key: settings.get(key)
             for key in sorted(settings)
@@ -284,14 +289,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         try:
             items = windows_to_settings(windows)
         except UcanessWriteRefused as err:
-            raise ServiceValidationError(str(err)) from err
-        return await _write_and_verify(hass, entry, items, f"plages de charge {windows}")
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="donnees_refusees", translation_placeholders={"detail": str(err)}) from err
+        return await _write_and_verify(hass, entry, items, "plages", str(windows))
 
     async def definir_mode(call: ServiceCall) -> ServiceResponse:
         entry = _entry(hass, call)
         _require_write(entry)
         mode = call.data["mode"]
-        return await _write_and_verify(hass, entry, {SET_WORK_MODE: WORK_MODES[mode]}, f"mode {mode}")
+        return await _write_and_verify(hass, entry, {SET_WORK_MODE: WORK_MODES[mode]}, "mode", str(mode))
 
     async def optimiser_charge(call: ServiceCall) -> ServiceResponse:
         """Calcul seul : rien n'est envoyé à l'onduleur. Repli sûr si une donnée manque."""
@@ -420,7 +425,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         kva = d.get("puissance_actuelle_kva")
         if d["question"] == "puissance":
             if not kva:
-                raise ServiceValidationError("Indiquez la puissance souscrite actuelle (puissance_actuelle_kva).")
+                raise ServiceValidationError(translation_domain=DOMAIN, translation_key="puissance_actuelle_manquante")
             maxi = await _statistiques(d["puissance_reseau"], d["jours"], "max")
             par_jour: dict[Any, float] = {}
             for debut_h, w in maxi:
@@ -445,7 +450,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         ramenees = [tarifs.a_la_puissance(o, cible)[0] for o in offres]
         mesures = [(h, k) for h, k in await _statistiques(d["soutirage"], d["jours"], "change") if k is not None]
         if not mesures:
-            raise ServiceValidationError(f"Aucune mesure horaire de {d['soutirage']} sur les {d['jours']} derniers jours.")
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="aucune_mesure_horaire", translation_placeholders={"entite": str(d["soutirage"]), "jours": str(d["jours"])})
         simulation = hass.states.get("input_boolean.jarvis_mode_simulation")
         resultat = await hass.async_add_executor_job(
             lambda: tarifs.classer(

@@ -17,11 +17,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: UcanessConfigEntry, asyn
 class ReglageChoix(EntiteReglage, SelectEntity):
     def __init__(self, coordinator, entry, reglage) -> None:
         super().__init__(coordinator, entry, reglage)
-        self._attr_options = list(reglage.options)
+        # État de l'entité = clé de traduction (« hphc », « base ») ; l'entrée du package garde son texte.
+        self._vers_cle = dict(zip(reglage.options, reglage.cles_options))
+        self._vers_valeur = dict(zip(reglage.cles_options, reglage.options))
+        self._attr_options = list(reglage.cles_options)
 
     @property
     def current_option(self) -> str | None:
-        return self.valeur
+        return self._vers_cle.get(self.valeur)
 
     async def async_select_option(self, option: str) -> None:
-        await self.async_definir(option)
+        await self.async_definir(self._vers_valeur.get(option, option))
