@@ -4,6 +4,12 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 27/11/2026
 
+### Intégration 0.7.0 et cartes 0.7.0 : véhicule électrique
+- **Options « Configurer votre véhicule »** : marque, modèle et version choisis dans le catalogue OpenEV Data (CDLA-Permissive-2.0, `donnees/vehicules.json`, 1 157 versions depuis 2018, `tools/vehicules/construire_catalogue.py`), caractéristiques proposées puis confirmées ou corrigées ; silhouette, couleur, charge visée, puissance de la borne, entité de charge transmise par la voiture. Capteur `sensor.ucaness_vehicule`.
+- **`ucaness.planifier_recharge_vehicule`** (calcul seul) : énergie à prendre, puissance la plus faible de la borne et du véhicule, surplus solaire d'abord puis heures les moins chères avant le départ ; plages à réseau marquées pour tenir la batterie de la maison (`vehicules.py`).
+- **`ucaness.definir_image_vehicule`** : image de la voiture (adresses servies par Home Assistant seulement).
+- **Carte `custom:ucaness-vehicle-card`** : silhouette 3D dessinée ou photo détourée dans le navigateur (modèle u2netp facultatif, `tools/vehicules/installer_detourage.sh` ; sinon fond uni), charge et objectif, plan de recharge. Sept langues.
+
 ### Intégration 0.6.0 : offres par pays
 - **Formule « plages »** dans le moteur d'offres (`tarifs.py`) : plusieurs niveaux de prix, plages horaires par type de jour (ouvré, samedi, dimanche et férié) et par heure légale (été, hiver) ; recharge réseau estimée dans le niveau le moins cher ; prix hors taxes signalés ; grille datée signalée une fois périmée ; puissances non entières (3,45 kVA).
 - **Catalogue par pays** (`catalogue.py`), choisi d'après le pays réglé dans Home Assistant :

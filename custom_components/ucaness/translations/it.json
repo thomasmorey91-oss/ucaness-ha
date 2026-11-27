@@ -37,7 +37,42 @@
           "scan_interval": "Intervallo di interrogazione del cloud (secondi, minimo 30)",
           "app_key": "Chiave applicativa UCanpower personale (facoltativa)",
           "app_secret": "Secret applicativo UCanpower personale (facoltativo)",
-          "write_enabled": "Scrittura consentita (solo modalità e fasce di ricarica)"
+          "write_enabled": "Scrittura consentita (solo modalità e fasce di ricarica)",
+          "configurer_vehicule": "Configura il tuo veicolo elettrico al passaggio successivo"
+        }
+      },
+      "vehicule_marque": {
+        "title": "Il tuo veicolo: marca",
+        "description": "Scegli la marca della tua auto elettrica. Dati dal catalogo libero OpenEV Data: verifica i valori proposti al passaggio successivo.",
+        "data": {
+          "marque": "Marca"
+        }
+      },
+      "vehicule_modele": {
+        "title": "Il tuo veicolo: modello",
+        "description": "Modello e versione della tua {marque}.",
+        "data": {
+          "modele": "Modello e versione"
+        }
+      },
+      "vehicule_details": {
+        "title": "Il tuo veicolo: caratteristiche",
+        "description": "Valori proposti per {vehicule}, da confermare o correggere in base al libretto o al manuale. Servono al calcolo del piano di ricarica; nulla viene inviato alla wallbox.",
+        "data": {
+          "nom": "Nome visualizzato",
+          "gabarit": "Sagoma",
+          "couleur": "Colore",
+          "capacite_kwh": "Capacità utile della batteria",
+          "ac_kw": "Potenza di ricarica massima del veicolo (corrente alternata)",
+          "phases": "Fasi del caricatore di bordo",
+          "conso_kwh_100km": "Consumo medio",
+          "soc_cible": "Carica desiderata prima della partenza",
+          "puissance_borne_kw": "Potenza della wallbox",
+          "entite_soc": "Stato di carica trasmesso dall'auto (facoltativo)"
+        },
+        "data_description": {
+          "entite_soc": "Entità di un'integrazione del costruttore che fornisce la percentuale della batteria. Senza, lo stato di carica si inserisce al collegamento.",
+          "puissance_borne_kw": "7,4 kW per una wallbox monofase da 32 A."
         }
       }
     }
@@ -248,6 +283,46 @@
           "description": "Potenza prelevata dalla rete (W)."
         }
       }
+    },
+    "planifier_recharge_vehicule": {
+      "name": "Pianifica la ricarica del veicolo",
+      "description": "Solo calcolo, nulla viene inviato alla wallbox: quando ricaricare prima della partenza al minor costo, prima il surplus solare e poi le ore più economiche. Le fasce che prelevano in parte dalla rete sono segnalate perché la batteria di casa non si scarichi nell'auto.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Voce UCANESS da usare (facoltativa se c'è un solo dispositivo)."
+        },
+        "soc_actuel": {
+          "name": "Stato di carica attuale",
+          "description": "In %. Lascia vuoto per leggere quello trasmesso dall'auto."
+        },
+        "soc_cible": {
+          "name": "Carica desiderata prima della partenza",
+          "description": "In %. Predefinito: valore delle opzioni."
+        },
+        "depart": {
+          "name": "Partenza",
+          "description": "Ora in cui l'auto deve essere pronta (7:30 del giorno dopo per impostazione predefinita)."
+        },
+        "puissance_borne_kw": {
+          "name": "Potenza della wallbox",
+          "description": "In kW. Predefinito: valore delle opzioni."
+        }
+      }
+    },
+    "definir_image_vehicule": {
+      "name": "Imposta l'immagine del veicolo",
+      "description": "Salva l'immagine mostrata sulla scheda del veicolo (foto scontornata caricata in Home Assistant). Vuoto: ritorno alla sagoma disegnata.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Voce UCANESS da usare (facoltativa se c'è un solo dispositivo)."
+        },
+        "image": {
+          "name": "Immagine",
+          "description": "Indirizzo di un'immagine servita da Home Assistant (/api/image/serve/… o /local/…)."
+        }
+      }
     }
   },
   "selector": {
@@ -261,6 +336,26 @@
       "options": {
         "hphc": "Ore di punta / fuori punta",
         "base": "Tariffa monoraria"
+      }
+    },
+    "marque_vehicule": {
+      "options": {
+        "autre": "Altro veicolo (fuori catalogo)",
+        "retirer": "Rimuovi il veicolo"
+      }
+    },
+    "gabarit": {
+      "options": {
+        "citadine": "Citycar",
+        "berline": "Berlina",
+        "suv": "SUV",
+        "utilitaire": "Furgone"
+      }
+    },
+    "phases": {
+      "options": {
+        "1": "Monofase",
+        "3": "Trifase"
       }
     }
   },
@@ -530,6 +625,9 @@
           "en_service": "In servizio",
           "a_verifier": "Da verificare"
         }
+      },
+      "vehicule": {
+        "name": "Veicolo"
       }
     },
     "binary_sensor": {
@@ -652,6 +750,21 @@
     },
     "reglage_ni_vrai_ni_faux": {
       "message": "Impostazione rifiutata: {reglage}: {valeur} non è né vero né falso"
+    },
+    "vehicule_absent": {
+      "message": "Nessun veicolo configurato: Impostazioni > Dispositivi e servizi > UCANESS > Configura, poi «Configura il tuo veicolo elettrico»."
+    },
+    "vehicule_soc_inconnu": {
+      "message": "Stato di carica del veicolo sconosciuto: indicalo (soc_actuel) o scegli nelle opzioni l'entità che lo trasmette."
+    },
+    "vehicule_tarif_inconnu": {
+      "message": "Prezzi dell'elettricità non inseriti: completa prezzi e fasce fuori picco nelle impostazioni del pilotaggio."
+    },
+    "vehicule_image_invalide": {
+      "message": "Immagine rifiutata: sono accettate solo immagini servite da Home Assistant (/api/image/serve/… o /local/…)."
+    },
+    "vehicule_depart_invalide": {
+      "message": "Partenza rifiutata: scegli un orario futuro entro i prossimi 7 giorni."
     }
   }
 }

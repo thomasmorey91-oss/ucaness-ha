@@ -3,3 +3,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 .coverage
+
+# Détourage de la photo du véhicule (tools/vehicules/installer_detourage.sh)
+dashboard/www/ucaness/detourage/

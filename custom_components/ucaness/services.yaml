@@ -193,3 +193,40 @@ simuler:
       selector:
         entity:
           domain: sensor
+
+planifier_recharge_vehicule:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: ucaness
+    soc_actuel:
+      required: false
+      selector:
+        number: { min: 0, max: 100, step: 1, unit_of_measurement: "%", mode: slider }
+    soc_cible:
+      required: false
+      selector:
+        number: { min: 20, max: 100, step: 5, unit_of_measurement: "%", mode: slider }
+    depart:
+      required: false
+      selector:
+        datetime:
+    puissance_borne_kw:
+      required: false
+      selector:
+        number: { min: 1.4, max: 22, step: 0.1, unit_of_measurement: kW, mode: box }
+
+definir_image_vehicule:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: ucaness
+    image:
+      required: true
+      example: "/api/image/serve/0123456789abcdef/original"
+      selector:
+        text:

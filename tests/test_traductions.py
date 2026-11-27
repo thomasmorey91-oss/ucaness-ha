@@ -101,7 +101,7 @@ def test_toutes_les_erreurs_ont_un_message_traduit():
     code = "".join(_source(f.name) for f in COMPOSANT.glob("*.py"))
     cles = set(re.findall(r'translation_key="(\w+)"', code)) | set(re.findall(r'"(reglage_\w+)"', code))
     cles |= set(re.findall(r'"((?:plages|mode)_(?:non_\w+|relecture_impossible))"', code))
-    cles -= {"type_tarif"}                       # clé de sélecteur, vérifiée plus haut
+    cles -= {"type_tarif", "marque_vehicule", "gabarit", "phases"}   # clés de sélecteur
     assert len(cles) > 10
     assert sorted(f"exceptions.{c}.message" for c in cles if f"exceptions.{c}.message" not in REF) == []
 

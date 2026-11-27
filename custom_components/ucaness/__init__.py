@@ -29,6 +29,7 @@ from .const import (
 )
 from .coordinator import UcanessConfigEntry, UcanessCoordinator
 from .services import async_setup_services
+from .vehicule_ha import CONF_VEHICULE, async_setup_services as async_setup_services_vehicule
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SELECT, Platform.TIME, Platform.SWITCH]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -36,6 +37,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await async_setup_services(hass)
+    await async_setup_services_vehicule(hass)
     return True
 
 
@@ -78,11 +80,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: UcanessConfigEntry) -> 
 
 
 def _hors_reglages(entry: UcanessConfigEntry) -> dict:
-    return {k: v for k, v in entry.options.items() if k != CONF_REGLAGES}
+    return {k: v for k, v in entry.options.items() if k not in (CONF_REGLAGES, CONF_VEHICULE)}
 
 
 async def _async_reload(hass: HomeAssistant, entry: UcanessConfigEntry) -> None:
-    # Un réglage du pilotage modifié ne change rien à la liaison avec l'onduleur : pas de
+    # Un réglage du pilotage ou le véhicule modifié ne change rien à la liaison avec l'onduleur : pas de
     # rechargement, les entités sont simplement rafraîchies.
     if _hors_reglages(entry) == getattr(entry.runtime_data, "options_chargees", None):
         entry.runtime_data.async_update_listeners()

@@ -18,8 +18,11 @@
  *   custom:ucaness-detail-card  une décision en clair, l'explication (« Pourquoi ? ») sur demande
  *   custom:ucaness-hours-card   graphique de la journée heure par heure, avec un choix en haut
  *   custom:ucaness-ucan-card    Ucan, la batterie UHome avec un visage, et son conseil du moment (0.5.1)
+ *   custom:ucaness-vehicle-card la voiture de la maison : silhouette ou photo détourée, charge, plan de recharge (0.7.0)
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
+ *
+ * 0.7.0 (27/11/2026) : carte du véhicule électrique (custom:ucaness-vehicle-card).
  *
  * 0.5.5 (27/11/2026) : « Et si… » dans la bulle Ucan (option simulateur, action ucaness.simuler).
  *
@@ -44,7 +47,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.6.1';
+const UC_VERSION = '0.7.0';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -196,7 +199,33 @@ const UC_I18N = /* I18N-DEBUT */{
   "carte_ucan_nom": "UCANESS : Ucan",
   "carte_ucan_desc": "Ucan, la batterie qui conseille : son expression et le conseil du moment.",
   "carte_hours_nom": "UCANESS : heure par heure",
-  "carte_hours_desc": "Graphique de la journée heure par heure, avec un choix en haut."
+  "carte_hours_desc": "Graphique de la journée heure par heure, avec un choix en haut.",
+  "veh_titre": "Véhicule",
+  "veh_absent": "Aucun véhicule : Paramètres > Appareils et services > UCANESS > Configurer, puis « Configurer votre véhicule ».",
+  "veh_soc_inconnu": "Charge inconnue",
+  "veh_cible": "Objectif {v} %",
+  "veh_batterie": "{v} kWh utiles",
+  "veh_recharge": "Recharge {v} kW",
+  "veh_planifier": "Planifier la recharge",
+  "veh_saisir_soc": "Charge actuelle (%)",
+  "veh_plan_titre": "Plan de recharge (calcul seul)",
+  "veh_depart": "départ {h}",
+  "veh_plan_total": "{e} kWh · {c} · {s} % solaire",
+  "veh_plan_incomplet": "Il manquera {e} kWh au départ.",
+  "veh_plage_solaire": "soleil",
+  "veh_plage_reseau": "réseau, batterie maison tenue",
+  "veh_rien": "Déjà chargé : rien à faire.",
+  "veh_photo": "Ma photo",
+  "veh_dessin": "Revenir au dessin",
+  "veh_detourage": "Détourage en cours… La photo reste dans ce navigateur.",
+  "veh_detourage_simple": "Détourage simple (fond uni) : réglez la tolérance.",
+  "veh_tolerance": "Tolérance",
+  "veh_utiliser": "Utiliser cette image",
+  "veh_annuler": "Annuler",
+  "veh_envoi": "Enregistrement…",
+  "veh_erreur": "Échec : {e}",
+  "carte_vehicle_nom": "UCANESS : véhicule",
+  "carte_vehicle_desc": "Votre voiture électrique, sa charge et le plan de recharge."
  },
  "en": {
   "meteo": "Weather: {etat}",
@@ -344,7 +373,33 @@ const UC_I18N = /* I18N-DEBUT */{
   "carte_ucan_nom": "UCANESS: Ucan",
   "carte_ucan_desc": "Ucan, the battery that gives advice: its mood and the current tip.",
   "carte_hours_nom": "UCANESS: hour by hour",
-  "carte_hours_desc": "Hour-by-hour chart of the day, with a selector at the top."
+  "carte_hours_desc": "Hour-by-hour chart of the day, with a selector at the top.",
+  "veh_titre": "Vehicle",
+  "veh_absent": "No vehicle: Settings > Devices & services > UCANESS > Configure, then “Set up your electric vehicle”.",
+  "veh_soc_inconnu": "Charge unknown",
+  "veh_cible": "Target {v} %",
+  "veh_batterie": "{v} kWh usable",
+  "veh_recharge": "Charging {v} kW",
+  "veh_planifier": "Plan charging",
+  "veh_saisir_soc": "Current charge (%)",
+  "veh_plan_titre": "Charging plan (calculation only)",
+  "veh_depart": "departure {h}",
+  "veh_plan_total": "{e} kWh · {c} · {s} % solar",
+  "veh_plan_incomplet": "{e} kWh will be missing at departure.",
+  "veh_plage_solaire": "sun",
+  "veh_plage_reseau": "grid, house battery held",
+  "veh_rien": "Already charged: nothing to do.",
+  "veh_photo": "My photo",
+  "veh_dessin": "Back to the drawing",
+  "veh_detourage": "Removing background… The photo stays in this browser.",
+  "veh_detourage_simple": "Simple cut-out (plain background): adjust the tolerance.",
+  "veh_tolerance": "Tolerance",
+  "veh_utiliser": "Use this image",
+  "veh_annuler": "Cancel",
+  "veh_envoi": "Saving…",
+  "veh_erreur": "Failed: {e}",
+  "carte_vehicle_nom": "UCANESS: vehicle",
+  "carte_vehicle_desc": "Your electric car, its charge and the charging plan."
  },
  "zh-Hans": {
   "meteo": "天气：{etat}",
@@ -492,7 +547,33 @@ const UC_I18N = /* I18N-DEBUT */{
   "carte_ucan_nom": "UCANESS：Ucan",
   "carte_ucan_desc": "Ucan，会提建议的电池：它的表情和当前建议。",
   "carte_hours_nom": "UCANESS：逐小时",
-  "carte_hours_desc": "当天逐小时图表，顶部可切换。"
+  "carte_hours_desc": "当天逐小时图表，顶部可切换。",
+  "veh_titre": "车辆",
+  "veh_absent": "尚无车辆：设置 > 设备与服务 > UCANESS > 配置，然后选择“设置您的电动汽车”。",
+  "veh_soc_inconnu": "电量未知",
+  "veh_cible": "目标 {v} %",
+  "veh_batterie": "可用 {v} kWh",
+  "veh_recharge": "充电 {v} kW",
+  "veh_planifier": "规划充电",
+  "veh_saisir_soc": "当前电量 (%)",
+  "veh_plan_titre": "充电计划（仅计算）",
+  "veh_depart": "出发 {h}",
+  "veh_plan_total": "{e} kWh · {c} · 光伏 {s} %",
+  "veh_plan_incomplet": "出发时将缺少 {e} kWh。",
+  "veh_plage_solaire": "光伏",
+  "veh_plage_reseau": "电网，保持家用电池",
+  "veh_rien": "已充满：无需操作。",
+  "veh_photo": "我的照片",
+  "veh_dessin": "恢复绘制图",
+  "veh_detourage": "正在抠图… 照片只保留在此浏览器中。",
+  "veh_detourage_simple": "简单抠图（纯色背景）：请调节容差。",
+  "veh_tolerance": "容差",
+  "veh_utiliser": "使用此图片",
+  "veh_annuler": "取消",
+  "veh_envoi": "正在保存…",
+  "veh_erreur": "失败：{e}",
+  "carte_vehicle_nom": "UCANESS：车辆",
+  "carte_vehicle_desc": "您的电动汽车、电量和充电计划。"
  },
  "de": {
   "meteo": "Wetter: {etat}",
@@ -640,7 +721,33 @@ const UC_I18N = /* I18N-DEBUT */{
   "carte_ucan_nom": "UCANESS: Ucan",
   "carte_ucan_desc": "Ucan, die Batterie, die berät: ihr Ausdruck und der aktuelle Tipp.",
   "carte_hours_nom": "UCANESS: Stunde für Stunde",
-  "carte_hours_desc": "Stundendiagramm des Tages, mit Auswahl oben."
+  "carte_hours_desc": "Stundendiagramm des Tages, mit Auswahl oben.",
+  "veh_titre": "Fahrzeug",
+  "veh_absent": "Kein Fahrzeug: Einstellungen > Geräte & Dienste > UCANESS > Konfigurieren, dann „Ihr Elektrofahrzeug einrichten“.",
+  "veh_soc_inconnu": "Ladestand unbekannt",
+  "veh_cible": "Ziel {v} %",
+  "veh_batterie": "{v} kWh nutzbar",
+  "veh_recharge": "Laden mit {v} kW",
+  "veh_planifier": "Laden planen",
+  "veh_saisir_soc": "Aktueller Ladestand (%)",
+  "veh_plan_titre": "Ladeplan (nur Berechnung)",
+  "veh_depart": "Abfahrt {h}",
+  "veh_plan_total": "{e} kWh · {c} · {s} % Solar",
+  "veh_plan_incomplet": "Bei der Abfahrt fehlen {e} kWh.",
+  "veh_plage_solaire": "Sonne",
+  "veh_plage_reseau": "Netz, Hausbatterie gehalten",
+  "veh_rien": "Bereits geladen: nichts zu tun.",
+  "veh_photo": "Mein Foto",
+  "veh_dessin": "Zurück zur Zeichnung",
+  "veh_detourage": "Hintergrund wird entfernt… Das Foto bleibt in diesem Browser.",
+  "veh_detourage_simple": "Einfaches Freistellen (einfarbiger Hintergrund): Toleranz einstellen.",
+  "veh_tolerance": "Toleranz",
+  "veh_utiliser": "Dieses Bild verwenden",
+  "veh_annuler": "Abbrechen",
+  "veh_envoi": "Wird gespeichert…",
+  "veh_erreur": "Fehlgeschlagen: {e}",
+  "carte_vehicle_nom": "UCANESS: Fahrzeug",
+  "carte_vehicle_desc": "Ihr Elektroauto, sein Ladestand und der Ladeplan."
  },
  "it": {
   "meteo": "Meteo: {etat}",
@@ -788,7 +895,33 @@ const UC_I18N = /* I18N-DEBUT */{
   "carte_ucan_nom": "UCANESS: Ucan",
   "carte_ucan_desc": "Ucan, la batteria che consiglia: la sua espressione e il consiglio del momento.",
   "carte_hours_nom": "UCANESS: ora per ora",
-  "carte_hours_desc": "Grafico della giornata ora per ora, con una scelta in alto."
+  "carte_hours_desc": "Grafico della giornata ora per ora, con una scelta in alto.",
+  "veh_titre": "Veicolo",
+  "veh_absent": "Nessun veicolo: Impostazioni > Dispositivi e servizi > UCANESS > Configura, poi «Configura il tuo veicolo elettrico».",
+  "veh_soc_inconnu": "Carica sconosciuta",
+  "veh_cible": "Obiettivo {v} %",
+  "veh_batterie": "{v} kWh utili",
+  "veh_recharge": "Ricarica {v} kW",
+  "veh_planifier": "Pianifica la ricarica",
+  "veh_saisir_soc": "Carica attuale (%)",
+  "veh_plan_titre": "Piano di ricarica (solo calcolo)",
+  "veh_depart": "partenza {h}",
+  "veh_plan_total": "{e} kWh · {c} · {s} % solare",
+  "veh_plan_incomplet": "Alla partenza mancheranno {e} kWh.",
+  "veh_plage_solaire": "sole",
+  "veh_plage_reseau": "rete, batteria di casa tenuta",
+  "veh_rien": "Già carica: niente da fare.",
+  "veh_photo": "La mia foto",
+  "veh_dessin": "Torna al disegno",
+  "veh_detourage": "Scontorno in corso… La foto resta in questo browser.",
+  "veh_detourage_simple": "Scontorno semplice (sfondo uniforme): regola la tolleranza.",
+  "veh_tolerance": "Tolleranza",
+  "veh_utiliser": "Usa questa immagine",
+  "veh_annuler": "Annulla",
+  "veh_envoi": "Salvataggio…",
+  "veh_erreur": "Errore: {e}",
+  "carte_vehicle_nom": "UCANESS: veicolo",
+  "carte_vehicle_desc": "La tua auto elettrica, la sua carica e il piano di ricarica."
  },
  "es": {
   "meteo": "Tiempo: {etat}",
@@ -936,7 +1069,33 @@ const UC_I18N = /* I18N-DEBUT */{
   "carte_ucan_nom": "UCANESS: Ucan",
   "carte_ucan_desc": "Ucan, la batería que aconseja: su expresión y el consejo del momento.",
   "carte_hours_nom": "UCANESS: hora a hora",
-  "carte_hours_desc": "Gráfico del día hora a hora, con un selector arriba."
+  "carte_hours_desc": "Gráfico del día hora a hora, con un selector arriba.",
+  "veh_titre": "Vehículo",
+  "veh_absent": "Ningún vehículo: Ajustes > Dispositivos y servicios > UCANESS > Configurar y luego «Configurar su vehículo eléctrico».",
+  "veh_soc_inconnu": "Carga desconocida",
+  "veh_cible": "Objetivo {v} %",
+  "veh_batterie": "{v} kWh útiles",
+  "veh_recharge": "Carga a {v} kW",
+  "veh_planifier": "Planificar la carga",
+  "veh_saisir_soc": "Carga actual (%)",
+  "veh_plan_titre": "Plan de carga (solo cálculo)",
+  "veh_depart": "salida {h}",
+  "veh_plan_total": "{e} kWh · {c} · {s} % solar",
+  "veh_plan_incomplet": "Faltarán {e} kWh a la salida.",
+  "veh_plage_solaire": "sol",
+  "veh_plage_reseau": "red, batería de casa retenida",
+  "veh_rien": "Ya cargado: nada que hacer.",
+  "veh_photo": "Mi foto",
+  "veh_dessin": "Volver al dibujo",
+  "veh_detourage": "Recortando… La foto se queda en este navegador.",
+  "veh_detourage_simple": "Recorte simple (fondo uniforme): ajuste la tolerancia.",
+  "veh_tolerance": "Tolerancia",
+  "veh_utiliser": "Usar esta imagen",
+  "veh_annuler": "Cancelar",
+  "veh_envoi": "Guardando…",
+  "veh_erreur": "Error: {e}",
+  "carte_vehicle_nom": "UCANESS: vehículo",
+  "carte_vehicle_desc": "Su coche eléctrico, su carga y el plan de carga."
  },
  "pt": {
   "meteo": "Meteorologia: {etat}",
@@ -1084,7 +1243,33 @@ const UC_I18N = /* I18N-DEBUT */{
   "carte_ucan_nom": "UCANESS: Ucan",
   "carte_ucan_desc": "Ucan, a bateria que aconselha: a sua expressão e o conselho do momento.",
   "carte_hours_nom": "UCANESS: hora a hora",
-  "carte_hours_desc": "Gráfico do dia hora a hora, com uma escolha no topo."
+  "carte_hours_desc": "Gráfico do dia hora a hora, com uma escolha no topo.",
+  "veh_titre": "Veículo",
+  "veh_absent": "Nenhum veículo: Definições > Dispositivos e serviços > UCANESS > Configurar e depois «Configurar o seu veículo elétrico».",
+  "veh_soc_inconnu": "Carga desconhecida",
+  "veh_cible": "Objetivo {v} %",
+  "veh_batterie": "{v} kWh úteis",
+  "veh_recharge": "Carregamento a {v} kW",
+  "veh_planifier": "Planear o carregamento",
+  "veh_saisir_soc": "Carga atual (%)",
+  "veh_plan_titre": "Plano de carregamento (só cálculo)",
+  "veh_depart": "partida {h}",
+  "veh_plan_total": "{e} kWh · {c} · {s} % solar",
+  "veh_plan_incomplet": "Faltarão {e} kWh à partida.",
+  "veh_plage_solaire": "sol",
+  "veh_plage_reseau": "rede, bateria da casa mantida",
+  "veh_rien": "Já carregado: nada a fazer.",
+  "veh_photo": "A minha foto",
+  "veh_dessin": "Voltar ao desenho",
+  "veh_detourage": "A recortar… A foto fica neste navegador.",
+  "veh_detourage_simple": "Recorte simples (fundo uniforme): ajuste a tolerância.",
+  "veh_tolerance": "Tolerância",
+  "veh_utiliser": "Usar esta imagem",
+  "veh_annuler": "Cancelar",
+  "veh_envoi": "A guardar…",
+  "veh_erreur": "Falha: {e}",
+  "carte_vehicle_nom": "UCANESS: veículo",
+  "carte_vehicle_desc": "O seu carro elétrico, a sua carga e o plano de carregamento."
  }
 }/* I18N-FIN */;
 let UC_LANG_VUE = null;   // dernière langue vue, pour les appels sans hass (configuration, sélecteur de cartes)
@@ -3723,6 +3908,402 @@ class UcanessUcanCard extends HTMLElement {
   }
 }
 
+/* ------------------------------------------------------------------ véhicule électrique (0.7.0) */
+
+/*
+ * custom:ucaness-vehicle-card : la voiture de la maison (Options UCANESS > « Configurer votre véhicule »).
+ * Silhouette dessinée (citadine, berline, SUV, utilitaire) à la couleur choisie, ou photo de la voiture
+ * détourée dans ce navigateur ; état de charge et objectif ; plan de recharge (calcul seul, rien n'est
+ * envoyé à la borne).
+ * Options : entity (sensor.ucaness_vehicule), charger_entity (état de la borne, facultatif), title.
+ *
+ * Photo : le détourage se fait dans le navigateur, la photo n'est envoyée nulle part ailleurs que dans
+ * Home Assistant (/api/image/upload). Avec le modèle u2netp (Apache-2.0) et onnxruntime-web (MIT)
+ * installés dans www/ucaness/detourage/ (tools/vehicules/installer_detourage.sh), le fond est retiré
+ * automatiquement ; sinon, détourage simple d'un fond uni, avec une tolérance réglable.
+ */
+
+const UC_GABARITS = {
+  citadine: { body: 'M30,100 L30,80 Q32,68 48,64 L92,58 Q112,34 150,30 L208,30 Q228,32 244,56 L268,64 Q288,70 290,86 L290,100 Z',
+    glass: 'M104,60 Q120,40 152,38 L204,38 Q220,40 234,58 Z', pillar: [166, 38, 22], wheels: [82, 238], r: 19, front: [34, 72], rear: [284, 70] },
+  berline: { body: 'M14,98 L14,82 Q16,72 34,68 L96,60 Q124,38 160,34 L214,34 Q240,36 258,58 L290,64 Q306,68 306,84 L306,98 Z',
+    glass: 'M108,60 Q130,42 162,40 L210,40 Q232,42 248,58 Z', pillar: [182, 40, 20], wheels: [80, 252], r: 19, front: [18, 74], rear: [300, 70] },
+  suv: { body: 'M18,100 L18,74 Q20,62 38,58 L88,52 Q104,26 136,24 L240,24 Q262,26 276,50 L292,56 Q304,62 304,78 L304,100 Z',
+    glass: 'M100,52 Q114,32 138,30 L236,30 Q254,32 266,50 Z', pillar: [184, 30, 22], wheels: [84, 250], r: 22, front: [22, 64], rear: [298, 62] },
+  utilitaire: { body: 'M14,100 L14,70 Q16,58 30,54 L56,48 Q72,18 100,16 L292,16 Q304,16 306,28 L306,100 Z',
+    glass: 'M64,48 Q78,24 100,22 L128,22 L128,48 Z', pillar: null, wheels: [76, 258], r: 20, front: [18, 62], rear: [300, 40] },
+};
+
+/** Couleur « #rrggbb » mélangée avec du blanc (t > 0) ou du noir (t < 0). */
+function ucMix(hex, t) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '')) ? String(hex).replace('#', '') : '4a90d9';
+  const c = [0, 2, 4].map((i) => parseInt(m.slice(i, i + 2), 16));
+  const o = t >= 0 ? 255 : 0, k = Math.abs(t);
+  return '#' + c.map((v) => Math.round(v + (o - v) * k).toString(16).padStart(2, '0')).join('');
+}
+
+/** Silhouette de profil, volumes en dégradé (style de la maison en direct), avant à gauche. */
+function ucCarSvg(gabarit, couleur, label) {
+  const g = UC_GABARITS[gabarit] || UC_GABARITS.citadine;
+  const base = /^#[0-9a-f]{6}$/i.test(couleur || '') ? couleur : '#4a90d9';
+  const id = 'uccar' + Math.random().toString(36).slice(2, 8);
+  const wheel = (x) => `
+    <g transform="translate(${x} 100)">
+      <circle r="${g.r}" fill="#081426" stroke="#1D3E66" stroke-width="2"/>
+      <circle r="${(g.r * 0.55).toFixed(1)}" fill="url(#${id}r)"/>
+      <circle r="${(g.r * 0.18).toFixed(1)}" fill="#0B1B33"/>
+    </g>`;
+  return `<svg viewBox="0 0 320 130" role="img" aria-label="${esc(label || '')}">
+    <defs>
+      <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${ucMix(base, 0.45)}"/><stop offset=".45" stop-color="${base}"/><stop offset="1" stop-color="${ucMix(base, -0.55)}"/>
+      </linearGradient>
+      <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#2A6FB0"/><stop offset=".55" stop-color="#0B2C55"/><stop offset="1" stop-color="#06203F"/>
+      </linearGradient>
+      <radialGradient id="${id}r"><stop offset="0" stop-color="#CFE6FF"/><stop offset="1" stop-color="#5E7FA6"/></radialGradient>
+      <radialGradient id="${id}s"><stop offset="0" stop-color="#00D1D6" stop-opacity=".45"/><stop offset="1" stop-color="#00D1D6" stop-opacity="0"/></radialGradient>
+    </defs>
+    <ellipse cx="160" cy="120" rx="150" ry="9" fill="url(#${id}s)"/>
+    <ellipse cx="160" cy="119" rx="128" ry="5" fill="#000" opacity=".45"/>
+    <path d="${g.body}" fill="url(#${id}b)" stroke="${ucMix(base, -0.65)}" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="${g.glass}" fill="url(#${id}g)" stroke="#7FD3FF" stroke-opacity=".35" stroke-width="1"/>
+    ${g.pillar ? `<rect x="${g.pillar[0]}" y="${g.pillar[1]}" width="5" height="${g.pillar[2]}" fill="${ucMix(base, -0.2)}"/>` : ''}
+    <path d="${g.body}" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="1" transform="translate(0 4) scale(1 .96)"/>
+    <rect x="${g.front[0] - 4}" y="${g.front[1]}" width="12" height="4" rx="2" fill="#7FF3F5"/>
+    <rect x="${g.rear[0] - 6}" y="${g.rear[1]}" width="8" height="5" rx="2" fill="#E0403A"/>
+    ${g.wheels.map((x) => `<circle cx="${x}" cy="100" r="${g.r + 5}" fill="${ucMix(base, -0.75)}"/>`).join('')}
+    ${g.wheels.map(wheel).join('')}
+  </svg>`;
+}
+
+/* -------- détourage de la photo (dans le navigateur) */
+
+let UC_DETOURAGE = null;
+
+/** Modèle u2netp servi par Home Assistant (www/ucaness/detourage/), ou null s'il n'est pas installé. */
+async function ucModeleDetourage() {
+  if (UC_DETOURAGE !== null) return UC_DETOURAGE;
+  try {
+    const base = UC_BASE + 'detourage/';
+    const ort = await import(base + 'ort.wasm.min.mjs');
+    ort.env.wasm.wasmPaths = base;
+    ort.env.wasm.numThreads = 1;          // Home Assistant n'isole pas la page : pas de fils d'exécution
+    const session = await ort.InferenceSession.create(base + 'u2netp.onnx', { executionProviders: ['wasm'] });
+    UC_DETOURAGE = { ort, session };
+  } catch (e) {
+    console.info('UCANESS : modèle de détourage absent, détourage simple', e);
+    UC_DETOURAGE = false;
+  }
+  return UC_DETOURAGE;
+}
+
+function ucCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+
+/** Image chargée, ramenée à `max` px au plus, dans un canevas. */
+function ucImageCanvas(img, max) {
+  const k = Math.min(1, max / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+  const c = ucCanvas(Math.round((img.naturalWidth || img.width) * k), Math.round((img.naturalHeight || img.height) * k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+
+/** Masque u2netp (320 × 320, 0 à 255) : prétraitement de rembg (division par le maximum, moyenne et écart ImageNet). */
+async function ucMasqueModele(src, modele) {
+  const S = 320;
+  const c = ucCanvas(S, S);
+  const x = c.getContext('2d');
+  x.drawImage(src, 0, 0, S, S);
+  const px = x.getImageData(0, 0, S, S).data;
+  let max = 1;
+  for (let i = 0; i < px.length; i += 4) max = Math.max(max, px[i], px[i + 1], px[i + 2]);
+  const mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225];
+  const t = new Float32Array(3 * S * S);
+  for (let p = 0; p < S * S; p++) for (let k = 0; k < 3; k++) t[k * S * S + p] = (px[p * 4 + k] / max - mean[k]) / std[k];
+  const { ort, session } = modele;
+  const sortie = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', t, [1, 3, S, S]) });
+  const d = sortie[session.outputNames[0]].data;
+  let lo = Infinity, hi = -Infinity;
+  for (const v of d) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  const m = ucCanvas(S, S);
+  const mx = m.getContext('2d');
+  const out = mx.createImageData(S, S);
+  for (let p = 0; p < S * S; p++) { out.data[p * 4 + 3] = Math.round(255 * (d[p] - lo) / ((hi - lo) || 1)); }
+  mx.putImageData(out, 0, 0);
+  return m;
+}
+
+/** Détourage simple : le fond uni qui touche les bords est retiré (remplissage depuis les bords). */
+function ucMasqueFondUni(src, tolerance) {
+  const w = src.width, h = src.height;
+  const px = src.getContext('2d').getImageData(0, 0, w, h).data;
+  const alpha = new Uint8ClampedArray(w * h).fill(255);
+  const ref = new Int32Array(w * h).fill(-1);
+  const pile = [];
+  const tol2 = tolerance * tolerance * 3;
+  const pousse = (p, r) => { if (ref[p] === -1) { ref[p] = r; pile.push(p); } };
+  for (let x = 0; x < w; x++) { pousse(x, x); pousse((h - 1) * w + x, (h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { pousse(y * w, y * w); pousse(y * w + w - 1, y * w + w - 1); }
+  while (pile.length) {
+    const p = pile.pop(), r = ref[p];
+    const dr = px[p * 4] - px[r * 4], dg = px[p * 4 + 1] - px[r * 4 + 1], db = px[p * 4 + 2] - px[r * 4 + 2];
+    if (dr * dr + dg * dg + db * db > tol2) continue;
+    alpha[p] = 0;
+    const x = p % w;
+    if (x > 0) pousse(p - 1, r);
+    if (x < w - 1) pousse(p + 1, r);
+    if (p >= w) pousse(p - w, r);
+    if (p < w * (h - 1)) pousse(p + w, r);
+  }
+  const m = ucCanvas(w, h);
+  const mx = m.getContext('2d');
+  const out = mx.createImageData(w, h);
+  for (let p = 0; p < w * h; p++) out.data[p * 4 + 3] = alpha[p];
+  mx.putImageData(out, 0, 0);
+  return m;
+}
+
+/** Applique le masque, recadre sur la voiture (marge 3 %) et rend un canevas transparent. */
+function ucAppliquerMasque(src, masque) {
+  const w = src.width, h = src.height;
+  const c = ucCanvas(w, h);
+  const x = c.getContext('2d');
+  x.drawImage(src, 0, 0);
+  x.globalCompositeOperation = 'destination-in';
+  x.imageSmoothingEnabled = true;
+  x.drawImage(masque, 0, 0, w, h);
+  const a = x.getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) {
+    if (a[(y * w + xx) * 4 + 3] > 24) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 < 0) return c;
+  const mg = Math.round(0.03 * Math.max(x1 - x0, y1 - y0));
+  x0 = Math.max(0, x0 - mg); y0 = Math.max(0, y0 - mg); x1 = Math.min(w - 1, x1 + mg); y1 = Math.min(h - 1, y1 + mg);
+  const r = ucCanvas(x1 - x0 + 1, y1 - y0 + 1);
+  r.getContext('2d').drawImage(c, x0, y0, r.width, r.height, 0, 0, r.width, r.height);
+  return r;
+}
+
+class UcanessVehicleCard extends HTMLElement {
+  setConfig(config) {
+    this._config = Object.assign({ entity: 'sensor.ucaness_vehicule' }, config || {});
+    this._ucSeen = null;
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: 'open' });
+      this.shadowRoot.innerHTML = `<style>${UC_BASE_CSS}${UC_VEHICLE_CSS}</style><div id="main"></div><div id="dlg"></div>`;
+    }
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    const c = this._config;
+    if (ucChanged(this, hass, [c.entity, c.charger_entity].filter(Boolean))) this._render();
+  }
+
+  getCardSize() { return 5; }
+
+  _render() {
+    if (!this.shadowRoot || !this._config) return;
+    const hass = this._hass || { states: {} };
+    const c = this._config;
+    const st = hass.states[c.entity];
+    const main = this.shadowRoot.getElementById('main');
+    if (!st || st.state === 'unavailable') {
+      main.innerHTML = `<div class="box"><div class="t">${esc(c.title || ucT(hass, 'veh_titre'))}</div><p class="muted">${esc(ucT(hass, 'veh_absent'))}</p></div>`;
+      return;
+    }
+    const a = st.attributes || {};
+    const soc = ucNum(hass, c.entity);
+    const cible = Number(a.soc_cible) || 80;
+    const brut = c.charger_entity && hass.states[c.charger_entity] ? hass.states[c.charger_entity].state : null;
+    const charge = brut === 'charging';
+    const BN = { charging: 'en_charge', ready: 'libre', paused: 'en_pause', scheduled: 'programmee', disconnected: 'hors_ligne', error: 'en_defaut', unavailable: 'indisponible' };
+    const borne = brut === null ? null : BN[brut] ? ucT(hass, 'borne_' + BN[brut]) : brut;
+    const kw = Math.min(Number(a.ac_kw) || 0, Number(a.puissance_borne_kw) || 0);
+    const nom = a.nom || ucT(hass, 'veh_titre');
+    const visuel = a.image
+      ? `<img class="photo" src="${esc(a.image)}" alt="${esc(nom)}">`
+      : ucCarSvg(a.gabarit, a.couleur, nom);
+    main.innerHTML = `
+      <div class="box">
+        <div class="head"><span class="t">${esc(c.title || nom)}</span>${borne ? `<span class="chip${charge ? ' on' : ''}">${esc(ucT(hass, 'borne'))} · ${esc(borne)}</span>` : ''}</div>
+        <div class="car${charge ? ' charging' : ''}">${visuel}</div>
+        <div class="soc">
+          <div class="bar"><i style="width:${soc === null ? 0 : Math.max(0, Math.min(100, soc))}%"></i><b style="left:${cible}%"></b></div>
+          <div class="row"><span class="v">${soc === null ? esc(ucT(hass, 'veh_soc_inconnu')) : esc(ucNumber(hass, Math.round(soc), 0)) + ' %'}</span><span class="muted">${esc(ucT(hass, 'veh_cible', { v: ucNumber(hass, cible, 0) }))}</span></div>
+          <div class="row muted"><span>${esc(ucT(hass, 'veh_batterie', { v: ucNumber(hass, Number(a.capacite_kwh) || 0, 1) }))}</span><span>${esc(ucT(hass, 'veh_recharge', { v: ucNumber(hass, kw, 1) }))}</span></div>
+        </div>
+        <div class="actions">
+          ${soc === null ? `<label class="saisie">${esc(ucT(hass, 'veh_saisir_soc'))} <input id="soc" type="number" min="0" max="100" step="1" inputmode="numeric"></label>` : ''}
+          <button type="button" class="uc-key btn" id="plan">${esc(ucT(hass, 'veh_planifier'))}</button>
+          <button type="button" class="uc-key btn ghost" id="photo">${esc(ucT(hass, 'veh_photo'))}</button>
+          ${a.image ? `<button type="button" class="uc-key btn ghost" id="dessin">${esc(ucT(hass, 'veh_dessin'))}</button>` : ''}
+          <input id="fichier" type="file" accept="image/*" hidden>
+        </div>
+        <div id="resultat">${this._planHtml || ''}</div>
+      </div>`;
+    const $ = (id) => main.querySelector('#' + id);
+    main.querySelector('.car').addEventListener('click', () => ucMoreInfo(this, c.entity));
+    $('plan').addEventListener('click', () => this._planifier());
+    $('photo').addEventListener('click', () => $('fichier').click());
+    $('fichier').addEventListener('change', (ev) => { const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (f) this._ouvrirPhoto(f); });
+    if ($('dessin')) $('dessin').addEventListener('click', () => this._hass.callService('ucaness', 'definir_image_vehicule', { image: '' }));
+  }
+
+  async _planifier() {
+    const hass = this._hass;
+    const data = {};
+    const champ = this.shadowRoot.querySelector('#soc');
+    if (champ && champ.value !== '') data.soc_actuel = Number(champ.value);
+    this._planHtml = `<p class="muted">…</p>`;
+    this._render();
+    try {
+      const r = await hass.callWS({ type: 'call_service', domain: 'ucaness', service: 'planifier_recharge_vehicule', service_data: data, return_response: true });
+      this._planHtml = this._formatPlan(r.response || {});
+    } catch (e) {
+      this._planHtml = `<p class="err">${esc(ucT(hass, 'veh_erreur', { e: (e && e.message) || e }))}</p>`;
+    }
+    this._render();
+  }
+
+  _formatPlan(p) {
+    const hass = this._hass;
+    const lang = ucLang(hass);
+    const heure = (iso) => new Date(iso).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
+    const jour = (iso) => new Date(iso).toLocaleDateString(lang, { weekday: 'short' });
+    let euros;
+    try { euros = new Intl.NumberFormat(lang, { style: 'currency', currency: (hass.config && hass.config.currency) || 'EUR' }); } catch (e) { euros = { format: (v) => v.toFixed(2) }; }
+    if (!p.energie_kwh) return `<p class="ok">${esc(ucT(hass, 'veh_rien'))}</p>`;
+    const lignes = (p.plages || []).map((l) => `
+      <li><span>${esc(jour(l.debut))} ${esc(heure(l.debut))}–${esc(heure(l.fin))}</span>
+      <span>${esc(ucFormat(hass, l.energie_kwh, 1, 'kWh'))}</span>
+      <span class="${l.tenir_batterie_maison ? 'res' : 'sol'}">${esc(ucT(hass, l.tenir_batterie_maison ? 'veh_plage_reseau' : 'veh_plage_solaire'))}</span></li>`).join('');
+    return `
+      <div class="plan">
+        <div class="t2">${esc(ucT(hass, 'veh_plan_titre'))} · ${esc(ucT(hass, 'veh_depart', { h: jour(p.depart) + ' ' + heure(p.depart) }))}</div>
+        <ul>${lignes}</ul>
+        <div class="tot">${esc(ucT(hass, 'veh_plan_total', { e: ucNumber(hass, p.energie_kwh, 1), c: euros.format(p.cout_estime_eur || 0), s: p.part_solaire_pct || 0 }))}</div>
+        ${p.complet ? '' : `<p class="err">${esc(ucT(hass, 'veh_plan_incomplet', { e: ucNumber(hass, p.manque_kwh, 1) }))}</p>`}
+      </div>`;
+  }
+
+  /* -------- photo : détourage dans le navigateur, puis enregistrement dans Home Assistant */
+
+  async _ouvrirPhoto(fichier) {
+    const hass = this._hass;
+    const dlg = this.shadowRoot.getElementById('dlg');
+    const url = URL.createObjectURL(fichier);
+    const img = new Image();
+    try {
+      await new Promise((ok, ko) => { img.onload = ok; img.onerror = ko; img.src = url; });
+    } catch (e) { URL.revokeObjectURL(url); return; }
+    const src = ucImageCanvas(img, 1600);
+    URL.revokeObjectURL(url);
+    dlg.innerHTML = `
+      <div class="voile"><div class="fen" role="dialog" aria-modal="true" aria-label="${esc(ucT(hass, 'veh_photo'))}">
+        <p class="muted" id="etat">${esc(ucT(hass, 'veh_detourage'))}</p>
+        <div class="damier"><canvas id="apercu"></canvas></div>
+        <label class="tol" hidden>${esc(ucT(hass, 'veh_tolerance'))} <input id="tol" type="range" min="4" max="80" value="28"></label>
+        <div class="actions"><button type="button" class="uc-key btn" id="ok" disabled>${esc(ucT(hass, 'veh_utiliser'))}</button>
+        <button type="button" class="uc-key btn ghost" id="non">${esc(ucT(hass, 'veh_annuler'))}</button></div>
+      </div></div>`;
+    const $ = (id) => dlg.querySelector('#' + id);
+    const fermer = () => { dlg.innerHTML = ''; };
+    $('non').addEventListener('click', fermer);
+    let resultat = null;
+    const montrer = (canvas) => {
+      resultat = canvas;
+      const a = $('apercu');
+      if (!a) return;
+      a.width = canvas.width; a.height = canvas.height;
+      a.getContext('2d').drawImage(canvas, 0, 0);
+      $('ok').disabled = false;
+    };
+    const modele = await ucModeleDetourage();
+    if (!$('etat')) return;               // fenêtre fermée entre-temps
+    if (modele) {
+      try {
+        montrer(ucAppliquerMasque(src, await ucMasqueModele(src, modele)));
+        $('etat').textContent = '';
+      } catch (e) {
+        $('etat').textContent = ucT(hass, 'veh_erreur', { e: (e && e.message) || e });
+      }
+    } else {
+      const petit = ucImageCanvas(src, 800);
+      const refaire = () => montrer(ucAppliquerMasque(src, ucMasqueFondUni(petit, Number($('tol').value))));
+      $('etat').textContent = ucT(hass, 'veh_detourage_simple');
+      dlg.querySelector('.tol').hidden = false;
+      $('tol').addEventListener('change', refaire);
+      refaire();
+    }
+    $('ok').addEventListener('click', async () => {
+      if (!resultat) return;
+      $('ok').disabled = true;
+      $('etat').textContent = ucT(hass, 'veh_envoi');
+      try {
+        const final = ucImageCanvas(resultat, 1024);
+        const blob = await new Promise((ok) => final.toBlob(ok, 'image/png'));
+        const fd = new FormData();
+        fd.append('file', blob, 'vehicule.png');
+        const r = await fetch('/api/image/upload', { method: 'POST', headers: { Authorization: `Bearer ${hass.auth.data.access_token}` }, body: fd });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        await hass.callService('ucaness', 'definir_image_vehicule', { image: `/api/image/serve/${j.id}/original` });
+        fermer();
+      } catch (e) {
+        $('etat').textContent = ucT(hass, 'veh_erreur', { e: (e && e.message) || e });
+        $('ok').disabled = false;
+      }
+    });
+  }
+}
+
+const UC_VEHICLE_CSS = `
+  :host { display: block; }
+  .box { padding: 12px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--uc-card-border); border-radius: 14px; background: var(--uc-card-bg); box-shadow: var(--uc-card-shadow); }
+  .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .t { font-size: 16px; color: var(--uc-label); }
+  .t2 { font-size: 14px; color: var(--uc-label); margin-bottom: 4px; }
+  .chip { padding: 3px 10px; border: 1px solid var(--uc-tab-border); border-radius: 12px; font-size: 13px; color: #CFE6FF; }
+  .chip.on { border-color: #00D1D6; color: #7FF3F5; }
+  .muted { color: var(--uc-muted); font-size: 13px; margin: 0; }
+  .car { cursor: pointer; display: flex; justify-content: center; }
+  .car svg { width: min(360px, 100%); height: auto; overflow: visible; }
+  .car .photo { max-width: min(360px, 100%); max-height: 170px; object-fit: contain; filter: drop-shadow(0 10px 10px rgba(0,0,0,.5)) drop-shadow(0 0 10px rgba(0,209,214,.25)); }
+  .car.charging svg, .car.charging .photo { animation: ucVeh 2.4s ease-in-out infinite; }
+  @keyframes ucVeh { 50% { filter: drop-shadow(0 0 12px rgba(0,209,214,.7)); } }
+  .bar { position: relative; height: 10px; border-radius: 5px; background: #16365F; }
+  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: linear-gradient(90deg, #00D1D6, #7FF3F5); }
+  .bar b { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--uc-orange); }
+  .row { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .v { font: 700 22px var(--uc-font); color: var(--uc-value); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .btn { padding: 8px 14px; border: 1px solid #2AB7E2; border-radius: 10px; background: linear-gradient(180deg, #154B84, #0B2C55); color: #fff; font: inherit; font-size: 14px; cursor: pointer; }
+  .btn.ghost { background: transparent; border-color: var(--uc-tab-border); color: #CFE6FF; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .saisie { font-size: 13px; color: var(--uc-muted); }
+  .saisie input { width: 64px; margin-left: 4px; padding: 5px; border-radius: 8px; border: 1px solid var(--uc-tab-border); background: #0A2546; color: #fff; font: inherit; }
+  .plan ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .plan li { display: grid; grid-template-columns: 1.6fr 1fr 1.6fr; gap: 6px; font-size: 13px; }
+  .plan .sol { color: #FFD27A; }
+  .plan .res { color: #9CC9F5; }
+  .tot { margin-top: 6px; font-size: 14px; color: var(--uc-value); }
+  .err { color: var(--uc-orange); font-size: 13px; margin: 4px 0 0; }
+  .ok { color: var(--uc-green); font-size: 13px; margin: 0; }
+  .voile { position: fixed; inset: 0; z-index: 9; background: rgba(3,10,22,.72); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .fen { width: min(560px, 100%); max-height: 90vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--uc-card-border); border-radius: 14px; background: #0A1B36; }
+  .damier { display: flex; justify-content: center; border-radius: 10px; background: repeating-conic-gradient(#1A3358 0 25%, #10243F 0 50%) 0 0 / 20px 20px; }
+  .damier canvas { max-width: 100%; max-height: 50vh; }
+  .tol { font-size: 13px; color: var(--uc-muted); display: flex; gap: 8px; align-items: center; }
+  .tol[hidden] { display: none; }
+`;
+
 /* ------------------------------------------------------------------ enregistrement */
 
 const UC_CARDS = [
@@ -3740,6 +4321,7 @@ const UC_CARDS = [
   ['ucaness-detail-card', UcanessDetailCard, ucT(null, 'carte_detail_nom'), ucT(null, 'carte_detail_desc')],
   ['ucaness-ucan-card', UcanessUcanCard, ucT(null, 'carte_ucan_nom'), ucT(null, 'carte_ucan_desc')],
   ['ucaness-hours-card', UcanessHoursCard, ucT(null, 'carte_hours_nom'), ucT(null, 'carte_hours_desc')],
+  ['ucaness-vehicle-card', UcanessVehicleCard, ucT(null, 'carte_vehicle_nom'), ucT(null, 'carte_vehicle_desc')],
 ];
 
 for (const [tag, cls, name, description] of UC_CARDS) {
@@ -3752,4 +4334,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };

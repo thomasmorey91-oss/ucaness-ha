@@ -37,7 +37,42 @@
           "scan_interval": "云端查询间隔（秒，最少 30 秒）",
           "app_key": "个人 UCanpower 应用密钥（可选）",
           "app_secret": "个人 UCanpower 应用 secret（可选）",
-          "write_enabled": "允许写入（仅限工作模式和充电时段）"
+          "write_enabled": "允许写入（仅限工作模式和充电时段）",
+          "configurer_vehicule": "在下一步设置您的电动汽车"
+        }
+      },
+      "vehicule_marque": {
+        "title": "您的车辆：品牌",
+        "description": "选择您的电动汽车品牌。数据来自开放目录 OpenEV Data：请在下一步核对建议值。",
+        "data": {
+          "marque": "品牌"
+        }
+      },
+      "vehicule_modele": {
+        "title": "您的车辆：型号",
+        "description": "您的 {marque} 的型号和版本。",
+        "data": {
+          "modele": "型号和版本"
+        }
+      },
+      "vehicule_details": {
+        "title": "您的车辆：参数",
+        "description": "{vehicule} 的建议值，请根据行驶证或说明书确认或更正。它们用于计算充电计划；不会向充电桩发送任何指令。",
+        "data": {
+          "nom": "显示名称",
+          "gabarit": "轮廓",
+          "couleur": "颜色",
+          "capacite_kwh": "电池可用容量",
+          "ac_kw": "车辆最大充电功率（交流）",
+          "phases": "车载充电机相数",
+          "conso_kwh_100km": "平均能耗",
+          "soc_cible": "出发前的目标电量",
+          "puissance_borne_kw": "充电桩功率",
+          "entite_soc": "车辆上报的电量（可选）"
+        },
+        "data_description": {
+          "entite_soc": "来自厂商集成、提供电池百分比的实体。没有它时，在插枪时输入电量。",
+          "puissance_borne_kw": "单相 32 A 充电桩为 7.4 kW。"
         }
       }
     }
@@ -248,6 +283,46 @@
           "description": "从电网取用的功率（W）。"
         }
       }
+    },
+    "planifier_recharge_vehicule": {
+      "name": "规划车辆充电",
+      "description": "仅计算，不会向充电桩发送任何指令：在出发前以最低成本充电的时间，先用光伏余电，再用最便宜的时段。部分取自电网的时段会被标记，以免家用电池向汽车放电。",
+      "fields": {
+        "config_entry_id": {
+          "name": "设备",
+          "description": "要使用的 UCANESS 条目（只有一台设备时可不填）。"
+        },
+        "soc_actuel": {
+          "name": "当前电量",
+          "description": "单位 %。留空则读取车辆上报的值。"
+        },
+        "soc_cible": {
+          "name": "出发前的目标电量",
+          "description": "单位 %。默认为选项中的值。"
+        },
+        "depart": {
+          "name": "出发",
+          "description": "车辆必须就绪的时间（默认为次日 7:30）。"
+        },
+        "puissance_borne_kw": {
+          "name": "充电桩功率",
+          "description": "单位 kW。默认为选项中的值。"
+        }
+      }
+    },
+    "definir_image_vehicule": {
+      "name": "设置车辆图片",
+      "description": "保存车辆卡片上显示的图片（已抠图并上传到 Home Assistant 的照片）。留空：恢复为绘制的轮廓。",
+      "fields": {
+        "config_entry_id": {
+          "name": "设备",
+          "description": "要使用的 UCANESS 条目（只有一台设备时可不填）。"
+        },
+        "image": {
+          "name": "图片",
+          "description": "由 Home Assistant 提供的图片地址（/api/image/serve/… 或 /local/…）。"
+        }
+      }
     }
   },
   "selector": {
@@ -261,6 +336,26 @@
       "options": {
         "hphc": "峰谷电价",
         "base": "单一电价"
+      }
+    },
+    "marque_vehicule": {
+      "options": {
+        "autre": "其他车辆（不在目录中）",
+        "retirer": "移除车辆"
+      }
+    },
+    "gabarit": {
+      "options": {
+        "citadine": "小型车",
+        "berline": "轿车",
+        "suv": "SUV",
+        "utilitaire": "厢式车"
+      }
+    },
+    "phases": {
+      "options": {
+        "1": "单相",
+        "3": "三相"
       }
     }
   },
@@ -530,6 +625,9 @@
           "en_service": "运行中",
           "a_verifier": "待检查"
         }
+      },
+      "vehicule": {
+        "name": "车辆"
       }
     },
     "binary_sensor": {
@@ -652,6 +750,21 @@
     },
     "reglage_ni_vrai_ni_faux": {
       "message": "设置被拒绝：{reglage}：{valeur} 既不是真也不是假"
+    },
+    "vehicule_absent": {
+      "message": "尚未设置车辆：设置 > 设备与服务 > UCANESS > 配置，然后选择“设置您的电动汽车”。"
+    },
+    "vehicule_soc_inconnu": {
+      "message": "车辆电量未知：请填写（soc_actuel），或在选项中选择上报电量的实体。"
+    },
+    "vehicule_tarif_inconnu": {
+      "message": "电价未填写：请在控制设置中填写电价和低谷时段。"
+    },
+    "vehicule_image_invalide": {
+      "message": "图片被拒绝：仅接受由 Home Assistant 提供的图片（/api/image/serve/… 或 /local/…）。"
+    },
+    "vehicule_depart_invalide": {
+      "message": "出发时间被拒绝：请选择未来 7 天内的时间。"
     }
   }
 }

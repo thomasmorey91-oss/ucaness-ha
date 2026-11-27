@@ -37,7 +37,42 @@
           "scan_interval": "Intervalo de consulta a la nube (segundos, mínimo 30)",
           "app_key": "Clave de aplicación UCanpower personal (opcional)",
           "app_secret": "Secret de aplicación UCanpower personal (opcional)",
-          "write_enabled": "Escritura permitida (solo modo y franjas de carga)"
+          "write_enabled": "Escritura permitida (solo modo y franjas de carga)",
+          "configurer_vehicule": "Configurar su vehículo eléctrico en el paso siguiente"
+        }
+      },
+      "vehicule_marque": {
+        "title": "Su vehículo: marca",
+        "description": "Elija la marca de su coche eléctrico. Datos del catálogo libre OpenEV Data: compruebe los valores propuestos en el paso siguiente.",
+        "data": {
+          "marque": "Marca"
+        }
+      },
+      "vehicule_modele": {
+        "title": "Su vehículo: modelo",
+        "description": "Modelo y versión de su {marque}.",
+        "data": {
+          "modele": "Modelo y versión"
+        }
+      },
+      "vehicule_details": {
+        "title": "Su vehículo: características",
+        "description": "Valores propuestos para {vehicule}, que debe confirmar o corregir según el permiso de circulación o el manual. Sirven para calcular el plan de carga; no se envía nada al cargador.",
+        "data": {
+          "nom": "Nombre mostrado",
+          "gabarit": "Silueta",
+          "couleur": "Color",
+          "capacite_kwh": "Capacidad útil de la batería",
+          "ac_kw": "Potencia de carga máxima del vehículo (corriente alterna)",
+          "phases": "Fases del cargador de a bordo",
+          "conso_kwh_100km": "Consumo medio",
+          "soc_cible": "Carga deseada antes de salir",
+          "puissance_borne_kw": "Potencia del cargador",
+          "entite_soc": "Estado de carga transmitido por el coche (opcional)"
+        },
+        "data_description": {
+          "entite_soc": "Entidad de una integración del fabricante que da el porcentaje de la batería. Sin ella, el estado de carga se introduce al enchufar.",
+          "puissance_borne_kw": "7,4 kW para un cargador monofásico de 32 A."
         }
       }
     }
@@ -248,6 +283,46 @@
           "description": "Potencia tomada de la red (W)."
         }
       }
+    },
+    "planifier_recharge_vehicule": {
+      "name": "Planificar la carga del vehículo",
+      "description": "Solo cálculo, no se envía nada al cargador: cuándo cargar antes de salir al menor coste, primero el excedente solar y después las horas más baratas. Las franjas que toman parte de la red se marcan para que la batería de la casa no se vacíe en el coche.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Entrada UCANESS que se usará (opcional si solo hay un dispositivo)."
+        },
+        "soc_actuel": {
+          "name": "Estado de carga actual",
+          "description": "En %. Déjelo vacío para leer el que transmite el coche."
+        },
+        "soc_cible": {
+          "name": "Carga deseada antes de salir",
+          "description": "En %. Por defecto, el valor de las opciones."
+        },
+        "depart": {
+          "name": "Salida",
+          "description": "Hora a la que el coche debe estar listo (7:30 del día siguiente por defecto)."
+        },
+        "puissance_borne_kw": {
+          "name": "Potencia del cargador",
+          "description": "En kW. Por defecto, el valor de las opciones."
+        }
+      }
+    },
+    "definir_image_vehicule": {
+      "name": "Definir la imagen del vehículo",
+      "description": "Guarda la imagen mostrada en la tarjeta del vehículo (foto recortada subida a Home Assistant). Vacío: vuelta a la silueta dibujada.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Dispositivo",
+          "description": "Entrada UCANESS que se usará (opcional si solo hay un dispositivo)."
+        },
+        "image": {
+          "name": "Imagen",
+          "description": "Dirección de una imagen servida por Home Assistant (/api/image/serve/… o /local/…)."
+        }
+      }
     }
   },
   "selector": {
@@ -261,6 +336,26 @@
       "options": {
         "hphc": "Horas punta / horas valle",
         "base": "Tarifa única"
+      }
+    },
+    "marque_vehicule": {
+      "options": {
+        "autre": "Otro vehículo (fuera del catálogo)",
+        "retirer": "Quitar el vehículo"
+      }
+    },
+    "gabarit": {
+      "options": {
+        "citadine": "Urbano",
+        "berline": "Berlina",
+        "suv": "SUV",
+        "utilitaire": "Furgoneta"
+      }
+    },
+    "phases": {
+      "options": {
+        "1": "Monofásico",
+        "3": "Trifásico"
       }
     }
   },
@@ -530,6 +625,9 @@
           "en_service": "En servicio",
           "a_verifier": "Por revisar"
         }
+      },
+      "vehicule": {
+        "name": "Vehículo"
       }
     },
     "binary_sensor": {
@@ -652,6 +750,21 @@
     },
     "reglage_ni_vrai_ni_faux": {
       "message": "Ajuste rechazado: {reglage}: {valeur} no es ni verdadero ni falso"
+    },
+    "vehicule_absent": {
+      "message": "No hay ningún vehículo configurado: Ajustes > Dispositivos y servicios > UCANESS > Configurar y luego «Configurar su vehículo eléctrico»."
+    },
+    "vehicule_soc_inconnu": {
+      "message": "Estado de carga del vehículo desconocido: indíquelo (soc_actuel) o elija en las opciones la entidad que lo transmite."
+    },
+    "vehicule_tarif_inconnu": {
+      "message": "Precios de la electricidad sin indicar: complete los precios y las horas valle en los ajustes del pilotaje."
+    },
+    "vehicule_image_invalide": {
+      "message": "Imagen rechazada: solo se aceptan imágenes servidas por Home Assistant (/api/image/serve/… o /local/…)."
+    },
+    "vehicule_depart_invalide": {
+      "message": "Salida rechazada: elija una hora futura dentro de los próximos 7 días."
     }
   }
 }

@@ -45,6 +45,8 @@ jobs:
         run: pytest -p no:homeassistant -p no:socket tests/test_tarifs.py
       - name: Grilles et offres de référence par pays
         run: pytest -p no:homeassistant -p no:socket tests/test_catalogues.py
+      - name: Véhicule électrique (catalogue et plan de recharge)
+        run: pytest -p no:homeassistant -p no:socket tests/test_vehicules.py
       - name: Moteur du tarif dynamique
         run: pytest -p no:homeassistant tests/test_optimiseur.py
       - name: Dimensionnement
