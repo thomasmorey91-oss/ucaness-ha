@@ -139,3 +139,30 @@ def test_chaque_etape_a_ses_textes():
                 assert "description" not in texte and texte["fix_flow"]["step"]["init"]["data"], (fichier, cle)
             else:
                 assert "{lien}" in texte["description"], (fichier, cle)
+
+
+def test_traductions_lisibles_par_home_assistant():
+    """Home Assistant lit chaque texte avec string.Formatter : une accolade imbriquée ou seule
+    le fait échouer (« Error while parsing localized string »)."""
+    import json
+    import pathlib
+    import string
+
+    racine = pathlib.Path(__file__).resolve().parent.parent / "custom_components" / "ucaness"
+    fichiers = [racine / "strings.json", *sorted((racine / "translations").glob("*.json"))]
+
+    def textes(o, chemin=""):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                yield from textes(v, f"{chemin}.{k}")
+        elif isinstance(o, str):
+            yield chemin, o
+
+    erreurs = []
+    for f in fichiers:
+        for chemin, texte in textes(json.loads(f.read_text(encoding="utf-8"))):
+            try:
+                list(string.Formatter().parse(texte))
+            except ValueError as err:
+                erreurs.append(f"{f.name}{chemin} : {err}")
+    assert not erreurs, erreurs
