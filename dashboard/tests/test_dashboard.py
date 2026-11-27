@@ -655,6 +655,69 @@ def test_apercu_d_ambiance_par_l_adresse(site):
             pg.close()
 
 
+def vivant_state(pg) -> dict:
+    return pg.evaluate(f"""() => {{
+        const r = {SCENE};
+        const q = (s) => r.querySelector(s);
+        return {{ particules: r.querySelectorAll('animateMotion').length, tirets: r.querySelectorAll('path.uc-flow').length,
+                  tag: q('.tag') ? q('.tag').textContent : null, carte: !!q('.niv.on'), veille: !!q('.uh.veille'), actif: !!q('.uh.actif'),
+                  bandeau: q('.ban.on') ? q('.ban').textContent : null, bulle: q('.ucan .bulle') ? q('.ucan .bulle').textContent : null,
+                  pastilles: [...r.querySelectorAll('.pastille')].map(e => e.className + '|' + e.textContent),
+                  soleil: !!q('.astre.soleil'), lune: !!q('.astre.lune'), flocons: r.querySelectorAll('.flocon').length, arc: !!q('.arc'),
+                  fenetres: r.querySelectorAll('.ov g path[fill^="rgba(255,196,90"]').length }};
+    }}""")
+
+
+def test_scene_vivante(site):
+    pg = open_page(site, "/tests/scene.html?vivant=1", width=1600, height=1000)
+    try:
+        st = vivant_state(pg)
+        assert pg.errors == []
+        assert st["particules"] >= 4 and st["tirets"] == 0            # néons et points de lumière à la place des tirets
+        assert st["actif"] and st["carte"] and "UHome" in st["tag"] and "0,82 kW" in st["tag"]
+        assert st["bandeau"] is None                                   # rien n'est annoncé à l'ouverture
+        assert st["bulle"] == "Je fais le plein de soleil" and st["soleil"] and not st["lune"]
+        assert any("or|100 % autonome" in x for x in st["pastilles"]) and any("Seuil réseau 6,0 kW" in x for x in st["pastilles"])
+        # La batterie se met à alimenter la maison : bandeau, autonomie estimée (42 % − 10 % de 10 kWh à 0,9 kW ≈ 3,6 h).
+        set_scene(pg, {"sensor.uhome_puissance_solaire": 0, "sensor.uhome_puissance_batterie": -900, "sensor.uhome_puissance_maison": 900})
+        st = vivant_state(pg)
+        assert st["bandeau"] == "La batterie alimente la maison" and "≈ 3,6 h" in st["bulle"]
+        assert not any("autonome" in x for x in st["pastilles"])
+        # Veille : modules éteints, carte de niveau rentrée ; achat proche du seuil : pastille orange.
+        set_scene(pg, {"sensor.uhome_puissance_batterie": 0, "sensor.uhome_puissance_reseau": 5200, "sensor.uhome_puissance_maison": 5200})
+        st = vivant_state(pg)
+        assert st["veille"] and not st["carte"] and st["bandeau"] == "Batterie en veille"
+        assert any(x.startswith("pastille warn|") for x in st["pastilles"])
+        # Nuit : lune, fenêtres éclairées, Ucan dort.
+        set_scene(pg, {"sun.sun": "below_horizon", "sensor.uhome_puissance_reseau": 400, "sensor.uhome_puissance_maison": 400})
+        st = vivant_state(pg)
+        assert st["lune"] and not st["soleil"] and st["fenetres"] == 2 and st["bulle"] == "Zzz… bonne nuit !"
+    finally:
+        pg.close()
+
+
+@pytest.mark.parametrize(("query", "cle"), [("&effet=neige", "flocons"), ("&effet=arcenciel", "arc")])
+def test_scene_vivante_neige_et_arc_en_ciel(site, query, cle):
+    pg = open_page(site, f"/tests/scene.html?vivant=1{query}", width=1280, height=800)
+    try:
+        assert pg.errors == [] and vivant_state(pg)[cle]
+    finally:
+        pg.close()
+
+
+def test_scene_vivante_mode_allege(site):
+    browser, _ = site
+    ctx = browser.new_context()
+    try:
+        pg = open_page(site, "/tests/scene.html?vivant=1&leger=1", width=1280, height=800, context=ctx)
+        st = vivant_state(pg)
+        assert pg.errors == [] and st["particules"] == 0 and st["tirets"] >= 1 and st["flocons"] == 0   # tirets simples
+        pg.close()
+        open_page(site, "/tests/scene.html?leger=0", context=ctx).close()
+    finally:
+        ctx.close()
+
+
 def test_ciels_fournis():
     js = JS.read_text(encoding="utf-8")
     assert "ciel/ciel-${amb.img}.jpg" in js

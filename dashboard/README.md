@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.7.0`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.8.0`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -145,6 +145,22 @@ Conventions de signe de l'intégration : batterie positive en charge, réseau po
 | `battery_path` | Page ouverte par un appui sur l'UHome (sinon, la fiche de la charge) |
 | `label_scale` | Taille des chiffres (1 par défaut) |
 | `details` | `false` : sans tensions ni fréquence. Sous 520 px de large, seuls les noms et les puissances restent |
+
+### Scène vivante (0.8.0, `vivant: true` sur la vue 3D)
+
+Option de `custom:ucaness-flow-card` avec `scene: 3d`. Sans elle, la vue 3D reste telle qu'avant.
+
+- **Flux en néon** : halo, tube coloré et points de lumière qui suivent le trajet, plus nombreux et plus rapides avec la puissance.
+- **UHome** : les trois modules se soulèvent l'un après l'autre quand la batterie travaille et s'éteignent en veille ; étiquette au-dessus (barre de charge, puissance) ; carte de niveau à segments qui glisse en bas à gauche tant que la batterie charge ou décharge.
+- **Bandeau d'événement** (6 s) : « La batterie se recharge », « La batterie alimente la maison », « Batterie en veille », achat ou injection, recharge de la voiture. `banner_entity` : le bandeau affiche aussi l'état de cette entité quand il change (par exemple une décision du pilotage).
+- **Ucan dans la scène** : `ucan: {x, y, w, couleur}` (positions en %, `couleur` en `#rrggbb`). Bulle selon le moment : « Zzz… bonne nuit ! », « Je fais le plein de soleil », et en décharge l'heure jusqu'à laquelle la batterie tient au rythme actuel (réserve au-dessus du plancher ÷ puissance ; `nodes.battery.floor_entity` et `capacity_entity`, par défaut les entrées du pilotage). Sans `ucan`, pas de mascotte.
+- **Ciel** : soleil placé d'après `sun.sun` (azimut et hauteur), lune la nuit, oiseaux par beau temps, étoile filante par nuit claire, arc-en-ciel quand il pleut avec le soleil bas, flocons quand la météo annonce de la neige. `lights: [[[x, y], …], …]` : fenêtres éclairées la nuit (un polygone par fenêtre).
+- **Pastilles** : « 100 % autonome » (les panneaux passent au doré) quand le soleil produit et que rien n'est pris au réseau ; `nodes.grid.limit_kw` : « Seuil réseau », orange à partir de 80 % de la puissance souscrite.
+- `nodes.home.outline` et `ev.outline` : contour lumineux de la maison ou du garage quand ils sont alimentés.
+- Mode allégé ou moins de mouvement : tirets habituels, ni points de lumière, ni oiseaux, ni flocons.
+- Essayer sans Home Assistant : `tests/scene.html?vivant=1`, avec `&ambiance=nuit`, `&effet=neige` ou `&effet=arcenciel`.
+
+Les chiffres clés (`custom:ucaness-stats-card`) ont une lueur à leur couleur (sauf en mode allégé).
 
 ### Cartes de l'écran de téléphone
 
