@@ -21,6 +21,8 @@
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
  *
+ * 0.5.3 (27/11/2026) : Ucan en bulle de discussion en bas à droite (floating: true).
+ *
  * 0.5.2 (27/11/2026) : carte Ucan dans une colonne étroite (300 px) : la bulle passe sous l'avatar.
  *
  * 0.5.1 (27/11/2026) : carte Ucan (custom:ucaness-ucan-card), avatar et conseil du moment.
@@ -38,7 +40,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.5.2';
+const UC_VERSION = '0.5.3';
 
 /* Dossier où se trouve ce fichier (en général /local/ucaness/). */
 const UC_BASE = (() => {
@@ -2344,7 +2346,9 @@ class UcanessHoursCard extends HTMLElement {
  * custom:ucaness-ucan-card : Ucan, la batterie UHome avec un visage, et son conseil du moment.
  *   conseil: sensor.ucan_conseil (pilotage/packages/ucan_conseils.yaml) ; soc: sensor.uhome_soc ;
  *   alert_entities: [...] (comme ucaness-status-card) ; script: script.ucan_conseil_reponse ;
- *   compact: true (téléphone : petit avatar à côté de la bulle).
+ *   compact: true (téléphone : petit avatar à côté de la bulle) ;
+ *   floating: true (0.5.3) : Ucan en bouton rond en bas à droite, devant les cartes ; un appui ouvre la
+ *   conversation ; pastille et léger battement quand un conseil attend ; offset_bottom, offset_right (px).
  * Expression : « à surveiller » (lumière orange) si une alerte est en cours, « un conseil » si un
  * conseil attend, « la nuit » (yeux fermés) quand le soleil est couché, sinon « tout va bien ».
  * Les barres des trois modules s'allument avec la charge (au-dessus de 0, 33 et 66 %).
@@ -2378,6 +2382,7 @@ class UcanessUcanCard extends HTMLElement {
     this._config = Object.assign({ conseil: 'sensor.ucan_conseil', soc: 'sensor.uhome_soc', script: 'script.ucan_conseil_reponse' }, config || {});
     this._ucSeen = null;
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    if (this.isConnected) this._flottant();
     this._render();
   }
 
@@ -2388,7 +2393,30 @@ class UcanessUcanCard extends HTMLElement {
     if (ucChanged(this, hass, ids)) this._render();
   }
 
-  getCardSize() { return this._config && this._config.compact ? 3 : 5; }
+  connectedCallback() { this._flottant(); this._render(); }
+
+  disconnectedCallback() {
+    if (this._flot) { this._flot.remove(); this._flot = null; }
+    if (this._echap) { window.removeEventListener('keydown', this._echap); this._echap = null; }
+  }
+
+  getCardSize() { return this._config && this._config.floating ? 0 : this._config && this._config.compact ? 3 : 5; }
+
+  /* Mode « bulle » (floating: true) : Ucan vit en bas à droite de l'écran, devant les cartes.
+     L'élément est posé sur <body> pour ne dépendre d'aucune carte (ni transformation ni défilement). */
+  _flottant() {
+    if (!this._config || !this._config.floating) {
+      if (this._flot) { this._flot.remove(); this._flot = null; }
+      return;
+    }
+    if (this._flot || typeof document === 'undefined') return;
+    this._flot = document.createElement('div');
+    this._flot.className = 'ucaness-ucan-bulle';
+    this._flot.attachShadow({ mode: 'open' });
+    document.body.appendChild(this._flot);
+    this._echap = (e) => { if (e.key === 'Escape' && this._ouvert) { this._ouvert = false; this._render(); } };
+    window.addEventListener('keydown', this._echap);
+  }
 
   _etat() {
     const h = this._hass;
@@ -2402,14 +2430,10 @@ class UcanessUcanCard extends HTMLElement {
     return { conseil, soc, alertes, humeur };
   }
 
-  _render() {
-    if (!this.shadowRoot || !this._config) return;
-    const c = this._config;
-    const { conseil, soc, alertes, humeur } = this._etat();
+  _corps(conseil, alertes) {
     const a = conseil ? conseil.attributes : {};
-    let corps;
     if (conseil) {
-      corps = `<p class="k">${esc(a.titre || 'Un conseil')}</p>
+      return `<p class="k">${esc(a.titre || 'Un conseil')}</p>
         <p class="t">${esc(a.constat || '')}</p><p class="t">${esc(a.geste || '')}</p>
         ${a.gain ? `<p class="t g">${esc(a.gain)}</p>` : ''}${a.avertissement ? `<p class="n">${esc(a.avertissement)}</p>` : ''}
         <div class="btns">
@@ -2417,10 +2441,71 @@ class UcanessUcanCard extends HTMLElement {
           <button type="button" class="uc-key s" data-r="plus_tard">Pas maintenant</button>
           <button type="button" class="uc-key q" data-r="jamais">Ne plus proposer</button>
         </div>`;
-    } else if (alertes.length) {
-      corps = `<p class="t">Une alerte est en cours : ${esc(alertes.map((x) => x.name).join(', '))}. Les conseils attendront.</p>`;
-    } else {
-      corps = `<p class="t">Tout va bien. Je vous ferai signe quand un geste en vaudra la peine.</p>`;
+    }
+    if (alertes.length) return `<p class="t">Une alerte est en cours : ${esc(alertes.map((x) => x.name).join(', '))}. Les conseils attendront.</p>`;
+    return `<p class="t">Tout va bien. Je vous ferai signe quand un geste en vaudra la peine.</p>`;
+  }
+
+  _boutons(root) {
+    const c = this._config;
+    root.querySelectorAll('button[data-r]').forEach((b) => b.addEventListener('click', () => {
+      const [dom, svc] = String(c.script).split('.');
+      if (this._hass && dom && svc) this._hass.callService(dom, svc, { reponse: b.dataset.r });
+    }));
+  }
+
+  _render() {
+    if (!this.shadowRoot || !this._config) return;
+    const c = this._config;
+    const { conseil, soc, alertes, humeur } = this._etat();
+    const cssBulle = `
+        p { margin: 0; }
+        .k { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--uc-label); }
+        .t { font: 400 16px/1.45 var(--uc-font); }
+        .g { color: var(--uc-green); }
+        .n { font-size: 13px; color: var(--uc-muted); }
+        .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+        button[data-r] { min-height: 44px; padding: 0 16px; border-radius: 22px; cursor: pointer; font: 400 16px var(--uc-font); }
+        .p { border: 0; background: var(--uc-tab); color: #031428; }
+        .s { border: 1px solid var(--uc-tab-border); background: linear-gradient(180deg, rgba(26,111,190,.35) 0%, rgba(10,37,70,.6) 100%); color: var(--uc-text); }
+        .q { border: 1px solid var(--uc-tab-border); background: transparent; color: #9CC9F5; }`;
+    if (c.floating) {
+      this.shadowRoot.innerHTML = '<style>:host { display: none; }</style>';
+      if (!this._flot) return;
+      const bas = Number(c.offset_bottom ?? 20);
+      const droite = Number(c.offset_right ?? 20);
+      const attente = !!conseil || alertes.length > 0;
+      const label = conseil ? 'Ucan : un conseil vous attend' : alertes.length ? 'Ucan : une alerte est en cours' : 'Ucan';
+      const r = this._flot.shadowRoot;
+      r.innerHTML = `
+        <style>${UC_BASE_CSS}
+          :host { position: fixed; right: ${droite}px; bottom: ${bas}px; z-index: 9; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+          .fab { position: relative; width: 64px; height: 64px; padding: 0; border-radius: 50%; border: 2px solid ${humeur === 'alerte' ? '#F39C12' : '#00D1D6'}; background: radial-gradient(circle at 50% 40%, #0D2A58 0%, #061B3D 70%); cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.5), 0 0 14px rgba(0,209,214,.35); }
+          .fab svg { position: absolute; left: 6px; top: 7px; width: 50px; height: 50px; }
+          .pastille { position: absolute; top: -2px; right: -2px; width: 16px; height: 16px; border-radius: 50%; background: ${humeur === 'alerte' ? '#F39C12' : '#2ECC71'}; border: 2px solid #061B3D; }
+          @keyframes ucan-appel { 0%, 100% { box-shadow: 0 6px 18px rgba(0,0,0,.5), 0 0 0 0 rgba(0,209,214,.55); } 50% { box-shadow: 0 6px 18px rgba(0,0,0,.5), 0 0 0 10px rgba(0,209,214,0); } }
+          .fab.appel { animation: ucan-appel 2.4s ease-in-out infinite; }
+          .panneau { width: min(360px, calc(100vw - ${2 * droite}px)); max-height: calc(100vh - ${bas + 110}px); overflow: auto; box-sizing: border-box; border: 1px solid var(--uc-panel-border); border-radius: 14px; background: var(--uc-panel-bg); box-shadow: 0 10px 30px rgba(0,0,0,.55); }
+          .tete { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; background: var(--uc-title-bg); border-bottom: 2px solid var(--uc-tab); border-radius: 14px 14px 0 0; }
+          .tete .av { width: 30px; height: 41px; }
+          .tete .av svg { width: 100%; height: 100%; display: block; }
+          .tete h2 { margin: 0; font: 400 19px var(--uc-font); flex: 1; }
+          .fermer { width: 44px; height: 44px; border: 0; background: transparent; color: var(--uc-text); cursor: pointer; border-radius: 22px; }
+          .msg { margin: 14px; padding: 14px 16px; border: 1px solid var(--uc-card-border); border-radius: 4px 14px 14px 14px; background: var(--uc-card-bg); display: flex; flex-direction: column; gap: 8px; }
+          ${cssBulle}
+        </style>
+        ${this._ouvert ? `<section class="panneau" role="dialog" aria-label="Ucan">
+          <div class="tete"><div class="av">${ucUcanSvg(humeur, soc)}</div><h2>Ucan</h2>
+            <button type="button" class="fermer" aria-label="Fermer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <div class="msg">${this._corps(conseil, alertes)}</div></section>` : ''}
+        <button type="button" class="fab uc-tap${attente && !this._ouvert && !UC_REDUCED && !UC_LIGHT ? ' appel' : ''}" aria-label="${label}" aria-expanded="${this._ouvert ? 'true' : 'false'}">
+          ${ucUcanSvg(humeur, soc).replace('viewBox="0 0 220 300"', 'viewBox="30 4 160 118"')}${attente && !this._ouvert ? '<span class="pastille" aria-hidden="true"></span>' : ''}
+        </button>`;
+      r.querySelector('.fab').addEventListener('click', () => { this._ouvert = !this._ouvert; this._render(); });
+      const f = r.querySelector('.fermer');
+      if (f) f.addEventListener('click', () => { this._ouvert = false; this._render(); });
+      this._boutons(r);
+      return;
     }
     this.shadowRoot.innerHTML = `
       <style>${UC_BASE_CSS}
@@ -2429,22 +2514,11 @@ class UcanessUcanCard extends HTMLElement {
         .av { flex: 0 0 auto; width: ${c.compact ? 64 : 150}px; height: ${c.compact ? 87 : 204}px; }
         .av svg { width: 100%; height: 100%; display: block; }
         .b { flex: 1 1 230px; min-width: 0; padding: 14px 18px; border: 1px solid var(--uc-card-border); border-radius: 4px 14px 14px 14px; background: var(--uc-card-bg); box-shadow: var(--uc-card-shadow); display: flex; flex-direction: column; gap: 8px; }
-        p { margin: 0; }
-        .k { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--uc-label); }
-        .t { font: 400 ${c.compact ? 16 : 17}px/1.45 var(--uc-font); }
-        .g { color: var(--uc-green); }
-        .n { font-size: 13px; color: var(--uc-muted); }
-        .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-        button { min-height: 44px; padding: 0 16px; border-radius: 22px; cursor: pointer; font: 400 16px var(--uc-font); }
-        .p { border: 0; background: var(--uc-tab); color: #031428; }
-        .s { border: 1px solid var(--uc-tab-border); background: linear-gradient(180deg, rgba(26,111,190,.35) 0%, rgba(10,37,70,.6) 100%); color: var(--uc-text); }
-        .q { border: 1px solid var(--uc-tab-border); background: transparent; color: #9CC9F5; }
+        ${cssBulle}
+        .t { font-size: ${c.compact ? 16 : 17}px; }
       </style>
-      <div class="w"><div class="av">${ucUcanSvg(humeur, soc)}</div><div class="b">${corps}</div></div>`;
-    this.shadowRoot.querySelectorAll('button[data-r]').forEach((b) => b.addEventListener('click', () => {
-      const [dom, svc] = String(c.script).split('.');
-      if (this._hass && dom && svc) this._hass.callService(dom, svc, { reponse: b.dataset.r });
-    }));
+      <div class="w"><div class="av">${ucUcanSvg(humeur, soc)}</div><div class="b">${this._corps(conseil, alertes)}</div></div>`;
+    this._boutons(this.shadowRoot);
   }
 }
 
