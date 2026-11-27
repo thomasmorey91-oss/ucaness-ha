@@ -117,16 +117,18 @@ def test_generateur_style_soir():
     """Style « soir » : même maison, mêmes panneaux, reflets et lumières en plus ; le style par défaut ne change pas."""
     gen = load_generator()
     import json
-    desc = json.loads((DASH_DIR / "tools" / "maison-exemple-soir.json").read_text(encoding="utf-8"))
-    cv = gen.render(desc)
+    desc = json.loads(EXAMPLE_JSON.read_text(encoding="utf-8"))      # même description : seul le trait change
+    cv = gen.render(desc, "soir")
     svg, _ = cv.svg()
     ET.fromstring(svg)
     assert len(cv.panels) == 12
     for attendu in ('id="uc-wet"', 'id="uc-spill"', 'filter="url(#uc-lueur)"', 'filter="url(#uc-flou2)"', "#22E0F0"):
         assert attendu in svg, attendu
-    assert (DASH_DIR / "www" / "ucaness" / "maison-exemple-soir.svg").read_text(encoding="utf-8") == svg, "relancer tools/maison_iso.py sur maison-exemple-soir.json"
-    clair, _ = gen.render(json.loads(EXAMPLE_JSON.read_text(encoding="utf-8"))).svg()
-    assert "uc-wet" not in clair and gen.render(desc, "").svg()[0].count("uc-flou") == 0
+    assert (DASH_DIR / "www" / "ucaness" / "maison-exemple-soir.svg").read_text(encoding="utf-8") == svg, "relancer tools/maison_iso.py maison-exemple.json … --style soir"
+    clair, boite = gen.render(desc).svg()
+    assert "uc-wet" not in clair and clair.count("uc-flou") == 0
+    # Même organisation : même cadre d'image et panneaux aux mêmes endroits (les positions calées sur l'image restent valables).
+    assert cv.svg()[1] == boite and cv.panels == gen.render(desc).panels
 
 
 def test_svg_exemple_a_jour():

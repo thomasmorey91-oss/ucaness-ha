@@ -5,7 +5,8 @@ Usage :
     python maison_iso.py description.json maison.svg [--style soir]
 
 Style « soir » (ou "style": "soir" dans la description) : murs sombres, fenêtres chaudes qui éclairent le sol,
-sol mouillé avec reflets, liserés lumineux, bassin éclairé, pylône en treillis ; "lampes": [[x, y], ...] pour des
+sol mouillé avec reflets, liserés lumineux, bassin éclairé. La description n'est pas modifiée : mêmes volumes,
+mêmes abords, seul le trait change. Ajouts facultatifs : "pylone": true (treillis à la place du poteau), "lampes": [[x, y], ...] pour des
 lampes de jardin, et ["sapin"] en 4e valeur d'un arbre pour un conifère.
 
 La description (JSON) liste des volumes posés sur une grille en mètres :
@@ -473,12 +474,12 @@ def render(desc: dict, style: str | None = None):
     pole = desc.get("poteau")
     if pole:
         x, y = pole
-        if soir:
+        if soir and desc.get("pylone"):          # pylône en treillis, seulement s'il est demandé
             _pylone(cv, x, y)
-        else:
-            cv.line((x, y, 0), (x, y, 8.6), "#9AA6BE", 2.2, .85)
-            cv.line((x - .8, y, 8.1), (x + .8, y, 8.1), "#9AA6BE", 1.6, .85)
-            cv.line((x - .8, y, 7.5), (x + .8, y, 7.5), "#9AA6BE", 1.2, .7)
+        else:                                    # le poteau reste un poteau : seul le trait change
+            cv.line((x, y, 0), (x, y, 8.6), "#C4CEDF" if soir else "#9AA6BE", 2.2, .95 if soir else .85)
+            cv.line((x - .8, y, 8.1), (x + .8, y, 8.1), "#C4CEDF" if soir else "#9AA6BE", 1.6, .95 if soir else .85)
+            cv.line((x - .8, y, 7.5), (x + .8, y, 7.5), "#C4CEDF" if soir else "#9AA6BE", 1.2, .85 if soir else .7)
     if soir:
         _soir_apres(cv, desc)
     return cv
