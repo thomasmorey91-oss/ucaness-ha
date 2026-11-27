@@ -17,8 +17,8 @@ from typing import Any, Mapping
 from .const import CONF_APP_KEY, CONF_APP_SECRET
 
 # Remplies par le mainteneur du dépôt. Vides : aucune clé livrée (seule une clé personnelle sert).
-CLE_LIVREE = ""
-SECRET_LIVRE = ""
+CLE_LIVREE = "zmjzts24ebey7kqn"
+SECRET_LIVRE = "fv74dtrg6aenvfthu4t3zj6d6b3kp9v9"
 
 PERSONNELLE = "personnelle"
 LIVREE = "livree"
