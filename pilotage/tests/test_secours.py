@@ -206,3 +206,99 @@ async def test_bilan_au_redemarrage(hass, maison):
         await asyncio.sleep(0)
     await hass.async_block_till_done()
     assert any("redémarré après un arrêt" in t for t, _ in notes)
+
+
+# --- Intégration communautaire « Vigilance Météo France » (format : couleur en anglais, liste « phenomena »
+# avec les créneaux horaires « timeline » ; color_id 3 = orange, 4 = rouge). Données INVENTÉES.
+
+def _phenomene(nom, creneaux):
+    """creneaux : [(début, fin, color_id)] ; datetimes comme dans l'intégration."""
+    couleur = max(c for _, _, c in creneaux)
+    graves = [(d, f) for d, f, c in creneaux if c == couleur]
+    return {
+        "phenomenon": nom,
+        "color_id": couleur,
+        "phenomenon_max_color_id": couleur,
+        "begin_time": min(d for d, _ in graves),
+        "end_time": max(f for _, f in graves),
+        "timeline": [{"begin_time": d, "end_time": f, "color_id": c} for d, f, c in creneaux],
+    }
+
+
+def _vigilance(hass, periode, phenomenes, couleur="red", code="herault"):
+    hass.states.async_set(
+        f"sensor.vigilance_{code}_{periode}", couleur,
+        {"department_name": "Hérault", "phenomena": phenomenes},
+    )
+
+
+async def _vigilance_communautaire(hass):
+    """Entrée vide : la nouvelle intégration doit être préférée au capteur d'origine."""
+    await hass.services.async_call("input_text", "set_value", {"entity_id": "input_text.jarvis_secours_vigilance", "value": ""}, blocking=True)
+    maintenant = dt_util.now().replace(microsecond=0)
+    _vigilance(hass, "aujourd_hui", [])
+    _vigilance(hass, "demain", [])
+    hass.states.async_set("sensor.vigilance_littoral_herault_aujourd_hui", "green", {"department_name": "Littoral Hérault", "phenomena": []})
+    await hass.async_block_till_done()
+    return maintenant
+
+
+async def test_vigilance_communautaire_trouvee_d_office(hass, maison):
+    await _vigilance_communautaire(hass)
+    risque = hass.states.get("binary_sensor.jarvis_risque_de_coupure")
+    assert risque.attributes["capteur_vigilance"] == "sensor.vigilance_herault_aujourd_hui"
+    assert risque.state == "off" and risque.attributes["motif"] == "aucun"
+
+
+async def test_vigilance_communautaire_rouge_dans_les_12_h(hass, maison):
+    notes, _ = maison
+    t0 = await _vigilance_communautaire(hass)
+    debut, fin = t0 + dt.timedelta(hours=5), t0 + dt.timedelta(hours=11)
+    _vigilance(hass, "aujourd_hui", [
+        _phenomene("Orages", [(t0 - dt.timedelta(hours=2), debut, 3), (debut, fin, 4)]),
+        _phenomene("Vent violent", [(t0, fin, 3)]),
+    ])
+    await hass.async_block_till_done()
+    risque = hass.states.get("binary_sensor.jarvis_risque_de_coupure")
+    assert risque.state == "on"
+    assert risque.attributes["motif"] == "Orages (rouge) à partir du " + dt_util.as_local(debut).strftime("%d/%m %Hh%M")
+    assert dt_util.parse_datetime(risque.attributes["debut"]) == debut
+    assert dt_util.parse_datetime(risque.attributes["fin"]) == fin
+    await hass.async_block_till_done()
+    assert any("Risque de coupure" in t for t, _ in notes), notes
+
+
+async def test_vigilance_communautaire_orange_ignoree_par_defaut(hass, maison):
+    t0 = await _vigilance_communautaire(hass)
+    _vigilance(hass, "aujourd_hui", [_phenomene("Vent violent", [(t0, t0 + dt.timedelta(hours=6), 3)])], couleur="orange")
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.jarvis_risque_de_coupure").state == "off"
+    await hass.services.async_call("input_select", "select_option", {"entity_id": "input_select.jarvis_secours_niveau_vigilance", "option": "Orange et rouge"}, blocking=True)
+    await hass.async_block_till_done()
+    risque = hass.states.get("binary_sensor.jarvis_risque_de_coupure")
+    assert risque.state == "on" and risque.attributes["motif"] == "Vent violent (orange)"
+
+
+async def test_vigilance_communautaire_demain_attend_les_12_h(hass, maison):
+    """Rouge demain : pas de risque tant que le créneau commence dans plus de 12 h."""
+    t0 = await _vigilance_communautaire(hass)
+    debut = t0 + dt.timedelta(hours=16)
+    _vigilance(hass, "demain", [_phenomene("Neige-verglas", [(debut, debut + dt.timedelta(hours=8), 4)])])
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.jarvis_risque_de_coupure").state == "off"
+    debut = t0 + dt.timedelta(hours=10)
+    _vigilance(hass, "demain", [_phenomene("Neige-verglas", [(debut, debut + dt.timedelta(hours=8), 4)])])
+    await hass.async_block_till_done()
+    risque = hass.states.get("binary_sensor.jarvis_risque_de_coupure")
+    assert risque.state == "on" and risque.attributes["motif"].startswith("Neige-verglas (rouge) à partir du ")
+
+
+async def test_vigilance_communautaire_creneau_fini_et_phenomene_non_retenu(hass, maison):
+    t0 = await _vigilance_communautaire(hass)
+    _vigilance(hass, "aujourd_hui", [
+        _phenomene("Orages", [(t0 - dt.timedelta(hours=6), t0 - dt.timedelta(hours=1), 4)]),
+        _phenomene("Canicule", [(t0, t0 + dt.timedelta(hours=6), 4)]),
+    ])
+    await hass.async_block_till_done()
+    risque = hass.states.get("binary_sensor.jarvis_risque_de_coupure")
+    assert risque.state == "off" and risque.attributes["motif"] == "aucun"

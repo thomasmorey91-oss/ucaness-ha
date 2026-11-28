@@ -95,7 +95,9 @@ input_select:
     icon: mdi:alert-octagon
 
 input_text:
-  # Vide : le premier capteur « …_weather_alert » de l'intégration Météo-France est pris d'office.
+  # Vide : trouvé d'office. D'abord le capteur « …_aujourd_hui » de l'intégration communautaire
+  # « Vigilance Météo France » (hors zone littorale), sinon le premier « …_weather_alert » de
+  # l'intégration Météo-France d'origine.
   jarvis_secours_vigilance:
     name: "Secours : capteur de vigilance Météo-France (vide = trouvé d'office)"
     max: 100
@@ -142,46 +144,181 @@ template:
         unique_id: jarvis_risque_coupure
         device_class: safety
         icon: mdi:weather-lightning-rainy
+        # Deux sources de vigilance, au choix dans « Secours : capteur de vigilance » (vide = trouvé d'office) :
+        #   - intégration communautaire « Vigilance Météo France » (sensor.vigilance_<département>_aujourd_hui) :
+        #     aujourd'hui ET demain, créneau par créneau ; un créneau compte s'il commence dans les 12 h et
+        #     n'est pas fini. Préférée quand elle est installée (clé gratuite de l'API Météo-France) ;
+        #   - intégration Météo-France d'origine (sensor.…_weather_alert) : vigilance du jour, sans horaire.
         state: >
           {% set c = states('input_text.jarvis_secours_vigilance') %}
-          {% if c in ['', 'unknown', 'unavailable'] %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
-          {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Vagues-submersion'] %}
-          {% set niveaux = ['Rouge'] if is_state('input_select.jarvis_secours_niveau_vigilance', 'Rouge') else ['Orange', 'Rouge'] %}
-          {% set ns = namespace(v=false) %}
-          {% if c not in ['', 'unknown'] and states(c) not in ['unknown', 'unavailable'] %}
-            {% for p in phen %}
-              {% if state_attr(c, p) in niveaux %}{% set ns.v = true %}{% endif %}
-            {% endfor %}
+          {% if c in ['', 'unknown', 'unavailable'] %}
+            {% set c = states.sensor | selectattr('entity_id', 'search', '_aujourd_hui$') | rejectattr('entity_id', 'search', 'littoral')
+                 | selectattr('attributes.phenomena', 'defined') | map(attribute='entity_id') | first | default('') %}
+            {% if not c %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
           {% endif %}
+          {% set rouge = is_state('input_select.jarvis_secours_niveau_vigilance', 'Rouge') %}
+          {% set niveaux = ['Rouge'] if rouge else ['Orange', 'Rouge'] %}
+          {% set couleurs = [4] if rouge else [3, 4] %}
+          {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Crues', 'Vagues-submersion'] %}
+          {% set horizon = now() + timedelta(hours=12) %}
+          {% set ns = namespace(v=[], a=[]) %}
+          {% if c and state_attr(c, 'phenomena') is none and states(c) not in ['unknown', 'unavailable'] %}
+            {% for p in phen if state_attr(c, p) in niveaux %}{% set ns.v = ns.v + [p ~ ' (' ~ state_attr(c, p) | lower ~ ')'] %}{% endfor %}
+          {% endif %}
+          {% for s in ([c] + ([c | replace('_aujourd_hui', '_demain')] if c.endswith('_aujourd_hui') else [])) if c and state_attr(s, 'phenomena') is not none %}
+            {% for p in state_attr(s, 'phenomena') if p.phenomenon in phen %}
+              {% set creneaux = (p.timeline or []) | selectattr('color_id', 'in', couleurs) | list %}
+              {% if not p.timeline and (p.color_id | int(0)) in couleurs %}{% set creneaux = [{'color_id': p.color_id, 'begin_time': p.begin_time, 'end_time': p.end_time}] %}{% endif %}
+              {% for k in creneaux %}
+                {% set kd = k.begin_time | as_datetime(none) %}{% set kf = k.end_time | as_datetime(none) %}
+                {% if (kf is none or kf > now()) and (kd is none or kd <= horizon) %}
+                  {% set ns.a = ns.a + [{'p': p.phenomenon, 'n': 'rouge' if (k.color_id | int(0)) == 4 else 'orange', 'd': kd, 'f': kf}] %}
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+          {% endfor %}
           {% set d = states('input_datetime.jarvis_secours_coupure_prevue_debut') | as_datetime(none) %}
           {% set f = states('input_datetime.jarvis_secours_coupure_prevue_fin') | as_datetime(none) %}
           {% set prevue = d is not none and f is not none and (d | as_local) - timedelta(hours=12) <= now() < (f | as_local) %}
-          {{ ns.v or prevue }}
+          {{ (ns.v | count > 0) or (ns.a | count > 0) or prevue }}
         attributes:
           capteur_vigilance: >
             {% set c = states('input_text.jarvis_secours_vigilance') %}
-            {% if c in ['', 'unknown', 'unavailable'] %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
+            {% if c in ['', 'unknown', 'unavailable'] %}
+              {% set c = states.sensor | selectattr('entity_id', 'search', '_aujourd_hui$') | rejectattr('entity_id', 'search', 'littoral')
+                   | selectattr('attributes.phenomena', 'defined') | map(attribute='entity_id') | first | default('') %}
+              {% if not c %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
+            {% endif %}
+            {% set rouge = is_state('input_select.jarvis_secours_niveau_vigilance', 'Rouge') %}
+            {% set niveaux = ['Rouge'] if rouge else ['Orange', 'Rouge'] %}
+            {% set couleurs = [4] if rouge else [3, 4] %}
+            {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Crues', 'Vagues-submersion'] %}
+            {% set horizon = now() + timedelta(hours=12) %}
+            {% set ns = namespace(v=[], a=[]) %}
+            {% if c and state_attr(c, 'phenomena') is none and states(c) not in ['unknown', 'unavailable'] %}
+              {% for p in phen if state_attr(c, p) in niveaux %}{% set ns.v = ns.v + [p ~ ' (' ~ state_attr(c, p) | lower ~ ')'] %}{% endfor %}
+            {% endif %}
+            {% for s in ([c] + ([c | replace('_aujourd_hui', '_demain')] if c.endswith('_aujourd_hui') else [])) if c and state_attr(s, 'phenomena') is not none %}
+              {% for p in state_attr(s, 'phenomena') if p.phenomenon in phen %}
+                {% set creneaux = (p.timeline or []) | selectattr('color_id', 'in', couleurs) | list %}
+                {% if not p.timeline and (p.color_id | int(0)) in couleurs %}{% set creneaux = [{'color_id': p.color_id, 'begin_time': p.begin_time, 'end_time': p.end_time}] %}{% endif %}
+                {% for k in creneaux %}
+                  {% set kd = k.begin_time | as_datetime(none) %}{% set kf = k.end_time | as_datetime(none) %}
+                  {% if (kf is none or kf > now()) and (kd is none or kd <= horizon) %}
+                    {% set ns.a = ns.a + [{'p': p.phenomenon, 'n': 'rouge' if (k.color_id | int(0)) == 4 else 'orange', 'd': kd, 'f': kf}] %}
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            {% endfor %}
+            {% set d = states('input_datetime.jarvis_secours_coupure_prevue_debut') | as_datetime(none) %}
+            {% set f = states('input_datetime.jarvis_secours_coupure_prevue_fin') | as_datetime(none) %}
+            {% set prevue = d is not none and f is not none and (d | as_local) - timedelta(hours=12) <= now() < (f | as_local) %}
             {{ c if c else 'aucun' }}
           motif: >
             {% set c = states('input_text.jarvis_secours_vigilance') %}
-            {% if c in ['', 'unknown', 'unavailable'] %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
-            {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Vagues-submersion'] %}
-            {% set niveaux = ['Rouge'] if is_state('input_select.jarvis_secours_niveau_vigilance', 'Rouge') else ['Orange', 'Rouge'] %}
-            {% set ns = namespace(m=[]) %}
-            {% if c not in ['', 'unknown'] %}
-              {% for p in phen %}
-                {% if state_attr(c, p) in niveaux %}{% set ns.m = ns.m + [p ~ ' (' ~ state_attr(c, p) | lower ~ ')'] %}{% endif %}
-              {% endfor %}
+            {% if c in ['', 'unknown', 'unavailable'] %}
+              {% set c = states.sensor | selectattr('entity_id', 'search', '_aujourd_hui$') | rejectattr('entity_id', 'search', 'littoral')
+                   | selectattr('attributes.phenomena', 'defined') | map(attribute='entity_id') | first | default('') %}
+              {% if not c %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
             {% endif %}
+            {% set rouge = is_state('input_select.jarvis_secours_niveau_vigilance', 'Rouge') %}
+            {% set niveaux = ['Rouge'] if rouge else ['Orange', 'Rouge'] %}
+            {% set couleurs = [4] if rouge else [3, 4] %}
+            {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Crues', 'Vagues-submersion'] %}
+            {% set horizon = now() + timedelta(hours=12) %}
+            {% set ns = namespace(v=[], a=[]) %}
+            {% if c and state_attr(c, 'phenomena') is none and states(c) not in ['unknown', 'unavailable'] %}
+              {% for p in phen if state_attr(c, p) in niveaux %}{% set ns.v = ns.v + [p ~ ' (' ~ state_attr(c, p) | lower ~ ')'] %}{% endfor %}
+            {% endif %}
+            {% for s in ([c] + ([c | replace('_aujourd_hui', '_demain')] if c.endswith('_aujourd_hui') else [])) if c and state_attr(s, 'phenomena') is not none %}
+              {% for p in state_attr(s, 'phenomena') if p.phenomenon in phen %}
+                {% set creneaux = (p.timeline or []) | selectattr('color_id', 'in', couleurs) | list %}
+                {% if not p.timeline and (p.color_id | int(0)) in couleurs %}{% set creneaux = [{'color_id': p.color_id, 'begin_time': p.begin_time, 'end_time': p.end_time}] %}{% endif %}
+                {% for k in creneaux %}
+                  {% set kd = k.begin_time | as_datetime(none) %}{% set kf = k.end_time | as_datetime(none) %}
+                  {% if (kf is none or kf > now()) and (kd is none or kd <= horizon) %}
+                    {% set ns.a = ns.a + [{'p': p.phenomenon, 'n': 'rouge' if (k.color_id | int(0)) == 4 else 'orange', 'd': kd, 'f': kf}] %}
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            {% endfor %}
             {% set d = states('input_datetime.jarvis_secours_coupure_prevue_debut') | as_datetime(none) %}
             {% set f = states('input_datetime.jarvis_secours_coupure_prevue_fin') | as_datetime(none) %}
-            {% if d is not none and f is not none and (d | as_local) - timedelta(hours=12) <= now() < (f | as_local) %}
-              {% set ns.m = ns.m + ['coupure programmée du ' ~ (d | as_local).strftime('%d/%m %Hh%M') ~ ' au ' ~ (f | as_local).strftime('%d/%m %Hh%M')] %}
+            {% set prevue = d is not none and f is not none and (d | as_local) - timedelta(hours=12) <= now() < (f | as_local) %}
+            {% set ns2 = namespace(m=ns.v, vus=[]) %}
+            {% for x in ns.a | sort(attribute='p') if x.p not in ns2.vus %}
+              {% set premier = ns.a | selectattr('p', 'eq', x.p) | rejectattr('d', 'none') | map(attribute='d') | min | default(none) %}
+              {% set ns2.vus = ns2.vus + [x.p] %}
+              {% set ns2.m = ns2.m + [x.p ~ ' (' ~ x.n ~ ')' ~ ((' à partir du ' ~ (premier | as_local).strftime('%d/%m %Hh%M')) if (premier is not none and premier > now()) else '')] %}
+            {% endfor %}
+            {% if prevue %}{% set ns2.m = ns2.m + ['coupure programmée du ' ~ (d | as_local).strftime('%d/%m %Hh%M') ~ ' au ' ~ (f | as_local).strftime('%d/%m %Hh%M')] %}{% endif %}
+            {{ ns2.m | join(', ') if ns2.m else 'aucun' }}
+          debut: >
+            {% set c = states('input_text.jarvis_secours_vigilance') %}
+            {% if c in ['', 'unknown', 'unavailable'] %}
+              {% set c = states.sensor | selectattr('entity_id', 'search', '_aujourd_hui$') | rejectattr('entity_id', 'search', 'littoral')
+                   | selectattr('attributes.phenomena', 'defined') | map(attribute='entity_id') | first | default('') %}
+              {% if not c %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
             {% endif %}
-            {{ ns.m | join(', ') if ns.m else 'aucun' }}
-          fin: >
+            {% set rouge = is_state('input_select.jarvis_secours_niveau_vigilance', 'Rouge') %}
+            {% set niveaux = ['Rouge'] if rouge else ['Orange', 'Rouge'] %}
+            {% set couleurs = [4] if rouge else [3, 4] %}
+            {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Crues', 'Vagues-submersion'] %}
+            {% set horizon = now() + timedelta(hours=12) %}
+            {% set ns = namespace(v=[], a=[]) %}
+            {% if c and state_attr(c, 'phenomena') is none and states(c) not in ['unknown', 'unavailable'] %}
+              {% for p in phen if state_attr(c, p) in niveaux %}{% set ns.v = ns.v + [p ~ ' (' ~ state_attr(c, p) | lower ~ ')'] %}{% endfor %}
+            {% endif %}
+            {% for s in ([c] + ([c | replace('_aujourd_hui', '_demain')] if c.endswith('_aujourd_hui') else [])) if c and state_attr(s, 'phenomena') is not none %}
+              {% for p in state_attr(s, 'phenomena') if p.phenomenon in phen %}
+                {% set creneaux = (p.timeline or []) | selectattr('color_id', 'in', couleurs) | list %}
+                {% if not p.timeline and (p.color_id | int(0)) in couleurs %}{% set creneaux = [{'color_id': p.color_id, 'begin_time': p.begin_time, 'end_time': p.end_time}] %}{% endif %}
+                {% for k in creneaux %}
+                  {% set kd = k.begin_time | as_datetime(none) %}{% set kf = k.end_time | as_datetime(none) %}
+                  {% if (kf is none or kf > now()) and (kd is none or kd <= horizon) %}
+                    {% set ns.a = ns.a + [{'p': p.phenomenon, 'n': 'rouge' if (k.color_id | int(0)) == 4 else 'orange', 'd': kd, 'f': kf}] %}
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            {% endfor %}
+            {% set d = states('input_datetime.jarvis_secours_coupure_prevue_debut') | as_datetime(none) %}
             {% set f = states('input_datetime.jarvis_secours_coupure_prevue_fin') | as_datetime(none) %}
-            {{ (f | as_local).isoformat() if (f is not none and (f | as_local) > now()) else (now() + timedelta(hours=12)).replace(minute=0, second=0, microsecond=0).isoformat() }}
+            {% set prevue = d is not none and f is not none and (d | as_local) - timedelta(hours=12) <= now() < (f | as_local) %}
+            {% set ds = ns.a | rejectattr('d', 'none') | map(attribute='d') | list + ([d] if prevue else []) %}
+            {{ ([ds | min, now()] | max | as_local).isoformat() if ds else (now().isoformat() if (ns.v or ns.a) else none) }}
+          fin: >
+            {% set c = states('input_text.jarvis_secours_vigilance') %}
+            {% if c in ['', 'unknown', 'unavailable'] %}
+              {% set c = states.sensor | selectattr('entity_id', 'search', '_aujourd_hui$') | rejectattr('entity_id', 'search', 'littoral')
+                   | selectattr('attributes.phenomena', 'defined') | map(attribute='entity_id') | first | default('') %}
+              {% if not c %}{% set c = states.sensor | map(attribute='entity_id') | select('search', '_weather_alert$') | first | default('') %}{% endif %}
+            {% endif %}
+            {% set rouge = is_state('input_select.jarvis_secours_niveau_vigilance', 'Rouge') %}
+            {% set niveaux = ['Rouge'] if rouge else ['Orange', 'Rouge'] %}
+            {% set couleurs = [4] if rouge else [3, 4] %}
+            {% set phen = ['Vent violent', 'Orages', 'Neige-verglas', 'Pluie-inondation', 'Inondation', 'Crues', 'Vagues-submersion'] %}
+            {% set horizon = now() + timedelta(hours=12) %}
+            {% set ns = namespace(v=[], a=[]) %}
+            {% if c and state_attr(c, 'phenomena') is none and states(c) not in ['unknown', 'unavailable'] %}
+              {% for p in phen if state_attr(c, p) in niveaux %}{% set ns.v = ns.v + [p ~ ' (' ~ state_attr(c, p) | lower ~ ')'] %}{% endfor %}
+            {% endif %}
+            {% for s in ([c] + ([c | replace('_aujourd_hui', '_demain')] if c.endswith('_aujourd_hui') else [])) if c and state_attr(s, 'phenomena') is not none %}
+              {% for p in state_attr(s, 'phenomena') if p.phenomenon in phen %}
+                {% set creneaux = (p.timeline or []) | selectattr('color_id', 'in', couleurs) | list %}
+                {% if not p.timeline and (p.color_id | int(0)) in couleurs %}{% set creneaux = [{'color_id': p.color_id, 'begin_time': p.begin_time, 'end_time': p.end_time}] %}{% endif %}
+                {% for k in creneaux %}
+                  {% set kd = k.begin_time | as_datetime(none) %}{% set kf = k.end_time | as_datetime(none) %}
+                  {% if (kf is none or kf > now()) and (kd is none or kd <= horizon) %}
+                    {% set ns.a = ns.a + [{'p': p.phenomenon, 'n': 'rouge' if (k.color_id | int(0)) == 4 else 'orange', 'd': kd, 'f': kf}] %}
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            {% endfor %}
+            {% set d = states('input_datetime.jarvis_secours_coupure_prevue_debut') | as_datetime(none) %}
+            {% set f = states('input_datetime.jarvis_secours_coupure_prevue_fin') | as_datetime(none) %}
+            {% set prevue = d is not none and f is not none and (d | as_local) - timedelta(hours=12) <= now() < (f | as_local) %}
+            {% set fs = ns.a | rejectattr('f', 'none') | map(attribute='f') | list + ([f] if (f is not none and (f | as_local) > now()) else []) %}
+            {{ (fs | max | as_local).isoformat() if fs else (now() + timedelta(hours=12)).replace(minute=0, second=0, microsecond=0).isoformat() }}
 
     sensor:
       - name: "Jarvis autonomie de secours"
