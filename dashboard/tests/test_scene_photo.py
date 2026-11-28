@@ -35,3 +35,18 @@ def test_scene_sur_photo_nuit(site):  # noqa: F811
     }}""")
     pg.close()
     assert got == {"calques": 2, "visible": ["../www/ucaness/maison-exemple.svg?n"], "reflet": False, "astre": False, "uhome": True}
+
+
+def test_etiquettes_masquables(site):  # noqa: F811
+    pg = open_page(site, "/tests/scene.html")
+    got = pg.evaluate(f"""async () => {{
+        const f = {FLOW};
+        const avant = f.shadowRoot.querySelectorAll('.lbls .lb').length;
+        const c = Object.assign({{}}, window.scene, {{ ev: Object.assign({{}}, window.scene.ev, {{ hide_label: true }}),
+            nodes: Object.assign({{}}, window.scene.nodes, {{ battery: Object.assign({{}}, window.scene.nodes.battery, {{ hide_label: true }}) }}) }});
+        f.setConfig(c); f.hass = window.fakeHass;
+        await new Promise((r) => setTimeout(r, 100));
+        return {{ avant, apres: f.shadowRoot.querySelectorAll('.lbls .lb').length, uhome: !!f.shadowRoot.querySelector('.uh') }};
+    }}""")
+    pg.close()
+    assert got["apres"] == got["avant"] - 2 and got["uhome"] is True
