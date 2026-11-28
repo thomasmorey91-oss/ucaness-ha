@@ -5292,7 +5292,7 @@ class UcanessGaugeCard extends HTMLElement {
         .g { position: relative; max-width: 260px; margin: 0 auto; }
         svg { display: block; width: 100%; height: auto; }
         .aig { transform-origin: 100px 100px; transition: transform ${UC_REDUCED || UC_LIGHT ? '0s' : '1.2s'} cubic-bezier(.3,1.3,.5,1); }
-        .v { position: absolute; left: 0; right: 0; bottom: 2px; text-align: center; font: 700 22px var(--uc-font); color: var(--uc-value); }
+        .v { margin-top: 2px; text-align: center; font: 700 22px var(--uc-font); color: var(--uc-value); }
         .v small { font-size: 13px; color: var(--uc-muted); }
         .n { margin: 2px 0 0; text-align: center; font-size: 13px; color: var(--uc-label); }
         .b { display: flex; justify-content: space-between; padding: 0 6%; font-size: 11px; color: var(--uc-muted); }
