@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.11.0`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.12.0`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -219,6 +219,11 @@ views:
 | `custom:ucaness-bilan-card` | Bilan chiffré de la journée : anneau d'autonomie (part des besoins couverte sans le réseau), soleil (et part utilisée), maison, réseau (et coût), économie. `production`, `consommation`, `achat` (une entité ou une liste, additionnées), `injection`, `cout` (sinon achat × prix), `economie` (sinon (consommation − achat) × prix, marquée « estimée »), `prix` (entité ou nombre). Compteurs du jour en kWh (Wh et MWh convertis). Un appui sur une tuile ouvre la fiche |
 | `custom:ucaness-forecast-card` | Météo des prochains jours (`entity`, `jours`, 5 par défaut), lue par l'abonnement aux prévisions quotidiennes de Home Assistant ; `solaire` : liste des capteurs de production prévue, un par jour (kWh) |
 | `custom:ucaness-ucan-card`, option `resume` | Résumé du soir dans la bulle d'Ucan, à partir de `heure` (`20:00` par défaut) quand aucun conseil n'attend ; mêmes clés que la carte de bilan |
+
+### Scène sur photo (0.12.0)
+
+- **`photos`** : une photo de la maison par ambiance, toutes au même cadrage : `jour`, `coucher`, `nuit`, `couvert`, `pluie`, `orage` (adresses, par exemple `/local/ucaness/maison/maison-jour.jpg`). La scène passe de l'une à l'autre en fondu selon le soleil (`sun.sun`) et la météo. Une photo absente est remplacée par la plus proche (orage → pluie → couvert → jour ; coucher → jour). Avec des photos : `aspect_ratio` au format des photos (1.5 pour 1536 × 1024), `image_area: {x: 0, y: 0, w: 100}`, pas de soleil, de lune, d'arc-en-ciel ni de reflet dessinés (la photo a son propre ciel), et `lights` inutile si la photo de nuit montre déjà les fenêtres éclairées.
+- **`nodes.battery.uhome.image`** : image de la batterie (PNG à fond transparent, recadrée au plus près) à la place du dessin, avec `ratio` = hauteur ÷ largeur de l'image (2,37 par défaut).
 
 ### Outils de la scène, glissement entre vues, cadran (0.11.0)
 
