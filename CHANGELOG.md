@@ -4,6 +4,10 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 28/11/2026
 
+### Cartes 0.9.0 : vue « Appareils » automatique
+- Stratégie de vue **`custom:ucaness-appareils`** : une carte par appareil reconnu (Appliance Électroménager Cards, facultatives), groupées par pièce ; les nouveaux appareils apparaissent seuls. Réglages : `theme`, `prix`, `exclure`, `appareils`.
+- **`custom:ucaness-appareil-card`** : carte rendue inerte (aucune commande), un appui ouvre la fiche de l'appareil. Sept langues.
+
 ### Pilotage : vigilance du lendemain pour le secours
 - `jarvis_secours.yaml` : « Jarvis risque de coupure » lit aussi l'intégration communautaire **« Vigilance Météo France »** (`sensor.vigilance_<département>_aujourd_hui` et `_demain`, clé gratuite de l'API Météo-France). Un créneau orange ou rouge compte s'il commence dans les 12 h et n'est pas fini ; motif avec l'heure de début ; nouvel attribut `debut`, `fin` = fin du dernier créneau retenu. Capteur trouvé d'office (zone littorale écartée), sinon l'intégration Météo-France d'origine, inchangée.
 

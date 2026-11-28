@@ -19,8 +19,13 @@
  *   custom:ucaness-hours-card   graphique de la journée heure par heure, avec un choix en haut
  *   custom:ucaness-ucan-card    Ucan, la batterie UHome avec un visage, et son conseil du moment (0.5.1)
  *   custom:ucaness-vehicle-card la voiture de la maison : silhouette ou photo détourée, charge, plan de recharge (0.7.0)
+ *   custom:ucaness-appareil-card une carte d'appareil rendue inerte (aucune commande), appui = fiche (0.9.0)
+ *   stratégie custom:ucaness-appareils  vue « Appareils » construite d'après les appareils de la maison (0.9.0)
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
+ *
+ * 0.9.0 (28/11/2026) : vue « Appareils » automatique (stratégie custom:ucaness-appareils) : chaque appareil reconnu
+ *   reçoit une carte « Appliance Électroménager Cards », en lecture seule ; les nouveaux appareils apparaissent seuls.
  *
  * 0.8.0 (27/11/2026) : scène vivante de la maison en direct (vivant: true) : néons et particules, modules de l'UHome
  *   qui s'allument, étiquette et carte de niveau, bandeau d'événement, Ucan dans la scène, soleil et lune, oiseaux,
@@ -51,7 +56,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.8.0';
+const UC_VERSION = '0.9.0';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -247,7 +252,13 @@ const UC_I18N = /* I18N-DEBUT */{
   "ucan_tient_long": "À ce rythme, je tiens plus de 24 h",
   "ucan_repos": "Tout roule",
   "autonome": "100 % autonome",
-  "seuil_reseau": "Seuil réseau {v} kW"
+  "seuil_reseau": "Seuil réseau {v} kW",
+  "carte_appareil_nom": "UCANESS appareil (lecture seule)",
+  "carte_appareil_desc": "Carte d'un appareil sans bouton d'action : un appui ouvre sa fiche.",
+  "appareils_titre": "Appareils",
+  "appareils_sans_piece": "Autres appareils",
+  "appareils_ouvrir": "Ouvrir la fiche de {nom}",
+  "appareils_vide": "Aucun appareil reconnu."
  },
  "en": {
   "meteo": "Weather: {etat}",
@@ -439,7 +450,13 @@ const UC_I18N = /* I18N-DEBUT */{
   "ucan_tient_long": "At this rate, I last more than 24 h",
   "ucan_repos": "All good",
   "autonome": "100 % self-sufficient",
-  "seuil_reseau": "Grid limit {v} kW"
+  "seuil_reseau": "Grid limit {v} kW",
+  "carte_appareil_nom": "UCANESS device (read-only)",
+  "carte_appareil_desc": "A device card without action buttons: tap to open its details.",
+  "appareils_titre": "Devices",
+  "appareils_sans_piece": "Other devices",
+  "appareils_ouvrir": "Open the details of {nom}",
+  "appareils_vide": "No device recognised."
  },
  "zh-Hans": {
   "meteo": "天气：{etat}",
@@ -631,7 +648,13 @@ const UC_I18N = /* I18N-DEBUT */{
   "ucan_tient_long": "按此速度，我能撑 24 小时以上",
   "ucan_repos": "一切正常",
   "autonome": "100 % 自给",
-  "seuil_reseau": "电网上限 {v} kW"
+  "seuil_reseau": "电网上限 {v} kW",
+  "carte_appareil_nom": "UCANESS 设备（只读）",
+  "carte_appareil_desc": "不带操作按钮的设备卡片：点按打开其详情。",
+  "appareils_titre": "设备",
+  "appareils_sans_piece": "其他设备",
+  "appareils_ouvrir": "打开 {nom} 的详情",
+  "appareils_vide": "未识别到设备。"
  },
  "de": {
   "meteo": "Wetter: {etat}",
@@ -823,7 +846,13 @@ const UC_I18N = /* I18N-DEBUT */{
   "ucan_tient_long": "Bei diesem Tempo halte ich über 24 h",
   "ucan_repos": "Alles läuft",
   "autonome": "100 % autark",
-  "seuil_reseau": "Netzgrenze {v} kW"
+  "seuil_reseau": "Netzgrenze {v} kW",
+  "carte_appareil_nom": "UCANESS Gerät (nur Anzeige)",
+  "carte_appareil_desc": "Gerätekarte ohne Bedienknöpfe: Tippe, um die Details zu öffnen.",
+  "appareils_titre": "Geräte",
+  "appareils_sans_piece": "Weitere Geräte",
+  "appareils_ouvrir": "Details von {nom} öffnen",
+  "appareils_vide": "Kein Gerät erkannt."
  },
  "it": {
   "meteo": "Meteo: {etat}",
@@ -1015,7 +1044,13 @@ const UC_I18N = /* I18N-DEBUT */{
   "ucan_tient_long": "A questo ritmo reggo più di 24 h",
   "ucan_repos": "Tutto bene",
   "autonome": "100 % autonoma",
-  "seuil_reseau": "Soglia rete {v} kW"
+  "seuil_reseau": "Soglia rete {v} kW",
+  "carte_appareil_nom": "UCANESS dispositivo (sola lettura)",
+  "carte_appareil_desc": "Scheda di un dispositivo senza pulsanti di comando: tocca per aprirne i dettagli.",
+  "appareils_titre": "Dispositivi",
+  "appareils_sans_piece": "Altri dispositivi",
+  "appareils_ouvrir": "Apri i dettagli di {nom}",
+  "appareils_vide": "Nessun dispositivo riconosciuto."
  },
  "es": {
   "meteo": "Tiempo: {etat}",
@@ -1207,7 +1242,13 @@ const UC_I18N = /* I18N-DEBUT */{
   "ucan_tient_long": "A este ritmo aguanto más de 24 h",
   "ucan_repos": "Todo en orden",
   "autonome": "100 % autónoma",
-  "seuil_reseau": "Límite de red {v} kW"
+  "seuil_reseau": "Límite de red {v} kW",
+  "carte_appareil_nom": "UCANESS aparato (solo lectura)",
+  "carte_appareil_desc": "Tarjeta de un aparato sin botones de acción: toca para abrir su ficha.",
+  "appareils_titre": "Aparatos",
+  "appareils_sans_piece": "Otros aparatos",
+  "appareils_ouvrir": "Abrir la ficha de {nom}",
+  "appareils_vide": "Ningún aparato reconocido."
  },
  "pt": {
   "meteo": "Meteorologia: {etat}",
@@ -1399,7 +1440,13 @@ const UC_I18N = /* I18N-DEBUT */{
   "ucan_tient_long": "A este ritmo aguento mais de 24 h",
   "ucan_repos": "Tudo bem",
   "autonome": "100 % autónoma",
-  "seuil_reseau": "Limite da rede {v} kW"
+  "seuil_reseau": "Limite da rede {v} kW",
+  "carte_appareil_nom": "UCANESS aparelho (só leitura)",
+  "carte_appareil_desc": "Cartão de um aparelho sem botões de ação: toque para abrir a sua ficha.",
+  "appareils_titre": "Aparelhos",
+  "appareils_sans_piece": "Outros aparelhos",
+  "appareils_ouvrir": "Abrir a ficha de {nom}",
+  "appareils_vide": "Nenhum aparelho reconhecido."
  }
 }/* I18N-FIN */;
 let UC_LANG_VUE = null;   // dernière langue vue, pour les appels sans hass (configuration, sélecteur de cartes)
@@ -4660,6 +4707,238 @@ const UC_VEHICLE_CSS = `
   .tol[hidden] { display: none; }
 `;
 
+/* ------------------------------------------------------------------ appareils : vue automatique (0.9.0) */
+/* Vue « Appareils » construite à chaque ouverture à partir des appareils de Home Assistant : chaque appareil
+ * reconnu reçoit une carte des « Appliance Électroménager Cards » (skyrotter, facultatives, à installer à part),
+ * enveloppée dans custom:ucaness-appareil-card qui la rend inerte : aucun bouton, aucun curseur, aucune commande ;
+ * un appui ouvre la fiche de l'appareil. Un appareil ajouté plus tard apparaît tout seul, sans modifier de fichier.
+ *
+ *   views:
+ *     - strategy:
+ *         type: custom:ucaness-appareils
+ *         theme: UCANESS                          # facultatif
+ *         prix: sensor.jarvis_prix_du_kwh_reseau  # facultatif : coût du jour au prix du tarif en cours
+ *         exclure: [HA-MCP Server]                # facultatif : noms ou identifiants d'appareils
+ *         appareils:                              # facultatif : réglages propres à un appareil (false = masqué)
+ *           Prise lave-linge: { entity: binary_sensor.lave_linge_en_marche }
+ */
+
+const UC_APP_NOYAU = [
+  // [famille de carte (cartes « prise + puissance »), mots du nom ou du modèle, sans accents ni majuscules]
+  ['washer_dryer', /lave.?linge.?sechant|washer.?dryer|waschtrockner|lavasciuga|lavasecadora|maquina de lavar e secar/],
+  ['washer', /lave.?linge|washer|washing|waschmaschine|lavatrice|lavadora|maquina de lavar roupa/],
+  ['dishwasher', /lave.?vaisselle|dishwasher|spulmaschine|geschirrspuler|lavastoviglie|lavavajillas|maquina de lavar loica/],
+  ['dryer', /seche.?linge|dryer|trockner|asciugatrice|secadora|maquina de secar/],
+  ['towel_dryer', /seche.?serviette|towel|handtuch|scaldasalviette|toallero|toalheiro/],
+  ['water_heater', /chauffe.?eau|ballon|water.?heater|boiler|warmwasser|scaldabagno|calentador|termoacumulador/],
+  ['oven', /\bfour\b|oven|backofen|forno|horno/],
+  ['fridge', /frigo|refrigerat|fridge|kuhlschrank|frigorifero|nevera|frigorifico/],
+  ['chest_freezer', /congelateur|freezer|gefrier|congelatore|congelador/],
+  ['tv', /\btv\b|\btele|televis|fernseh/],
+  ['av_receiver', /hi.?fi|ampli|av.?receiver|home.?cinema|enceinte|stereo/],
+  ['coffee_maker', /cafe|coffee|kaffee|caffe/],
+  ['kettle', /bouilloire|kettle|wasserkocher|bollitore|hervidor|chaleira/],
+  ['microwave', /micro.?onde|microwave|mikrowelle|microonde|microondas/],
+  ['dehumidifier', /deshumidificateur|dehumidifier|entfeuchter|deumidificatore|deshumidificador|desumidificador/],
+  ['radiator', /radiateur|radiator|heizkorper|termosifone|radiador/],
+];
+
+function ucNorm(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+/* Cartes de la vue, regroupées par pièce : [{ piece, cartes: [{ type: 'custom:ucaness-appareil-card', … }] }].
+ * Fonction pure : ne lit que hass.devices, hass.entities, hass.areas et hass.states. */
+function ucAppareilsCartes(hass, cfg = {}) {
+  const devices = (hass && hass.devices) || {};
+  const regs = (hass && hass.entities) || {};
+  const states = (hass && hass.states) || {};
+  const areas = (hass && hass.areas) || {};
+  const exclure = new Set((cfg.exclure || []).map(ucNorm));
+  const reglages = {};
+  for (const [k, v] of Object.entries(cfg.appareils || {})) reglages[ucNorm(k)] = v;
+  const parAppareil = {};
+  for (const [id, r] of Object.entries(regs)) {
+    if (!r || !r.device_id || r.hidden || r.hidden_by || r.entity_category || !states[id]) continue;
+    (parAppareil[r.device_id] = parAppareil[r.device_id] || []).push(id);
+  }
+  const groupes = {};
+  for (const dev of Object.values(devices)) {
+    if (!dev || dev.entry_type === 'service' || dev.disabled_by) continue;
+    const nom = dev.name_by_user || dev.name || '';
+    if (exclure.has(ucNorm(nom)) || exclure.has(ucNorm(dev.id))) continue;
+    const reglage = reglages[ucNorm(nom)] ?? reglages[ucNorm(dev.id)];
+    if (reglage === false) continue;
+    const ents = (parAppareil[dev.id] || []).sort();
+    const carte = ucAppareilCarte(dev, nom, ents, states, cfg);
+    if (!carte) continue;
+    const { plus, ...auto } = carte;
+    const card = { ...auto, ...(reglage && typeof reglage === 'object' ? reglage : {}), name: (reglage && reglage.name) || nom };
+    const piece = (dev.area_id && areas[dev.area_id] && areas[dev.area_id].name) || '';
+    (groupes[piece] = groupes[piece] || []).push({ type: 'custom:ucaness-appareil-card', plus: card.entity || plus, nom, card });
+  }
+  return Object.keys(groupes)
+    .sort((a, b) => (a === '') - (b === '') || a.localeCompare(b))
+    .map((piece) => ({ piece, cartes: groupes[piece].sort((a, b) => a.nom.localeCompare(b.nom)) }));
+}
+
+/* Carte d'un appareil d'après ses entités, ou null si rien d'utile à montrer. Toujours sans commande. */
+function ucAppareilCarte(dev, nom, ents, states, cfg) {
+  const dc = (e) => (states[e] && states[e].attributes && states[e].attributes.device_class) || '';
+  const dom = (e) => e.split('.')[0];
+  const une = (d, classes, motif) => ents.find((e) => dom(e) === d && (!classes || classes.includes(dc(e))) && (!motif || motif.test(e)));
+  const texte = ucNorm(`${nom} ${dev.model || ''} ${dev.manufacturer || ''}`);
+  const ro = { show_controls: false, show_toggle: false, show_modes: false, tap_action: { action: 'none' }, hold_action: { action: 'none' } };
+  const puissance = une('sensor', ['power']);
+  const energie = une('sensor', ['energy']);
+  const cout = cfg.prix ? { price_per_kwh: cfg.prix } : {};
+
+  // Volets, porte de garage, portail motorisé (entité cover)
+  const volet = une('cover');
+  if (volet) {
+    const c = dc(volet);
+    if (c === 'garage') return { type: 'custom:appliance-garage-door-card', entity: volet, plus: volet, ...ro };
+    if (c === 'gate') return { type: 'custom:appliance-swing-gate-card', entity: volet, plus: volet, ...ro };
+    return { type: 'custom:appliance-roller-shutter-card', entity: volet, plus: volet, show_slider: false, ...ro };
+  }
+  // Sonnette vidéo, caméra
+  const camera = une('camera', null, /(?<!_vignette)$/) || une('camera');
+  const mouvement = une('binary_sensor', ['motion'], /mouvement|motion/) || une('binary_sensor', ['motion']);
+  if (/sonnette|doorbell|klingel|campanello|timbre|campainha/.test(texte) && (camera || mouvement)) {
+    const visiteur = une('binary_sensor', null, /visiteur|visitor|ring|sonnerie/);
+    return { type: 'custom:appliance-video-doorbell-card', entity_camera: camera, entity_ring: visiteur, entity_motion: mouvement, plus: camera || mouvement, ...ro };
+  }
+  if (camera) return { type: 'custom:appliance-camera-card', entity_camera: camera, entity_motion: mouvement, plus: camera, ...ro };
+  if (/camera/.test(texte) && mouvement) return { type: 'custom:appliance-motion-sensor-card', entity: mouvement, plus: mouvement, ...ro };
+  // Borne de recharge
+  if (/wallbox|borne|charg(eur|er|ing)|wallbox|ladestation|colonnina|cargador|carregador/.test(texte) && puissance) {
+    const etat = une('sensor', null, /etat|status|description/);
+    return { type: 'custom:appliance-ev-charger-card', entity_status: etat, entity_power: puissance, plus: etat || puissance, ...ro };
+  }
+  // Compteur Linky
+  if (/linky|zlinky|teleinfo|\btic\b/.test(texte)) {
+    const app = une('sensor', ['apparent_power']) || puissance;
+    return { type: 'custom:appliance-linky-card', entity_power: app, plus: app, ...ro };
+  }
+  // Batterie domestique (charge en %, puissance de la batterie)
+  const soc = une('sensor', ['battery'], /soc|niveau|level/);
+  const pBat = une('sensor', ['power'], /batter/);
+  if (soc && pBat) return { type: 'custom:appliance-battery-card', entity_soc: soc, entity_power: pBat, plus: soc, ...ro };
+  // Téléviseur, box, lecteur
+  const media = une('media_player');
+  if (media) return { type: 'custom:appliance-tv-box-card', entity: media, plus: media, ...ro };
+  // Ouvrants (contact de porte ou de fenêtre)
+  const ouvrant = une('binary_sensor', ['door', 'window', 'garage_door', 'opening']);
+  if (ouvrant) {
+    const model = /fenetre|window|baie|fenster|finestra|ventana|janela/.test(texte) ? 'window'
+      : /service|garage|cellier|buanderie/.test(texte) ? 'service_door' : 'front_door';
+    return { type: 'custom:appliance-door-sensor-card', entity: ouvrant, model, plus: ouvrant, ...ro };
+  }
+  // Sonde de température (et d'humidité)
+  const temp = une('sensor', ['temperature']);
+  const hum = une('sensor', ['humidity']);
+  if (temp && (hum || !puissance)) {
+    return { type: 'custom:appliance-room-climate-card', entity_temperature: temp, entity_humidity: hum, plus: temp, ...ro };
+  }
+  // Portail commandé par un relais (sans position) : état du relais seulement
+  if (/portail|gate|\btor\b|cancello|porton|portao/.test(texte)) {
+    const relais = une('switch') || une('binary_sensor');
+    if (relais) return { type: 'custom:appliance-swing-gate-card', entity: relais, plus: relais, ...ro };
+  }
+  // Appareil branché sur une prise qui mesure (famille d'après le nom), sinon prise connectée
+  if (puissance) {
+    const famille = (UC_APP_NOYAU.find(([, motif]) => motif.test(texte)) || ['smart_plug'])[0];
+    const prise = une('switch');
+    const base = { power: puissance, plus: prise || puissance, ...ro, ...cout };
+    if (energie) Object.assign(base, { energy: energie, energy_period: 'day' });
+    if (famille === 'smart_plug') return { type: 'custom:appliance-smart-plug-card', ...base, entity: prise };
+    return { type: `custom:appliance-${famille.replace('_', '-')}-card`, ...base };
+  }
+  return null;
+}
+
+/* Stratégie de vue : custom:ucaness-appareils */
+class UcanessAppareilsStrategy extends HTMLElement {
+  static async generate(config, hass) {
+    const groupes = ucAppareilsCartes(hass, config);
+    const sections = groupes.map(({ piece, cartes }) => ({
+      type: 'grid',
+      cards: [{ type: 'heading', heading: piece || ucT(hass, 'appareils_sans_piece') }, ...cartes],
+    }));
+    if (!sections.length) sections.push({ type: 'grid', cards: [{ type: 'markdown', content: ucT(hass, 'appareils_vide') }] });
+    const vue = { type: 'sections', title: config.title || ucT(hass, 'appareils_titre'), path: config.path || 'appareils', max_columns: config.max_columns || 3, sections };
+    if (config.theme) vue.theme = config.theme;
+    return vue;
+  }
+}
+
+/* custom:ucaness-appareil-card : une carte rendue inerte (aucune commande) ; un appui ouvre la fiche de l'appareil. */
+class UcanessAppareilCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot.innerHTML = `<style>
+      :host { display: block; position: relative; }
+      .l { pointer-events: none; user-select: none; }
+      .voile { position: absolute; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; margin: 0; padding: 0;
+        border: 0; background: transparent; cursor: pointer; border-radius: var(--ha-card-border-radius, 12px); }
+      .voile:focus-visible { outline: 2px solid var(--primary-color, #00D1D6); outline-offset: 2px; }
+    </style><div class="l" inert></div><button class="voile" type="button"></button>`;
+    this._l = this.shadowRoot.querySelector('.l');
+    this._voile = this.shadowRoot.querySelector('.voile');
+    this._voile.addEventListener('click', () => {
+      if (!this._c.plus) return;
+      this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: this._c.plus }, bubbles: true, composed: true }));
+    });
+  }
+
+  setConfig(config) {
+    if (!config || !config.card || !config.card.type) throw new Error('ucaness-appareil-card : « card » manquant');
+    this._c = config;
+    this._carte = null;
+    this._l.textContent = '';
+    this._creer();
+  }
+
+  async _creer() {
+    const c = this._c;
+    let el;
+    try {
+      const aides = window.loadCardHelpers ? await window.loadCardHelpers() : null;
+      el = aides ? aides.createCardElement(c.card) : document.createElement(c.card.type.replace(/^custom:/, ''));
+      if (!aides && el.setConfig) el.setConfig(c.card);
+    } catch (err) {
+      el = document.createElement('div');
+      el.textContent = String(err && err.message || err);
+    }
+    if (c !== this._c) return;
+    this._carte = el;
+    if (this._hass) el.hass = this._hass;
+    this._l.appendChild(el);
+    this._majLibelle();
+  }
+
+  _majLibelle() {
+    this._voile.setAttribute('aria-label', ucT(this._hass, 'appareils_ouvrir', { nom: (this._c && (this._c.card.name || this._c.nom)) || '' }));
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this._carte) this._carte.hass = hass;
+    if (this._c) this._majLibelle();
+  }
+
+  getCardSize() {
+    return (this._carte && this._carte.getCardSize && this._carte.getCardSize()) || 5;
+  }
+
+  getGridOptions() {
+    return { columns: 12, rows: 'auto' };
+  }
+}
+
+if (!customElements.get('ll-strategy-view-ucaness-appareils')) customElements.define('ll-strategy-view-ucaness-appareils', UcanessAppareilsStrategy);
+
 /* ------------------------------------------------------------------ enregistrement */
 
 const UC_CARDS = [
@@ -4678,6 +4957,7 @@ const UC_CARDS = [
   ['ucaness-ucan-card', UcanessUcanCard, ucT(null, 'carte_ucan_nom'), ucT(null, 'carte_ucan_desc')],
   ['ucaness-hours-card', UcanessHoursCard, ucT(null, 'carte_hours_nom'), ucT(null, 'carte_hours_desc')],
   ['ucaness-vehicle-card', UcanessVehicleCard, ucT(null, 'carte_vehicle_nom'), ucT(null, 'carte_vehicle_desc')],
+  ['ucaness-appareil-card', UcanessAppareilCard, ucT(null, 'carte_appareil_nom'), ucT(null, 'carte_appareil_desc')],
 ];
 
 for (const [tag, cls, name, description] of UC_CARDS) {
@@ -4690,4 +4970,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };

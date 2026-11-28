@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.8.0`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.9.0`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -191,6 +191,25 @@ La voiture de la maison, telle que réglée dans les options de l'intégration (
 - Options : `entity` (`sensor.ucaness_vehicule`), `charger_entity` (état de la borne, par exemple `sensor.wallbox_status_description`), `title`.
 
 L'image téléversée est servie par Home Assistant à une adresse difficile à deviner mais sans mot de passe, comme le dossier `www` : n'utilisez pas une photo où l'on voit la plaque d'immatriculation ou la maison si cela vous gêne.
+
+### Vue « Appareils » automatique (0.9.0)
+
+Une vue construite à chaque ouverture d'après les appareils de Home Assistant : chaque appareil reconnu reçoit une carte des [Appliance Électroménager Cards](https://github.com/skyrotter/ha-appliance-electromenager-cards) (skyrotter, licence MIT, à installer à part par HACS), groupée par pièce. Un appareil ajouté plus tard apparaît tout seul.
+
+```yaml
+views:
+  - strategy:
+      type: custom:ucaness-appareils
+      theme: UCANESS                          # facultatif
+      prix: sensor.prix_du_kwh                # facultatif : coût du jour au prix du tarif en cours
+      exclure: [Mon serveur]                  # facultatif : noms ou identifiants d'appareils
+      appareils:                              # facultatif : réglages d'un appareil (false = masqué)
+        Prise lave-linge: { entity: binary_sensor.lave_linge_en_marche }
+```
+
+- **Lecture seule** : chaque carte est enveloppée dans `custom:ucaness-appareil-card`, qui la rend inerte (ni bouton, ni curseur, ni commande, même si la carte en propose) ; un appui ouvre la fiche de l'appareil.
+- **Reconnaissance** : volet, porte de garage ou portail (`cover`), sonnette vidéo, caméra, borne de recharge, compteur Linky, batterie (charge en % et puissance), téléviseur ou box (`media_player`), ouvrant (contact), sonde de température, et appareil branché sur une prise qui mesure, reconnu par son nom (lave-linge, lave-vaisselle, sèche-linge, sèche-serviettes, chauffe-eau, four, réfrigérateur, congélateur, téléviseur, hi-fi, cafetière…, en sept langues), sinon carte de prise connectée. Un appareil sans rien d'utile à montrer (téléphone, service) n'a pas de carte.
+- Sans les Appliance Électroménager Cards, Home Assistant affiche une carte d'erreur à la place de chaque appareil.
 
 ### `custom:ucaness-note-card`
 
