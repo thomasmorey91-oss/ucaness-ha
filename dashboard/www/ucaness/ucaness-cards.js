@@ -3199,7 +3199,8 @@ class UcanessFlowCard extends HTMLElement {
           .tiroir { position: absolute; right: 1%; bottom: calc(4% + max(30px, 4.2cqw)); min-width: min(260px, 62%); padding: 10px 12px; border: 1px solid var(--uc-card-border); border-radius: 12px; background: rgba(8,22,46,0.96); box-shadow: var(--uc-card-shadow); font-size: 13px; color: #E6ECF5; animation: ucTiroir .3s ease; }
           @keyframes ucTiroir { from { transform: translateY(12px); opacity: 0; } }
           .tiroir[hidden], .visite[hidden], .replay[hidden] { display: none; }
-          .replay { position: absolute; left: 50%; top: 13%; transform: translateX(-50%); min-width: min(300px, 70%); padding: 8px 12px; border: 1px solid var(--uc-tab); border-radius: 12px; background: rgba(8,22,46,0.9); box-shadow: 0 0 14px rgba(0,209,214,.3); color: #FFFFFF; font: 700 max(13px, 2cqw) var(--uc-font); text-align: center; }
+          .replay { position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%); width: min(260px, 42%); box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--uc-tab); border-radius: 12px; background: rgba(8,22,46,0.9); box-shadow: 0 0 14px rgba(0,209,214,.3); color: #FFFFFF; font: 700 max(13px, 2cqw) var(--uc-font); text-align: center; }
+          .stage.rejeu .live { display: none; }
           .replay i { display: block; height: 4px; margin-top: 6px; border-radius: 2px; background: #16365F; overflow: hidden; }
           .replay i u { display: block; height: 100%; width: 0; background: var(--uc-tab); }
           .replay button { margin-top: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--uc-tab-border); border-radius: 16px; background: transparent; color: #CFE6FF; cursor: pointer; font: 400 13px var(--uc-font); }
@@ -3221,7 +3222,7 @@ class UcanessFlowCard extends HTMLElement {
           .stage.cinema { position: fixed; inset: 0; z-index: 9999; margin: auto; background: #030B20; }
           @media (prefers-reduced-motion: reduce) { .tiroir { animation: none; } }
           /* Petite largeur (téléphone) : seulement le nom et les chiffres principaux. */
-          @container (max-width: 520px) { .tag { display: none; } .lb .o { display: none; } .lb.g { left: auto !important; right: 0; text-align: right; } }
+          @container (max-width: 520px) { .replay { bottom: auto; top: 14%; width: 62%; } .tag { display: none; } .lb .o { display: none; } .lb.g { left: auto !important; right: 0; text-align: right; } }
         </style>
         <div class="stage scene" role="img">
           ${V ? '<div class="sky2" aria-hidden="true"></div>' : ''}
@@ -3279,6 +3280,7 @@ class UcanessFlowCard extends HTMLElement {
     const bouton = root.querySelector('[data-outil="replay"]');
     if (bouton) bouton.setAttribute('aria-expanded', 'true');
     box.hidden = false;
+    root.querySelector('.stage').classList.add('rejeu');
     box.innerHTML = esc(ucT(reel, 'replay_charge'));
     const debut = new Date(); debut.setHours(0, 0, 0, 0);
     let stats = {};
@@ -3331,6 +3333,8 @@ class UcanessFlowCard extends HTMLElement {
     const root = this.shadowRoot;
     const box = root && root.querySelector('.replay');
     if (box) { box.hidden = true; box.innerHTML = ''; }
+    const st = root && root.querySelector('.stage');
+    if (st) st.classList.remove('rejeu');
     const bouton = root && root.querySelector('[data-outil="replay"]');
     if (bouton) bouton.setAttribute('aria-expanded', 'false');
     this._hass = r.reel;
