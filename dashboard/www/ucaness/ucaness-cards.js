@@ -4714,9 +4714,9 @@ const UC_VEHICLE_CSS = `
  * un appui ouvre la fiche de l'appareil. Un appareil ajouté plus tard apparaît tout seul, sans modifier de fichier.
  *
  *   views:
- *     - strategy:
+ *     - theme: UCANESS                            # facultatif : sur la vue, à côté de la stratégie
+ *       strategy:
  *         type: custom:ucaness-appareils
- *         theme: UCANESS                          # facultatif
  *         prix: sensor.jarvis_prix_du_kwh_reseau  # facultatif : coût du jour au prix du tarif en cours
  *         exclure: [HA-MCP Server]                # facultatif : noms ou identifiants d'appareils
  *         appareils:                              # facultatif : réglages propres à un appareil (false = masqué)
@@ -4765,7 +4765,7 @@ function ucAppareilsCartes(hass, cfg = {}) {
   const groupes = {};
   for (const dev of Object.values(devices)) {
     if (!dev || dev.entry_type === 'service' || dev.disabled_by) continue;
-    const nom = dev.name_by_user || dev.name || '';
+    const nom = (dev.name_by_user || dev.name || '').trim();
     if (exclure.has(ucNorm(nom)) || exclure.has(ucNorm(dev.id))) continue;
     const reglage = reglages[ucNorm(nom)] ?? reglages[ucNorm(dev.id)];
     if (reglage === false) continue;
@@ -4912,9 +4912,15 @@ class UcanessAppareilCard extends HTMLElement {
       el.textContent = String(err && err.message || err);
     }
     if (c !== this._c) return;
+    this._l.appendChild(el);
+    // Les Appliance Électroménager Cards chargent leurs fonctions communes (window.appliancePrice…) juste après
+    // leur module : attendre qu'elles soient là avant le premier rendu (3 s au plus).
+    if (/^custom:appliance-/.test(c.card.type)) {
+      for (let i = 0; i < 30 && typeof window.appliancePrice !== 'function'; i += 1) await new Promise((r) => setTimeout(r, 100));
+      if (c !== this._c) return;
+    }
     this._carte = el;
     if (this._hass) el.hass = this._hass;
-    this._l.appendChild(el);
     this._majLibelle();
   }
 

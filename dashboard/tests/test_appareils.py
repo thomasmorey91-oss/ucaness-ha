@@ -24,7 +24,7 @@ APPAREILS = {
     "d1": ("Prise lave-linge", "S60ZBTPF", "garage", [
         _ent("switch.prise_ll", state="on"), _ent("sensor.prise_ll_puissance", "power", unit="W"),
         _ent("sensor.prise_ll_energie", "energy", unit="kWh"), _ent("select.prise_ll_comportement", cat="config")]),
-    "d2": ("Prise lave-vaisselle", "S60ZBTPF", "cuisine", [
+    "d2": ("Prise lave-vaisselle ", "S60ZBTPF", "cuisine", [
         _ent("switch.prise_lv"), _ent("sensor.prise_lv_puissance", "power", unit="W")]),
     "d3": ("Prise bureau", "S60ZBTPF", "bureau", [
         _ent("switch.prise_bureau"), _ent("sensor.prise_bureau_puissance", "power", unit="W")]),
@@ -122,7 +122,8 @@ def test_pieces_reglages_exclusions_et_prix(module_page):
     groupes = _cartes(module_page, {
         "exclure": ["Portail piéton"],
         "prix": "sensor.prix_kwh",
-        "appareils": {"prise lave-linge": {"entity": "binary_sensor.lave_linge_en_marche"}, "TV salon": False},
+        "appareils": {"prise lave-linge": {"entity": "binary_sensor.lave_linge_en_marche"}, "TV salon": False,
+                      "Prise Lave-Vaisselle": {"name": "Lave-vaisselle"}},
     })
     pieces = [g["piece"] for g in groupes]
     assert pieces == sorted(p for p in pieces if p) + [""]          # pièces triées, « Autres appareils » à la fin
@@ -131,6 +132,7 @@ def test_pieces_reglages_exclusions_et_prix(module_page):
     ll = cartes["Prise lave-linge"]
     assert ll["card"]["entity"] == "binary_sensor.lave_linge_en_marche" and ll["plus"] == "binary_sensor.lave_linge_en_marche"
     assert ll["card"]["price_per_kwh"] == "sensor.prix_kwh"
+    assert any(c["card"]["name"] == "Lave-vaisselle" for c in cartes.values())    # nom à espace final retrouvé
     assert "Téléphone" not in cartes and "Serveur de l'assistant" not in cartes   # rien d'utile à montrer
 
 

@@ -198,9 +198,9 @@ Une vue construite à chaque ouverture d'après les appareils de Home Assistant 
 
 ```yaml
 views:
-  - strategy:
+  - theme: UCANESS                            # facultatif : le thème se règle sur la vue, à côté de la stratégie
+    strategy:
       type: custom:ucaness-appareils
-      theme: UCANESS                          # facultatif
       prix: sensor.prix_du_kwh                # facultatif : coût du jour au prix du tarif en cours
       exclure: [Mon serveur]                  # facultatif : noms ou identifiants d'appareils
       appareils:                              # facultatif : réglages d'un appareil (false = masqué)
