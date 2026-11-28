@@ -69,7 +69,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.14.0';
+const UC_VERSION = '0.14.1';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -3125,8 +3125,8 @@ class UcanessFlowCard extends HTMLElement {
     const labels = `
       <div class="live"><i></i>${esc(age === null ? ucT(hass, 'en_attente_mesures') : ucT(hass, 'en_direct', { age: age < 120 ? age + ' s' : Math.round(age / 60) + ' min' }))}</div>
       ${L(N.solar, 'right', N.solar.entity, `<span class="t" style="color:#F7B248">${esc(N.solar.label && N.solar.label !== 'Solaire' ? N.solar.label : ucT(hass, 'panneaux_solaires'))}</span><br>${kwv('pv', pv)}${sd ? `<br><span class="o">${sd}</span>` : ''}`)}
-      ${L(N.battery, 'right', N.battery.soc_entity, `<span class="t" style="color:${uhColor}">${esc(N.battery.label || 'UHome')}</span><br><b>${soc === null ? '—' : `<span data-n="soc" data-v="${Math.round(soc)}" data-d="0">${esc(ucNumber(hass, Math.round(soc), 0))}</span>`} % · ${bat === null ? '—' : `<span data-n="bat" data-v="${Math.abs(bat) / 1000}" data-d="2">${esc(ucNumber(hass, Math.abs(bat) / 1000, 2))}</span>`} kW</b><br><span class="o">${esc(ucT(hass, 'batterie_deux_points'))}</span>${esc(etatBat)}${mode ? `<br><span class="o">${esc(ucT(hass, 'onduleur_mode', { mode }))}</span>` : ''}`)}
-      ${E ? L(E, 'left', E.entity, `<span class="t" style="color:${evOn ? '#2ED198' : '#9CC9F5'}">${esc(ucT(hass, 'recharge'))}</span><br>${kwv('ev', ev)}<br><span class="o">${esc(E.name || ucT(hass, 'borne'))} · </span>${esc(evState)}`) : ''}
+      ${N.battery.hide_label ? '' : L(N.battery, 'right', N.battery.soc_entity, `<span class="t" style="color:${uhColor}">${esc(N.battery.label || 'UHome')}</span><br><b>${soc === null ? '—' : `<span data-n="soc" data-v="${Math.round(soc)}" data-d="0">${esc(ucNumber(hass, Math.round(soc), 0))}</span>`} % · ${bat === null ? '—' : `<span data-n="bat" data-v="${Math.abs(bat) / 1000}" data-d="2">${esc(ucNumber(hass, Math.abs(bat) / 1000, 2))}</span>`} kW</b><br><span class="o">${esc(ucT(hass, 'batterie_deux_points'))}</span>${esc(etatBat)}${mode ? `<br><span class="o">${esc(ucT(hass, 'onduleur_mode', { mode }))}</span>` : ''}`)}
+      ${E && !E.hide_label ? L(E, 'left', E.entity, `<span class="t" style="color:${evOn ? '#2ED198' : '#9CC9F5'}">${esc(ucT(hass, 'recharge'))}</span><br>${kwv('ev', ev)}<br><span class="o">${esc(E.name || ucT(hass, 'borne'))} · </span>${esc(evState)}`) : ''}
       ${L(N.home, 'right', N.home.entity, `<span class="t" style="color:#FFC440">${esc(N.home.label || ucT(hass, 'maison'))}</span><br>${kwv('home', home)}${hd ? `<br><span class="o">${hd}</span>` : ''}`)}
       ${L(N.grid, 'left', N.grid.entity, `<span class="t" style="color:#F7B248">${esc(N.grid.label || ucT(hass, 'reseau'))}</span><br>${kwv('grid', grid)}${gridOut ? '<br>' + esc(ucT(hass, 'injection')) : ''}${gd ? `<br><span class="o">${gd.replace(' · ', '<br>')}</span>` : ''}`, 'g')}`;
     const label = [

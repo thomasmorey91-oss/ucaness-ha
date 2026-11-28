@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.14.0`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.14.1`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -219,6 +219,10 @@ views:
 | `custom:ucaness-bilan-card` | Bilan chiffré de la journée : anneau d'autonomie (part des besoins couverte sans le réseau), soleil (et part utilisée), maison, réseau (et coût), économie. `production`, `consommation`, `achat` (une entité ou une liste, additionnées), `injection`, `cout` (sinon achat × prix), `economie` (sinon (consommation − achat) × prix, marquée « estimée »), `prix` (entité ou nombre). Compteurs du jour en kWh (Wh et MWh convertis). Un appui sur une tuile ouvre la fiche |
 | `custom:ucaness-forecast-card` | Météo des prochains jours (`entity`, `jours`, 5 par défaut), lue par l'abonnement aux prévisions quotidiennes de Home Assistant ; `solaire` : liste des capteurs de production prévue, un par jour (kWh) |
 | `custom:ucaness-ucan-card`, option `resume` | Résumé du soir dans la bulle d'Ucan, à partir de `heure` (`20:00` par défaut) quand aucun conseil n'attend ; mêmes clés que la carte de bilan |
+
+### Étiquettes masquables (0.14.1)
+
+- **`hide_label: true`** sur `nodes.battery` ou sur `ev` (vue 3D) : retire l'étiquette chiffrée de l'UHome ou de la borne, par exemple quand la carte de niveau et l'étiquette au-dessus de l'UHome suffisent. L'objet dessiné reste, et un appui l'ouvre toujours.
 
 ### Parler à Ucan (0.14.0)
 

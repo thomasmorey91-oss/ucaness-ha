@@ -4,6 +4,9 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 28/11/2026
 
+### Cartes 0.14.1 : étiquettes masquables
+- Option `hide_label` de l'UHome et de la borne dans la vue 3D.
+
 ### Cartes 0.14.0 : parler à Ucan
 - Option `parler` de la bulle d'Ucan : bouton qui ouvre Assist, l'assistant de Home Assistant.
 
