@@ -222,7 +222,7 @@ views:
 
 ### Parler à Ucan (0.14.0)
 
-- **`parler`** (`custom:ucaness-ucan-card` flottante) : bouton « Parler à Ucan » dans le panneau d'Ucan, qui ouvre Assist, l'assistant de Home Assistant. `parler: true` (dernier assistant utilisé) ou `parler: {pipeline_id: …, start_listening: true}`. Ucan ne répond qu'à ce qu'Assist sait faire : pour des questions sur l'énergie, ajouter des phrases personnalisées (`custom_sentences`) et des réponses (`intent_script`) qui lisent les capteurs.
+- **`parler`** (`custom:ucaness-ucan-card` flottante) : bouton « Parler à Ucan » dans le panneau d'Ucan, qui ouvre Assist, l'assistant de Home Assistant. `parler: true` (dernier assistant utilisé), `parler: {pipeline: Home Assistant}` (assistant désigné par son nom) ou `parler: {pipeline_id: …, start_listening: true}`. Ucan ne répond qu'à ce qu'Assist sait faire : pour des questions sur l'énergie, ajouter des phrases personnalisées (`custom_sentences`) et des réponses (`intent_script`) qui lisent les capteurs.
 
 ### Replay de la journée et trophées (0.13.0)
 

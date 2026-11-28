@@ -2730,9 +2730,17 @@ function ucTrophees(prod, achat, lat, lon, maintenant, tolerance) {
 }
 
 /** « Parler à Ucan » (0.14.0) : ouvre Assist, l'assistant de Home Assistant. L'évènement part de la carte (dans
- *  l'arbre du tableau de bord), sinon Home Assistant ne le reçoit pas. parler: true ou {pipeline_id, start_listening}. */
-function ucAssist(el, opts) {
-  const o = opts && typeof opts === 'object' ? opts : {};
+ *  l'arbre du tableau de bord), sinon Home Assistant ne le reçoit pas. parler: true ou {pipeline_id | pipeline (nom de
+ *  l'assistant), start_listening}. */
+async function ucAssist(el, opts, hass) {
+  const o = Object.assign({}, opts && typeof opts === 'object' ? opts : {});
+  if (!o.pipeline_id && o.pipeline && hass && typeof hass.callWS === 'function') {
+    try {
+      const l = await hass.callWS({ type: 'assist_pipeline/pipeline/list' });
+      const p = ((l && l.pipelines) || []).find((x) => x.name === o.pipeline);
+      if (p) o.pipeline_id = p.id;
+    } catch (e) { /* liste indisponible : dernier assistant utilisé */ }
+  }
   el.dispatchEvent(new CustomEvent('hass-action', {
     bubbles: true,
     composed: true,
@@ -5057,7 +5065,7 @@ class UcanessUcanCard extends HTMLElement {
       const f = r.querySelector('.fermer');
       if (f) f.addEventListener('click', () => { this._ouvert = false; this._render(); });
       const pa = r.querySelector('.parler');
-      if (pa) pa.addEventListener('click', () => { this._ouvert = false; this._render(); ucAssist(this, c.parler); });
+      if (pa) pa.addEventListener('click', () => { this._ouvert = false; this._render(); ucAssist(this, c.parler, this._hass); });
       this._boutons(r);
       return;
     }

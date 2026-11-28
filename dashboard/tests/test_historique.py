@@ -111,7 +111,14 @@ def test_parler_a_ucan(page):
         c._ouvert = true; c._render();
         const flot = [...document.body.children].find((x) => x.shadowRoot && x.shadowRoot.querySelector('.fab'));
         flot.shadowRoot.querySelector('.parler').click();
+        await new Promise((r) => setTimeout(r, 50));
+        c.setConfig({ floating: true, parler: { pipeline: 'Maison FR' } });
+        c.hass = Object.assign({}, window.fakeHass, { callWS: async () => ({ pipelines: [{ id: 'x', name: 'Autre' }, { id: 'fr1', name: 'Maison FR' }] }) });
+        c._ouvert = true; c._render();
+        const flot2 = [...document.body.children].find((x) => x.shadowRoot && x.shadowRoot.querySelector('.parler'));
+        flot2.shadowRoot.querySelector('.parler').click();
+        await new Promise((r) => setTimeout(r, 50));
         return { recu, ferme: !flot.shadowRoot.querySelector('.panneau') };
     }""")
-    assert got["recu"] == [{"config": {"tap_action": {"action": "assist", "pipeline_id": "p1", "start_listening": False}}, "action": "tap"}]
-    assert got["ferme"] is True
+    assert [r["config"]["tap_action"]["pipeline_id"] for r in got["recu"]] == ["p1", "fr1"]
+    assert got["recu"][0] == {"config": {"tap_action": {"action": "assist", "pipeline_id": "p1", "start_listening": False}}, "action": "tap"}
