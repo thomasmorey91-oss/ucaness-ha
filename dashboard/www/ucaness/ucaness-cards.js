@@ -68,7 +68,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.11.0';
+const UC_VERSION = '0.12.0';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -2539,6 +2539,20 @@ class UcanessPanelCard extends HTMLElement {
 
 /* ------------------------------------------------------------------ vue en direct */
 
+/** Photo à afficher selon l'ambiance : nuit, coucher de soleil, pluie ou orage, ciel couvert, sinon jour.
+ *  Une photo absente est remplacée par la plus proche (pluie → couvert → jour), puis par l'image de base. */
+function ucPhoto(photos, amb, base) {
+  const p = photos || {};
+  const a = amb || { night: false, dusk: false, meteo: 0 };
+  const ordre = a.night ? ['nuit']
+    : a.dusk && a.meteo <= 1 ? ['coucher', 'jour']
+      : a.meteo >= 3 ? ['orage', 'pluie', 'couvert', 'jour']
+        : a.meteo === 2 ? ['pluie', 'couvert', 'jour']
+          : a.meteo === 1 ? ['couvert', 'jour'] : ['jour'];
+  for (const k of ordre) if (p[k]) return p[k];
+  return base || p.jour || null;
+}
+
 const UC_FLOW_DEFAULTS = {
   image: UC_BASE + 'maison-exemple.svg',
   aspect_ratio: 1.45,
@@ -2807,7 +2821,8 @@ class UcanessFlowCard extends HTMLElement {
     // de niveau, bandeau d'événement, Ucan, soleil et lune, oiseaux, étoile filante, arc-en-ciel, neige.
     const V = !!c.vivant;
     const anime = V && !UC_LIGHT && !UC_REDUCED;
-    const amb = V ? ucAmbiance(hass, c) : null;
+    const PH = c.photos && typeof c.photos === 'object' ? c.photos : null;
+    const amb = V || PH ? ucAmbiance(hass, c) : null;
     const autonome = V && sunOn && homeOn && !gridIn;
     const sig = JSON.stringify([V && [amb.night, autonome], sunOn && pace(pv), charging, discharging, homeOn && pace(home), (gridIn || gridOut) && [gridIn, pace(grid)], evOn && pace(ev), soc === null ? null : Math.round(soc / 5), uhColor, Math.round(halo * 5)]);
     const glow = UC_LIGHT ? '' : 'filter: drop-shadow(0 0 4px VAR);';
@@ -2841,7 +2856,8 @@ class UcanessFlowCard extends HTMLElement {
     const many = (list, fn) => (Array.isArray(list) && Array.isArray(list[0]) && Array.isArray(list[0][0]) ? list : (list ? [list] : [])).map(fn).join('');
     const solarRoutes = N.solar.routes || (N.solar.route ? [N.solar.route] : []);
     const uh = Object.assign({ x: 33, y: 61, w: 9 }, N.battery.uhome || {});
-    const uhH = uh.w * (126 / 60) * (W / H);                 // hauteur de la colonne en % de la carte
+    const uhR = uh.image ? (Number(uh.ratio) || 2.37) : 126 / 60;
+    const uhH = uh.w * uhR * (W / H);                        // hauteur de la colonne en % de la carte
     const bulb = Object.assign({ x: 75, y: 73, w: 6 }, N.home.bulb || {});
     const borne = E ? Object.assign({ x: 73, y: 56, w: 3 }, E.borne || {}) : null;
     const pole = Array.isArray(N.grid.route) && N.grid.route[0];
@@ -2860,6 +2876,7 @@ class UcanessFlowCard extends HTMLElement {
       </svg>
       ${borne ? `<svg class="borne" style="left:${borne.x}%;top:${borne.y}%;width:${borne.w}%" viewBox="0 0 19 33" aria-hidden="true"><polygon points="0,8.5 16,0 16,24.5 0,33" fill="#1B2130" stroke="#6FD6F5" stroke-width="1.3" stroke-linejoin="round"/><polygon points="16,0 19,1.5 19,26 16,24.5" fill="#11151F" stroke="#6FD6F5" stroke-width="0.8"/><circle cx="8" cy="15" r="4" fill="none" stroke="${evLed}" stroke-width="1.8"/>${evOn && !UC_LIGHT ? `<circle class="uc-wave" cx="8" cy="15" r="4" fill="none" stroke="${evLed}" stroke-width="1.8" style="animation-duration: 1.6s"/>` : ''}</svg>` : ''}
       <button type="button" class="uh${V ? (charging || discharging ? ' actif' : ' veille') : ''}" style="left:${uh.x}%;top:${uh.y}%;width:${uh.w}%" aria-label="${esc(ucT(hass, 'uhome_batterie_a', { soc: soc === null ? '—' : Math.round(soc), etat: etatBat }) + (c.battery_path ? '. ' + ucT(hass, 'ouvrir_page_batterie') : ''))}">
+        ${uh.image ? `<img src="${esc(uh.image)}" alt="" aria-hidden="true">` : `
         <svg viewBox="0 0 60 126" aria-hidden="true">
           <defs><linearGradient id="uhm" x1="0" x2="1"><stop offset="0" stop-color="#2B2E34"/><stop offset=".55" stop-color="#34373E"/><stop offset="1" stop-color="#24262B"/></linearGradient>
           <linearGradient id="uht" x1="0" x2="1"><stop offset="0" stop-color="#30333A"/><stop offset=".55" stop-color="#3A3D45"/><stop offset="1" stop-color="#2A2D33"/></linearGradient></defs>
@@ -2873,7 +2890,7 @@ class UcanessFlowCard extends HTMLElement {
           <rect x="50" y="44" width="3" height="72" rx="1.5" fill="#15171B"/>
           <rect x="50" y="${(116 - 72 * Math.max(0.03, Math.min(1, (soc || 0) / 100))).toFixed(1)}" width="3" height="${(72 * Math.max(0.03, Math.min(1, (soc || 0) / 100))).toFixed(1)}" rx="1.5" fill="${uhColor}"/>
           <rect x="4" y="120" width="12" height="5" rx="1.5" fill="#15171B"/><rect x="41" y="120" width="12" height="5" rx="1.5" fill="#15171B"/>
-        </svg>
+        </svg>`}
       </button>
       <svg class="bulb${homeOn ? ' lit' : ''}" style="left:${bulb.x}%;top:${bulb.y}%;width:${bulb.w}%" viewBox="0 0 24 26" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4a6 6 0 0 0-4 10.5c.8.8 1 1.6 1 2.5h6c0-.9.2-1.7 1-2.5A6 6 0 0 0 12 4z" fill="#FFC440" stroke="#FFB020" stroke-width="1"/><path d="M9.5 19h5M10 21.5h4" stroke="#9AA6BE" stroke-width="1.6"/><path d="M3 5l2 1.5M21 5l-2 1.5M1.5 11.5h2.5M20 11.5h2.5M5 18l1.6-1.2M19 18l-1.6-1.2" stroke="#FFC440" stroke-width="1.4"/></svg>`;
     // Chiffres écrits à côté des objets.
@@ -2970,7 +2987,10 @@ class UcanessFlowCard extends HTMLElement {
           @keyframes ucLift { 0% { transform: translateY(7px); opacity: .45; } 60% { transform: translateY(-2px); opacity: 1; } 100% { transform: none; } }
           .uh.actif .uc-mod { animation: ucLift .7s cubic-bezier(.2,.8,.2,1) backwards; }
           .uh { position: absolute; padding: 0; border: 0; background: none; cursor: pointer; filter: drop-shadow(0 8px 10px rgba(0,0,0,0.5)); }
-          .uh svg { display: block; width: 100%; height: auto; }
+          .uh svg, .uh img { display: block; width: 100%; height: auto; }
+          .uh.veille img { filter: brightness(.8) saturate(.7); }
+          .house.ph { opacity: 0; transition: opacity 1.4s ease; }
+          .house.ph.on { opacity: 1; }
           .borne { position: absolute; height: auto; overflow: visible; }
           .bulb { position: absolute; height: auto; opacity: .45; }
           .bulb.lit { opacity: 1; filter: drop-shadow(0 0 1.3cqw rgba(255,196,64,0.85)); }
@@ -3017,8 +3037,8 @@ class UcanessFlowCard extends HTMLElement {
         </style>
         <div class="stage scene" role="img">
           ${V ? '<div class="sky2" aria-hidden="true"></div>' : ''}
-          <img class="house" src="${esc(c.image)}" alt="">
-          ${V ? `<img class="reflet" src="${esc(c.image)}" alt="" aria-hidden="true">` : ''}
+          ${PH ? '<img class="house ph" alt=""><img class="house ph" alt="">' : `<img class="house" src="${esc(c.image)}" alt="">`}
+          ${V && !PH ? `<img class="reflet" src="${esc(c.image)}" alt="" aria-hidden="true">` : ''}
           <div class="art"></div>
           <div class="lbls"></div>
           ${V ? '<div class="fx"><div class="fxc"></div><div class="ban" role="status"></div></div>' : ''}
@@ -3048,12 +3068,27 @@ class UcanessFlowCard extends HTMLElement {
     }
     root.querySelector('.lbls').innerHTML = labels;
     ucCount(this, root.querySelector('.lbls'), hass);
+    if (PH) this._photo(ucPhoto(PH, amb, c.image));
     if (V) {
       this._amb = amb;
       this._appliquerPrefs(amb);
       this._vivant({ amb, anime, uh, uhColor, soc, bat, grid, charging, discharging, sunOn, gridIn, gridOut, evOn, autonome });
       if (this._ouvert === 'infos') this._remplirTiroir();
     }
+  }
+
+  /** Photo de la maison (option photos, 0.12.0) : fondu enchaîné entre deux calques quand l'ambiance change. */
+  _photo(url) {
+    const root = this.shadowRoot;
+    const ls = root ? root.querySelectorAll('.house.ph') : [];
+    if (ls.length !== 2 || !url || this._photoUrl === url) return;
+    this._photoUrl = url;
+    const cur = Array.from(ls).find((l) => l.classList.contains('on'));
+    const next = cur === ls[0] ? ls[1] : ls[0];
+    const montrer = () => { next.classList.add('on'); if (cur) cur.classList.remove('on'); };
+    next.onload = montrer;
+    next.src = url;
+    if (next.complete && next.naturalWidth) montrer();
   }
 
   /** Scène vivante : ciel (soleil, lune, oiseaux, étoile filante, arc-en-ciel, neige), étiquette et carte de niveau
@@ -3078,12 +3113,13 @@ class UcanessFlowCard extends HTMLElement {
     const mx = 10 + 80 * Math.min(1, tn), my = 24 - 18 * Math.sin(Math.PI * Math.min(1, tn));
     const etat = e.amb.weather ? e.amb.weather.state : '';
     const neige = effet === 'neige' || etat === 'snowy' || etat === 'snowy-rainy';
-    const arc = effet === 'arcenciel' || (!e.amb.night && e.amb.meteo === 2 && Number(a.elevation) > 3 && Number(a.elevation) < 42);
+    const photo = !!(c.photos && typeof c.photos === 'object');
+    const arc = !photo && (effet === 'arcenciel' || (!e.amb.night && e.amb.meteo === 2 && Number(a.elevation) > 3 && Number(a.elevation) < 42));
     const cielSig = JSON.stringify([e.amb.night, e.amb.meteo, neige, arc, Math.round(sx), Math.round(sy), Math.round(mx), e.anime]);
     if (this._cielSig !== cielSig) {
       this._cielSig = cielSig;
       const bandes = ['#E5484D', '#F39C12', '#FFD86B', '#2ED198', '#2AB7E2', '#7A6BE0'];
-      let h = e.amb.night
+      let h = photo ? '' : e.amb.night
         ? `<div class="astre lune" style="left:${mx.toFixed(1)}%;top:${my.toFixed(1)}%"></div>`
         : (e.amb.meteo <= 1 ? `<div class="astre soleil" style="left:${sx.toFixed(1)}%;top:${sy.toFixed(1)}%"></div>` : '');
       if (arc) h += `<svg class="arc" viewBox="0 0 400 200">${bandes.map((col, i) => `<path d="M${20 + i * 5},200 A${180 - i * 5},${180 - i * 5} 0 0 1 ${380 - i * 5},200" fill="none" stroke="${col}" stroke-width="5"/>`).join('')}</svg>`;
@@ -5817,4 +5853,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessBilanCard, UcanessForecastCard, UcanessGaugeCard, ucBilanJour, ucVoisin, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessBilanCard, UcanessForecastCard, UcanessGaugeCard, ucBilanJour, ucVoisin, ucPhoto, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };

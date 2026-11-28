@@ -4,6 +4,10 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 28/11/2026
 
+### Cartes 0.12.0 : scène sur photo
+- Option `photos` de la vue 3D : une photo par ambiance (jour, coucher, nuit, couvert, pluie, orage) avec fondu enchaîné.
+- Option `nodes.battery.uhome.image` : image de la batterie à la place du dessin.
+
 ### Cartes 0.11.0 : outils de la scène, glissement entre vues, cadran
 - Scène vivante : menu des animations (gardé sur l'appareil), tiroir d'infos du jour, visite guidée, mode cinéma ; reflet sur le sol mouillé quand il pleut.
 - Glissement entre vues sur écran tactile (tablette et téléphone).
