@@ -22,8 +22,13 @@
  *   custom:ucaness-appareil-card une carte d'appareil rendue inerte (aucune commande), appui = fiche (0.9.0)
  *   stratégie custom:ucaness-appareils  vue « Appareils » construite d'après les appareils de la maison (0.9.0)
  *   custom:ucaness-appareils-card la même liste dans une page existante, un panneau par pièce (0.9.1)
+ *   custom:ucaness-bilan-card    bilan chiffré de la journée : autonomie, soleil, maison, réseau, économie (0.10.0)
+ *   custom:ucaness-forecast-card météo des 5 prochains jours, avec le soleil prévu (0.10.0)
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
+ *
+ * 0.10.0 (28/11/2026) : bilan du jour (custom:ucaness-bilan-card), météo des 5 jours (custom:ucaness-forecast-card),
+ *   résumé du soir dans la bulle d'Ucan (option resume de custom:ucaness-ucan-card).
  *
  * 0.9.1 (28/11/2026) : carte custom:ucaness-appareils-card (la liste automatique dans une page UCANESS, un panneau par pièce).
  *
@@ -59,7 +64,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.9.1';
+const UC_VERSION = '0.10.0';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -263,7 +268,26 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_ouvrir": "Ouvrir la fiche de {nom}",
   "appareils_vide": "Aucun appareil reconnu.",
   "carte_appareils_nom": "UCANESS appareils (liste automatique)",
-  "carte_appareils_desc": "Tous les appareils de la maison, un panneau par pièce, en lecture seule."
+  "carte_appareils_desc": "Tous les appareils de la maison, un panneau par pièce, en lecture seule.",
+  "carte_bilan_nom": "UCANESS bilan du jour",
+  "carte_bilan_desc": "Autonomie, soleil, maison, réseau et économie de la journée.",
+  "carte_forecast_nom": "UCANESS météo 5 jours",
+  "carte_forecast_desc": "La météo des prochains jours, avec le soleil prévu.",
+  "bilan_autonomie": "Autonomie",
+  "bilan_soleil": "Soleil",
+  "bilan_maison": "Maison",
+  "bilan_reseau": "Réseau",
+  "bilan_economie": "Économie",
+  "bilan_utilise": "{pct} % utilisé",
+  "bilan_estimee": "estimée",
+  "bilan_phrase": "La maison a couvert {pct} % de ses besoins aujourd'hui, avec {soleil} kWh de soleil.",
+  "bilan_phrase_100": "Journée 100 % autonome : {soleil} kWh de soleil, rien pris au réseau.",
+  "aujourdhui": "Auj.",
+  "meteo_5_jours": "Météo des 5 prochains jours",
+  "meteo_attente": "Prévision en attente…",
+  "resume_titre": "Ma journée",
+  "resume_soir": "Aujourd'hui, {soleil} kWh de soleil : la maison a tenu à {pct} % sans le réseau, environ {eco} € économisés. Bonne soirée !",
+  "resume_soir_sans_eco": "Aujourd'hui, {soleil} kWh de soleil : la maison a tenu à {pct} % sans le réseau. Bonne soirée !"
  },
  "en": {
   "meteo": "Weather: {etat}",
@@ -463,7 +487,26 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_ouvrir": "Open the details of {nom}",
   "appareils_vide": "No device recognised.",
   "carte_appareils_nom": "UCANESS devices (automatic list)",
-  "carte_appareils_desc": "Every device in the home, one panel per room, read-only."
+  "carte_appareils_desc": "Every device in the home, one panel per room, read-only.",
+  "carte_bilan_nom": "UCANESS day summary",
+  "carte_bilan_desc": "Self-sufficiency, sun, home, grid and savings for the day.",
+  "carte_forecast_nom": "UCANESS 5-day weather",
+  "carte_forecast_desc": "The weather for the coming days, with the expected sun.",
+  "bilan_autonomie": "Self-sufficiency",
+  "bilan_soleil": "Sun",
+  "bilan_maison": "Home",
+  "bilan_reseau": "Grid",
+  "bilan_economie": "Savings",
+  "bilan_utilise": "{pct} % used",
+  "bilan_estimee": "estimated",
+  "bilan_phrase": "The home covered {pct} % of its needs today, with {soleil} kWh of sun.",
+  "bilan_phrase_100": "100 % self-sufficient day: {soleil} kWh of sun, nothing taken from the grid.",
+  "aujourdhui": "Today",
+  "meteo_5_jours": "Weather for the next 5 days",
+  "meteo_attente": "Forecast pending…",
+  "resume_titre": "My day",
+  "resume_soir": "Today, {soleil} kWh of sun: the home ran {pct} % without the grid, about {eco} € saved. Have a nice evening!",
+  "resume_soir_sans_eco": "Today, {soleil} kWh of sun: the home ran {pct} % without the grid. Have a nice evening!"
  },
  "zh-Hans": {
   "meteo": "天气：{etat}",
@@ -663,7 +706,26 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_ouvrir": "打开 {nom} 的详情",
   "appareils_vide": "未识别到设备。",
   "carte_appareils_nom": "UCANESS 设备（自动列表）",
-  "carte_appareils_desc": "家中所有设备，每个房间一个面板，只读。"
+  "carte_appareils_desc": "家中所有设备，每个房间一个面板，只读。",
+  "carte_bilan_nom": "UCANESS 今日总结",
+  "carte_bilan_desc": "今日的自给率、太阳能、家庭用电、电网和节省。",
+  "carte_forecast_nom": "UCANESS 5 天天气",
+  "carte_forecast_desc": "未来几天的天气及预计太阳能。",
+  "bilan_autonomie": "自给率",
+  "bilan_soleil": "太阳能",
+  "bilan_maison": "家庭",
+  "bilan_reseau": "电网",
+  "bilan_economie": "节省",
+  "bilan_utilise": "已利用 {pct} %",
+  "bilan_estimee": "估算",
+  "bilan_phrase": "今天家里 {pct} % 的用电自给，太阳能 {soleil} kWh。",
+  "bilan_phrase_100": "今天 100 % 自给：太阳能 {soleil} kWh，未从电网取电。",
+  "aujourdhui": "今天",
+  "meteo_5_jours": "未来 5 天天气",
+  "meteo_attente": "等待预报…",
+  "resume_titre": "我的一天",
+  "resume_soir": "今天太阳能 {soleil} kWh：家里 {pct} % 的时间无需电网，约节省 {eco} €。晚上好！",
+  "resume_soir_sans_eco": "今天太阳能 {soleil} kWh：家里 {pct} % 的时间无需电网。晚上好！"
  },
  "de": {
   "meteo": "Wetter: {etat}",
@@ -863,7 +925,26 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_ouvrir": "Details von {nom} öffnen",
   "appareils_vide": "Kein Gerät erkannt.",
   "carte_appareils_nom": "UCANESS Geräte (automatische Liste)",
-  "carte_appareils_desc": "Alle Geräte im Haus, ein Bereich pro Raum, nur zur Anzeige."
+  "carte_appareils_desc": "Alle Geräte im Haus, ein Bereich pro Raum, nur zur Anzeige.",
+  "carte_bilan_nom": "UCANESS Tagesbilanz",
+  "carte_bilan_desc": "Autarkie, Sonne, Haus, Netz und Ersparnis des Tages.",
+  "carte_forecast_nom": "UCANESS 5-Tage-Wetter",
+  "carte_forecast_desc": "Das Wetter der nächsten Tage mit der erwarteten Sonne.",
+  "bilan_autonomie": "Autarkie",
+  "bilan_soleil": "Sonne",
+  "bilan_maison": "Haus",
+  "bilan_reseau": "Netz",
+  "bilan_economie": "Ersparnis",
+  "bilan_utilise": "{pct} % genutzt",
+  "bilan_estimee": "geschätzt",
+  "bilan_phrase": "Das Haus hat heute {pct} % seines Bedarfs gedeckt, mit {soleil} kWh Sonne.",
+  "bilan_phrase_100": "Tag zu 100 % autark: {soleil} kWh Sonne, nichts aus dem Netz.",
+  "aujourdhui": "Heute",
+  "meteo_5_jours": "Wetter der nächsten 5 Tage",
+  "meteo_attente": "Vorhersage folgt…",
+  "resume_titre": "Mein Tag",
+  "resume_soir": "Heute {soleil} kWh Sonne: Das Haus lief zu {pct} % ohne Netz, etwa {eco} € gespart. Schönen Abend!",
+  "resume_soir_sans_eco": "Heute {soleil} kWh Sonne: Das Haus lief zu {pct} % ohne Netz. Schönen Abend!"
  },
  "it": {
   "meteo": "Meteo: {etat}",
@@ -1063,7 +1144,26 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_ouvrir": "Apri i dettagli di {nom}",
   "appareils_vide": "Nessun dispositivo riconosciuto.",
   "carte_appareils_nom": "UCANESS dispositivi (elenco automatico)",
-  "carte_appareils_desc": "Tutti i dispositivi della casa, un pannello per stanza, in sola lettura."
+  "carte_appareils_desc": "Tutti i dispositivi della casa, un pannello per stanza, in sola lettura.",
+  "carte_bilan_nom": "UCANESS bilancio del giorno",
+  "carte_bilan_desc": "Autonomia, sole, casa, rete e risparmio della giornata.",
+  "carte_forecast_nom": "UCANESS meteo 5 giorni",
+  "carte_forecast_desc": "Il meteo dei prossimi giorni, con il sole previsto.",
+  "bilan_autonomie": "Autonomia",
+  "bilan_soleil": "Sole",
+  "bilan_maison": "Casa",
+  "bilan_reseau": "Rete",
+  "bilan_economie": "Risparmio",
+  "bilan_utilise": "{pct} % usato",
+  "bilan_estimee": "stimato",
+  "bilan_phrase": "Oggi la casa ha coperto il {pct} % del fabbisogno, con {soleil} kWh di sole.",
+  "bilan_phrase_100": "Giornata autonoma al 100 %: {soleil} kWh di sole, niente dalla rete.",
+  "aujourdhui": "Oggi",
+  "meteo_5_jours": "Meteo dei prossimi 5 giorni",
+  "meteo_attente": "Previsione in arrivo…",
+  "resume_titre": "La mia giornata",
+  "resume_soir": "Oggi {soleil} kWh di sole: la casa è andata al {pct} % senza rete, circa {eco} € risparmiati. Buona serata!",
+  "resume_soir_sans_eco": "Oggi {soleil} kWh di sole: la casa è andata al {pct} % senza rete. Buona serata!"
  },
  "es": {
   "meteo": "Tiempo: {etat}",
@@ -1263,7 +1363,26 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_ouvrir": "Abrir la ficha de {nom}",
   "appareils_vide": "Ningún aparato reconocido.",
   "carte_appareils_nom": "UCANESS aparatos (lista automática)",
-  "carte_appareils_desc": "Todos los aparatos de la casa, un panel por habitación, solo lectura."
+  "carte_appareils_desc": "Todos los aparatos de la casa, un panel por habitación, solo lectura.",
+  "carte_bilan_nom": "UCANESS balance del día",
+  "carte_bilan_desc": "Autonomía, sol, casa, red y ahorro del día.",
+  "carte_forecast_nom": "UCANESS tiempo a 5 días",
+  "carte_forecast_desc": "El tiempo de los próximos días, con el sol previsto.",
+  "bilan_autonomie": "Autonomía",
+  "bilan_soleil": "Sol",
+  "bilan_maison": "Casa",
+  "bilan_reseau": "Red",
+  "bilan_economie": "Ahorro",
+  "bilan_utilise": "{pct} % aprovechado",
+  "bilan_estimee": "estimado",
+  "bilan_phrase": "Hoy la casa cubrió el {pct} % de sus necesidades, con {soleil} kWh de sol.",
+  "bilan_phrase_100": "Día 100 % autónomo: {soleil} kWh de sol, nada de la red.",
+  "aujourdhui": "Hoy",
+  "meteo_5_jours": "Tiempo de los próximos 5 días",
+  "meteo_attente": "Previsión pendiente…",
+  "resume_titre": "Mi día",
+  "resume_soir": "Hoy, {soleil} kWh de sol: la casa funcionó al {pct} % sin la red, unos {eco} € ahorrados. ¡Buenas noches!",
+  "resume_soir_sans_eco": "Hoy, {soleil} kWh de sol: la casa funcionó al {pct} % sin la red. ¡Buenas noches!"
  },
  "pt": {
   "meteo": "Meteorologia: {etat}",
@@ -1463,7 +1582,26 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_ouvrir": "Abrir a ficha de {nom}",
   "appareils_vide": "Nenhum aparelho reconhecido.",
   "carte_appareils_nom": "UCANESS aparelhos (lista automática)",
-  "carte_appareils_desc": "Todos os aparelhos da casa, um painel por divisão, só leitura."
+  "carte_appareils_desc": "Todos os aparelhos da casa, um painel por divisão, só leitura.",
+  "carte_bilan_nom": "UCANESS balanço do dia",
+  "carte_bilan_desc": "Autonomia, sol, casa, rede e poupança do dia.",
+  "carte_forecast_nom": "UCANESS meteorologia a 5 dias",
+  "carte_forecast_desc": "O tempo dos próximos dias, com o sol previsto.",
+  "bilan_autonomie": "Autonomia",
+  "bilan_soleil": "Sol",
+  "bilan_maison": "Casa",
+  "bilan_reseau": "Rede",
+  "bilan_economie": "Poupança",
+  "bilan_utilise": "{pct} % aproveitado",
+  "bilan_estimee": "estimada",
+  "bilan_phrase": "Hoje a casa cobriu {pct} % das suas necessidades, com {soleil} kWh de sol.",
+  "bilan_phrase_100": "Dia 100 % autónomo: {soleil} kWh de sol, nada da rede.",
+  "aujourdhui": "Hoje",
+  "meteo_5_jours": "Tempo dos próximos 5 dias",
+  "meteo_attente": "Previsão a chegar…",
+  "resume_titre": "O meu dia",
+  "resume_soir": "Hoje, {soleil} kWh de sol: a casa funcionou {pct} % sem a rede, cerca de {eco} € poupados. Boa noite!",
+  "resume_soir_sans_eco": "Hoje, {soleil} kWh de sol: a casa funcionou {pct} % sem a rede. Boa noite!"
  }
 }/* I18N-FIN */;
 let UC_LANG_VUE = null;   // dernière langue vue, pour les appels sans hass (configuration, sélecteur de cartes)
@@ -4012,7 +4150,9 @@ class UcanessUcanCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     const c = this._config;
-    const ids = [c.conseil, c.soc, 'sun.sun', ...ucAlertList(c.alert_entities).map((a) => a.entity)];
+    const r = c.resume || {};
+    const ids = [c.conseil, c.soc, 'sun.sun', ...ucAlertList(c.alert_entities).map((a) => a.entity),
+      ...[].concat(r.production || [], r.consommation || [], r.achat || [], r.economie || [], r.prix || [])];
     if (ucChanged(this, hass, ids)) this._render();
   }
 
@@ -4124,7 +4264,24 @@ class UcanessUcanCard extends HTMLElement {
         </div>`;
     }
     if (alertes.length) return `<p class="t">${esc(ucT(this._hass, 'alerte_conseils_attendront', { noms: alertes.map((x) => x.name).join(', ') }))}</p>`;
+    const resume = this._resume();
+    if (resume) return `<p class="k">${esc(ucT(this._hass, 'resume_titre'))}</p><p class="t">${esc(resume)}</p>`;
     return `<p class="t">${esc(ucT(this._hass, 'ucan_tout_va_bien'))}</p>`;
+  }
+
+  /* Résumé du soir (0.10.0, option resume: {heure: '20:00', production, consommation, achat, prix, economie…},
+   * mêmes clés que custom:ucaness-bilan-card) : à partir de l'heure donnée, quand aucun conseil n'attend,
+   * Ucan raconte la journée. */
+  _resume() {
+    const r = this._config.resume;
+    if (!r || !this._hass) return '';
+    const [hh, mm] = String(r.heure || '20:00').split(':').map(Number);
+    const n = new Date();
+    if (n.getHours() * 60 + n.getMinutes() < (hh || 0) * 60 + (mm || 0)) return '';
+    const b = ucBilanJour(this._hass, r);
+    if (b.prod === null || b.autonomie === null) return '';
+    const p = { soleil: ucNombre(this._hass, b.prod, 1), pct: Math.round(b.autonomie * 100), eco: ucNombre(this._hass, b.economie, 2) };
+    return ucT(this._hass, b.economie === null ? 'resume_soir_sans_eco' : 'resume_soir', p);
   }
 
   /* Simulateur « et si » (option simulateur: {puissance_actuelle_kva, abonnement_actuel_eur_an, jours}) :
@@ -4724,6 +4881,184 @@ const UC_VEHICLE_CSS = `
   .tol[hidden] { display: none; }
 `;
 
+/* ------------------------------------------------------------------ bilan du jour, météo 5 jours (0.10.0) */
+/* Bilan de la journée d'après les compteurs du jour (kWh) : partagé par custom:ucaness-bilan-card et par le
+ * résumé du soir d'Ucan. Options : production, consommation, achat (une entité ou une liste, additionnées),
+ * injection, cout (€ ; sinon achat × prix), economie (€ ; sinon (consommation − achat) × prix, « estimée »), prix. */
+function ucKwh(hass, id) {
+  const st = id && hass && hass.states[id];
+  if (!st) return null;
+  const v = parseFloat(st.state);
+  if (!Number.isFinite(v)) return null;
+  const u = String((st.attributes || {}).unit_of_measurement || '');
+  return u === 'Wh' ? v / 1000 : u === 'MWh' ? v * 1000 : v;
+}
+
+function ucBilanJour(hass, c = {}) {
+  const somme = (x) => {
+    const ids = Array.isArray(x) ? x : (x ? [x] : []);
+    const vals = ids.map((id) => ucKwh(hass, id)).filter((v) => v !== null);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+  };
+  const prod = somme(c.production);
+  const conso = somme(c.consommation);
+  const achat = somme(c.achat);
+  const injection = somme(c.injection);
+  const prixSt = c.prix && hass && hass.states[c.prix];
+  const prix = prixSt ? parseFloat(prixSt.state) : (Number.isFinite(Number(c.prix)) ? Number(c.prix) : NaN);
+  const borne = (v) => Math.max(0, Math.min(1, v));
+  const autonomie = conso > 0 && achat !== null ? borne(1 - achat / conso) : null;
+  const autoconso = prod > 0 && injection !== null ? borne((prod - injection) / prod) : null;
+  const coutLu = somme(c.cout);
+  const cout = coutLu !== null ? coutLu : (achat !== null && Number.isFinite(prix) ? achat * prix : null);
+  const ecoLue = somme(c.economie);
+  const economie = ecoLue !== null ? ecoLue
+    : (conso !== null && achat !== null && Number.isFinite(prix) ? Math.max(0, conso - achat) * prix : null);
+  return { prod, conso, achat, injection, autonomie, autoconso, cout, economie, economieEstimee: ecoLue === null && economie !== null };
+}
+
+function ucNombre(hass, v, digits) {
+  return Number.isFinite(v) ? v.toLocaleString(ucLang(hass) === 'zh-Hans' ? 'zh-CN' : ucLang(hass), { minimumFractionDigits: digits, maximumFractionDigits: digits }) : '—';
+}
+
+/* custom:ucaness-bilan-card : le bilan chiffré de la journée (autonomie, soleil, maison, réseau, économie). */
+class UcanessBilanCard extends HTMLElement {
+  setConfig(config) {
+    this._config = Object.assign({}, config || {});
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    const c = this._config;
+    const ids = [].concat(c.production || [], c.consommation || [], c.achat || [], c.injection || [], c.cout || [], c.economie || [], c.prix || []);
+    if (ucChanged(this, hass, ids)) this._render();
+  }
+
+  getCardSize() { return 4; }
+
+  _render() {
+    if (!this.shadowRoot || !this._config) return;
+    const h = this._hass;
+    const c = this._config;
+    const b = ucBilanJour(h, c);
+    const kwh = (v) => `${ucNombre(h, v, 1)} kWh`;
+    const eur = (v) => `${ucNombre(h, v, 2)} €`;
+    const pct = b.autonomie === null ? null : Math.round(b.autonomie * 100);
+    const tuile = (cle, val, sous, id, couleur) => `<button type="button" class="tu" data-id="${esc(Array.isArray(id) ? id[0] || '' : id || '')}">
+        <span class="l">${esc(ucT(h, cle))}</span><span class="v" style="color:${couleur}">${esc(val)}</span>${sous ? `<span class="s">${esc(sous)}</span>` : ''}</button>`;
+    const phrase = pct === null ? '' : ucT(h, pct >= 100 ? 'bilan_phrase_100' : 'bilan_phrase', { pct, soleil: ucNombre(h, b.prod, 1) });
+    this.shadowRoot.innerHTML = `<style>${UC_BASE_CSS}
+        :host { display: block; }
+        .bi { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: center; }
+        .an { position: relative; width: 112px; height: 112px; }
+        .an svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .an .c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .an .p { font: 700 26px var(--uc-font); color: var(--uc-value); }
+        .an .k { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--uc-label); }
+        .gr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .tu { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border: 1px solid var(--uc-tab-border); border-radius: 8px;
+          background: rgba(6, 27, 61, .55); color: inherit; font: inherit; text-align: left; cursor: pointer; min-height: 44px; }
+        .tu .l { font-size: 12px; color: var(--uc-label); }
+        .tu .v { font: 700 18px var(--uc-font); }
+        .tu .s { font-size: 11px; color: var(--uc-muted); }
+        .ph { margin: 8px 0 0; font-size: 14px; color: #CFE6FF; }
+        @media (max-width: 360px) { .bi { grid-template-columns: 1fr; justify-items: center; } }
+      </style>
+      <div class="bi">
+        <div class="an" role="img" aria-label="${esc(ucT(h, 'bilan_autonomie'))} ${pct === null ? '—' : pct + ' %'}">
+          <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="#1B2F52" stroke-width="12"/>
+            <circle cx="60" cy="60" r="50" fill="none" stroke="var(--uc-green)" stroke-width="12" stroke-linecap="round"
+              stroke-dasharray="${(pct || 0) * 3.1416} 400" /></svg>
+          <div class="c"><span class="p">${pct === null ? '—' : pct + ' %'}</span><span class="k">${esc(ucT(h, 'bilan_autonomie'))}</span></div>
+        </div>
+        <div class="gr">
+          ${tuile('bilan_soleil', kwh(b.prod), b.autoconso === null ? '' : ucT(h, 'bilan_utilise', { pct: Math.round(b.autoconso * 100) }), c.production, '#F5C542')}
+          ${tuile('bilan_maison', kwh(b.conso), '', c.consommation, '#00FFFF')}
+          ${tuile('bilan_reseau', kwh(b.achat), b.cout === null ? '' : eur(b.cout), c.achat, '#9CC9F5')}
+          ${tuile('bilan_economie', eur(b.economie), b.economieEstimee ? ucT(h, 'bilan_estimee') : '', c.economie || c.prix, '#2ECC71')}
+        </div>
+      </div>
+      ${phrase ? `<p class="ph">${esc(phrase)}</p>` : ''}`;
+    this.shadowRoot.querySelectorAll('.tu').forEach((el) => el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      if (id && this._hass && this._hass.states[id]) this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: id }, bubbles: true, composed: true }));
+    }));
+  }
+}
+
+/* custom:ucaness-forecast-card : la météo des 5 prochains jours (entity: weather.x, jours: 5), avec, si
+ * fourni, le soleil prévu chaque jour (solaire: [sensor du jour 1, du jour 2, …] en kWh). */
+class UcanessForecastCard extends HTMLElement {
+  setConfig(config) {
+    if (!config || !config.entity) throw new Error('ucaness-forecast-card : « entity » manquant');
+    this._config = Object.assign({ jours: 5 }, config);
+    this._jours = null;
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this._abonner();
+    this._render();
+  }
+
+  set hass(hass) {
+    const premier = !this._hass;
+    this._hass = hass;
+    if (premier) this._abonner();
+    const ids = [this._config.entity, ...(this._config.solaire || [])];
+    if (ucChanged(this, hass, ids)) this._render();
+  }
+
+  connectedCallback() { this._abonner(); }
+
+  disconnectedCallback() {
+    if (this._desabo) { Promise.resolve(this._desabo).then((f) => typeof f === 'function' && f()).catch(() => {}); }
+    this._desabo = null;
+  }
+
+  getCardSize() { return 3; }
+
+  _abonner() {
+    const h = this._hass;
+    if (this._desabo || !h || !h.connection || !this._config || !this.isConnected) return;
+    this._desabo = h.connection.subscribeMessage((ev) => {
+      this._jours = (ev && ev.forecast) || [];
+      this._render();
+    }, { type: 'weather/subscribe_forecast', forecast_type: 'daily', entity_id: this._config.entity }).catch(() => { this._desabo = null; });
+  }
+
+  _render() {
+    if (!this.shadowRoot || !this._config) return;
+    const h = this._hass;
+    const c = this._config;
+    const lang = ucLang(h) === 'zh-Hans' ? 'zh-CN' : ucLang(h);
+    const jours = (this._jours || (h && h.states[c.entity] && h.states[c.entity].attributes.forecast) || []).slice(0, c.jours);
+    const sol = c.solaire || [];
+    const col = jours.map((j, i) => {
+      const d = new Date(j.datetime);
+      const nom = i === 0 ? ucT(h, 'aujourdhui') : d.toLocaleDateString(lang, { weekday: 'short' });
+      const kwh = sol[i] ? ucKwh(h, sol[i]) : null;
+      const pluie = Number.isFinite(j.precipitation_probability) ? `${Math.round(j.precipitation_probability)} %` : (Number.isFinite(j.precipitation) && j.precipitation > 0 ? `${ucNombre(h, j.precipitation, 1)} mm` : '');
+      return `<div class="j"><span class="n">${esc(nom)}</span>
+        <ha-icon icon="${esc(UC_METEO_ICONES[j.condition] || 'mdi:weather-cloudy')}"></ha-icon>
+        <span class="t"><b>${Number.isFinite(j.temperature) ? Math.round(j.temperature) + '°' : '—'}</b> ${Number.isFinite(j.templow) ? Math.round(j.templow) + '°' : ''}</span>
+        <span class="p">${esc(pluie)}</span>
+        ${sol.length ? `<span class="s">${kwh === null ? '—' : esc(ucNombre(h, kwh, 1) + ' kWh')}</span>` : ''}</div>`;
+    }).join('');
+    this.shadowRoot.innerHTML = `<style>${UC_BASE_CSS}
+        :host { display: block; }
+        .r { display: grid; grid-template-columns: repeat(${Math.max(1, jours.length || c.jours)}, minmax(0, 1fr)); gap: 4px; }
+        .j { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; border-radius: 8px; background: rgba(6, 27, 61, .45); }
+        .j:first-child { outline: 1px solid var(--uc-tab-border); }
+        .n { font-size: 12px; color: var(--uc-label); text-transform: capitalize; }
+        ha-icon { --mdc-icon-size: 26px; color: #9CC9F5; }
+        .t { font-size: 13px; color: var(--uc-muted); } .t b { font: 700 16px var(--uc-font); color: #fff; }
+        .p { font-size: 11px; color: #7DABCD; min-height: 13px; }
+        .s { font-size: 12px; color: #F5C542; }
+        .v { font-size: 13px; color: var(--uc-muted); }
+      </style>${jours.length ? `<div class="r" role="list" aria-label="${esc(ucT(h, 'meteo_5_jours'))}">${col}</div>` : `<p class="v">${esc(ucT(h, 'meteo_attente'))}</p>`}`;
+  }
+}
+
 /* ------------------------------------------------------------------ appareils : vue automatique (0.9.0) */
 /* Vue « Appareils » construite à chaque ouverture à partir des appareils de Home Assistant : chaque appareil
  * reconnu reçoit une carte des « Appliance Électroménager Cards » (skyrotter, facultatives, à installer à part),
@@ -5039,6 +5374,8 @@ const UC_CARDS = [
   ['ucaness-vehicle-card', UcanessVehicleCard, ucT(null, 'carte_vehicle_nom'), ucT(null, 'carte_vehicle_desc')],
   ['ucaness-appareil-card', UcanessAppareilCard, ucT(null, 'carte_appareil_nom'), ucT(null, 'carte_appareil_desc')],
   ['ucaness-appareils-card', UcanessAppareilsCard, ucT(null, 'carte_appareils_nom'), ucT(null, 'carte_appareils_desc')],
+  ['ucaness-bilan-card', UcanessBilanCard, ucT(null, 'carte_bilan_nom'), ucT(null, 'carte_bilan_desc')],
+  ['ucaness-forecast-card', UcanessForecastCard, ucT(null, 'carte_forecast_nom'), ucT(null, 'carte_forecast_desc')],
 ];
 
 for (const [tag, cls, name, description] of UC_CARDS) {
@@ -5051,4 +5388,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessBilanCard, UcanessForecastCard, ucBilanJour, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
