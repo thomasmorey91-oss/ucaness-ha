@@ -69,7 +69,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.13.0';
+const UC_VERSION = '0.14.0';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -299,6 +299,7 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Visite guidée",
   "outil_animations": "Animations",
   "outil_cinema": "Mode cinéma",
+  "ucan_parler": "Parler à Ucan",
   "outil_replay": "Replay de la journée",
   "replay_charge": "Chargement de la journée…",
   "replay_vide": "Pas encore de mesures aujourd'hui.",
@@ -555,6 +556,7 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Guided tour",
   "outil_animations": "Animations",
   "outil_cinema": "Cinema mode",
+  "ucan_parler": "Talk to Ucan",
   "outil_replay": "Replay of the day",
   "replay_charge": "Loading the day…",
   "replay_vide": "No readings yet today.",
@@ -811,6 +813,7 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "导览",
   "outil_animations": "动画",
   "outil_cinema": "影院模式",
+  "ucan_parler": "和 Ucan 对话",
   "outil_replay": "回放今天",
   "replay_charge": "正在加载今天的数据…",
   "replay_vide": "今天还没有数据。",
@@ -1067,6 +1070,7 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Rundgang",
   "outil_animations": "Animationen",
   "outil_cinema": "Kinomodus",
+  "ucan_parler": "Mit Ucan sprechen",
   "outil_replay": "Tagesrückblick",
   "replay_charge": "Tag wird geladen…",
   "replay_vide": "Heute noch keine Messwerte.",
@@ -1323,6 +1327,7 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Visita guidata",
   "outil_animations": "Animazioni",
   "outil_cinema": "Modalità cinema",
+  "ucan_parler": "Parla con Ucan",
   "outil_replay": "Replay della giornata",
   "replay_charge": "Caricamento della giornata…",
   "replay_vide": "Ancora nessuna misura oggi.",
@@ -1579,6 +1584,7 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Visita guiada",
   "outil_animations": "Animaciones",
   "outil_cinema": "Modo cine",
+  "ucan_parler": "Hablar con Ucan",
   "outil_replay": "Repetición del día",
   "replay_charge": "Cargando el día…",
   "replay_vide": "Todavía no hay medidas hoy.",
@@ -1835,6 +1841,7 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Visita guiada",
   "outil_animations": "Animações",
   "outil_cinema": "Modo cinema",
+  "ucan_parler": "Falar com o Ucan",
   "outil_replay": "Replay do dia",
   "replay_charge": "A carregar o dia…",
   "replay_vide": "Ainda sem medições hoje.",
@@ -2720,6 +2727,17 @@ function ucTrophees(prod, achat, lat, lon, maintenant, tolerance) {
   }
   const autonomes = Object.keys(jours).filter((k) => jours[k].heures >= 4 && jours[k].kwh <= tol && (prodJour[k] || 0) > 0).sort();
   return { record, prodAujourdhui: Math.round((prodJour[aujourdhui] || 0) * 10) / 10, autonomes: autonomes.length, derniere: autonomes.length ? autonomes[autonomes.length - 1] : null };
+}
+
+/** « Parler à Ucan » (0.14.0) : ouvre Assist, l'assistant de Home Assistant. L'évènement part de la carte (dans
+ *  l'arbre du tableau de bord), sinon Home Assistant ne le reçoit pas. parler: true ou {pipeline_id, start_listening}. */
+function ucAssist(el, opts) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  el.dispatchEvent(new CustomEvent('hass-action', {
+    bubbles: true,
+    composed: true,
+    detail: { config: { tap_action: { action: 'assist', pipeline_id: o.pipeline_id || 'last_used', start_listening: !!o.start_listening } }, action: 'tap' },
+  }));
 }
 
 /** Photo à afficher selon l'ambiance : nuit, coucher de soleil, pluie ou orage, ciel couvert, sinon jour.
@@ -5012,6 +5030,7 @@ class UcanessUcanCard extends HTMLElement {
           .tete .av svg { width: 100%; height: 100%; display: block; }
           .tete h2 { margin: 0; font: 400 19px var(--uc-font); flex: 1; }
           .replacer { min-height: 36px; padding: 0 10px; border: 1px solid var(--uc-tab-border); border-radius: 18px; background: transparent; color: #9CC9F5; font: 400 14px var(--uc-font); cursor: pointer; }
+          .parler { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--uc-tab-border); border-radius: 22px; background: transparent; color: var(--uc-tab); cursor: pointer; --mdc-icon-size: 22px; }
           .fermer { width: 44px; height: 44px; border: 0; background: transparent; color: var(--uc-text); cursor: pointer; border-radius: 22px; }
           .etsi { margin: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
           .etsi .msg { margin: 4px 0 0; }
@@ -5022,6 +5041,7 @@ class UcanessUcanCard extends HTMLElement {
         ${this._ouvert ? `<section class="panneau" role="dialog" aria-label="Ucan">
           <div class="tete"><div class="av">${ucUcanSvg(humeur, soc)}</div><h2>Ucan</h2>
             ${this._deplace ? `<button type="button" class="replacer">${esc(ucT(this._hass, 'replacer'))}</button>` : ''}
+            ${c.parler ? `<button type="button" class="parler" aria-label="${esc(ucT(this._hass, 'ucan_parler'))}" title="${esc(ucT(this._hass, 'ucan_parler'))}"><ha-icon icon="mdi:microphone-message"></ha-icon></button>` : ''}
             <button type="button" class="fermer" aria-label="${esc(ucT(this._hass, 'fermer'))}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
           <div class="msg">${this._corps(conseil, alertes)}</div>${this._etsiHtml()}</section>` : ''}
         <button type="button" class="fab uc-tap${attente && !this._ouvert && !UC_REDUCED && !UC_LIGHT ? ' appel' : ''}" aria-label="${label}" aria-expanded="${this._ouvert ? 'true' : 'false'}">
@@ -5036,6 +5056,8 @@ class UcanessUcanCard extends HTMLElement {
       });
       const f = r.querySelector('.fermer');
       if (f) f.addEventListener('click', () => { this._ouvert = false; this._render(); });
+      const pa = r.querySelector('.parler');
+      if (pa) pa.addEventListener('click', () => { this._ouvert = false; this._render(); ucAssist(this, c.parler); });
       this._boutons(r);
       return;
     }
@@ -6190,4 +6212,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessBilanCard, UcanessForecastCard, UcanessGaugeCard, ucBilanJour, ucVoisin, ucPhoto, ucSoleil, ucReplayFrames, ucTrophees, UcanessTropheesCard, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessBilanCard, UcanessForecastCard, UcanessGaugeCard, ucBilanJour, ucVoisin, ucPhoto, ucAssist, ucSoleil, ucReplayFrames, ucTrophees, UcanessTropheesCard, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
