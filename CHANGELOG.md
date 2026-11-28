@@ -4,6 +4,9 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 28/11/2026
 
+### Cartes 0.14.0 : parler à Ucan
+- Option `parler` de la bulle d'Ucan : bouton qui ouvre Assist, l'assistant de Home Assistant.
+
 ### Cartes 0.13.0 : replay de la journée, trophées
 - Bouton « Replay de la journée » dans les outils de la scène : la journée en 30 s depuis les statistiques sur 5 minutes.
 - **`custom:ucaness-trophees-card`** : record de production et journées 100 % autonomes, calculés depuis les statistiques horaires.

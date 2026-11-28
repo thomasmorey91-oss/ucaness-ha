@@ -96,3 +96,29 @@ def test_carte_trophees(page):
     }""")
     assert got[0].startswith("Record de production 9,5 kWh le 20/11/2026")
     assert got[1].startswith("Journées 100 % autonomes 0")
+
+
+def test_parler_a_ucan(page):
+    got = page.evaluate("""async () => {
+        await import('/www/ucaness/ucaness-cards.js');
+        const c = document.createElement('ucaness-ucan-card');
+        c.setConfig({ floating: true, parler: { pipeline_id: 'p1' } });
+        document.body.appendChild(c);
+        c.hass = window.fakeHass;
+        await new Promise((r) => setTimeout(r, 100));
+        const recu = [];
+        c.addEventListener('hass-action', (e) => recu.push(e.detail));
+        c._ouvert = true; c._render();
+        const flot = [...document.body.children].find((x) => x.shadowRoot && x.shadowRoot.querySelector('.fab'));
+        flot.shadowRoot.querySelector('.parler').click();
+        await new Promise((r) => setTimeout(r, 50));
+        c.setConfig({ floating: true, parler: { pipeline: 'Maison FR' } });
+        c.hass = Object.assign({}, window.fakeHass, { callWS: async () => ({ pipelines: [{ id: 'x', name: 'Autre' }, { id: 'fr1', name: 'Maison FR' }] }) });
+        c._ouvert = true; c._render();
+        const flot2 = [...document.body.children].find((x) => x.shadowRoot && x.shadowRoot.querySelector('.parler'));
+        flot2.shadowRoot.querySelector('.parler').click();
+        await new Promise((r) => setTimeout(r, 50));
+        return { recu, ferme: !flot.shadowRoot.querySelector('.panneau') };
+    }""")
+    assert [r["config"]["tap_action"]["pipeline_id"] for r in got["recu"]] == ["p1", "fr1"]
+    assert got["recu"][0] == {"config": {"tap_action": {"action": "assist", "pipeline_id": "p1", "start_listening": False}}, "action": "tap"}
