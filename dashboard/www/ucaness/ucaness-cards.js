@@ -25,6 +25,7 @@
  *   custom:ucaness-bilan-card    bilan chiffré de la journée : autonomie, soleil, maison, réseau, économie (0.10.0)
  *   custom:ucaness-forecast-card météo des 5 prochains jours, avec le soleil prévu (0.10.0)
  *   custom:ucaness-gauge-card    cadran à aiguille (0.11.0)
+ *   custom:ucaness-trophees-card record de production et journées 100 % autonomes (0.13.0)
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
  *
@@ -68,7 +69,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.12.0';
+const UC_VERSION = '0.13.0';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -298,6 +299,21 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Visite guidée",
   "outil_animations": "Animations",
   "outil_cinema": "Mode cinéma",
+  "outil_replay": "Replay de la journée",
+  "replay_charge": "Chargement de la journée…",
+  "replay_vide": "Pas encore de mesures aujourd'hui.",
+  "replay_arreter": "Arrêter le replay",
+  "replay_titre": "Replay · {heure}",
+  "carte_trophees_nom": "UCANESS trophées",
+  "carte_trophees_desc": "Record de production et journées 100 % autonomes, calculés depuis l'historique.",
+  "trophee_record": "Record de production",
+  "trophee_record_le": "le {date}",
+  "trophee_record_battu": "Record battu aujourd'hui !",
+  "trophee_autonomes": "Journées 100 % autonomes",
+  "trophee_derniere": "dernière le {date}",
+  "trophee_aucune": "pas encore",
+  "trophee_calcul": "Calcul en cours…",
+  "trophee_indispo": "Historique indisponible",
   "anim_ucan": "Ucan dans la scène",
   "anim_ciel": "Ciel animé (oiseaux, étoiles, neige)",
   "anim_bandeau": "Bandeau d'événement",
@@ -539,6 +555,21 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Guided tour",
   "outil_animations": "Animations",
   "outil_cinema": "Cinema mode",
+  "outil_replay": "Replay of the day",
+  "replay_charge": "Loading the day…",
+  "replay_vide": "No readings yet today.",
+  "replay_arreter": "Stop the replay",
+  "replay_titre": "Replay · {heure}",
+  "carte_trophees_nom": "UCANESS trophies",
+  "carte_trophees_desc": "Production record and 100% self-sufficient days, computed from history.",
+  "trophee_record": "Production record",
+  "trophee_record_le": "on {date}",
+  "trophee_record_battu": "Record beaten today!",
+  "trophee_autonomes": "100% self-sufficient days",
+  "trophee_derniere": "last on {date}",
+  "trophee_aucune": "not yet",
+  "trophee_calcul": "Calculating…",
+  "trophee_indispo": "History unavailable",
   "anim_ucan": "Ucan in the scene",
   "anim_ciel": "Animated sky (birds, stars, snow)",
   "anim_bandeau": "Event banner",
@@ -780,6 +811,21 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "导览",
   "outil_animations": "动画",
   "outil_cinema": "影院模式",
+  "outil_replay": "回放今天",
+  "replay_charge": "正在加载今天的数据…",
+  "replay_vide": "今天还没有数据。",
+  "replay_arreter": "停止回放",
+  "replay_titre": "回放 · {heure}",
+  "carte_trophees_nom": "UCANESS 奖杯",
+  "carte_trophees_desc": "根据历史数据计算的发电记录和 100% 自给的天数。",
+  "trophee_record": "发电记录",
+  "trophee_record_le": "{date}",
+  "trophee_record_battu": "今天打破记录！",
+  "trophee_autonomes": "100% 自给的天数",
+  "trophee_derniere": "最近一次 {date}",
+  "trophee_aucune": "暂无",
+  "trophee_calcul": "正在计算…",
+  "trophee_indispo": "历史数据不可用",
   "anim_ucan": "场景中的 Ucan",
   "anim_ciel": "动态天空（飞鸟、星星、雪）",
   "anim_bandeau": "事件横幅",
@@ -1021,6 +1067,21 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Rundgang",
   "outil_animations": "Animationen",
   "outil_cinema": "Kinomodus",
+  "outil_replay": "Tagesrückblick",
+  "replay_charge": "Tag wird geladen…",
+  "replay_vide": "Heute noch keine Messwerte.",
+  "replay_arreter": "Rückblick beenden",
+  "replay_titre": "Rückblick · {heure}",
+  "carte_trophees_nom": "UCANESS Trophäen",
+  "carte_trophees_desc": "Erzeugungsrekord und Tage mit 100 % Autarkie, aus dem Verlauf berechnet.",
+  "trophee_record": "Erzeugungsrekord",
+  "trophee_record_le": "am {date}",
+  "trophee_record_battu": "Rekord heute gebrochen!",
+  "trophee_autonomes": "Tage mit 100 % Autarkie",
+  "trophee_derniere": "zuletzt am {date}",
+  "trophee_aucune": "noch keine",
+  "trophee_calcul": "Wird berechnet…",
+  "trophee_indispo": "Verlauf nicht verfügbar",
   "anim_ucan": "Ucan in der Szene",
   "anim_ciel": "Bewegter Himmel (Vögel, Sterne, Schnee)",
   "anim_bandeau": "Ereignisbanner",
@@ -1262,6 +1323,21 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Visita guidata",
   "outil_animations": "Animazioni",
   "outil_cinema": "Modalità cinema",
+  "outil_replay": "Replay della giornata",
+  "replay_charge": "Caricamento della giornata…",
+  "replay_vide": "Ancora nessuna misura oggi.",
+  "replay_arreter": "Ferma il replay",
+  "replay_titre": "Replay · {heure}",
+  "carte_trophees_nom": "UCANESS trofei",
+  "carte_trophees_desc": "Record di produzione e giornate autonome al 100 %, calcolati dallo storico.",
+  "trophee_record": "Record di produzione",
+  "trophee_record_le": "il {date}",
+  "trophee_record_battu": "Record battuto oggi!",
+  "trophee_autonomes": "Giornate autonome al 100 %",
+  "trophee_derniere": "ultima il {date}",
+  "trophee_aucune": "non ancora",
+  "trophee_calcul": "Calcolo in corso…",
+  "trophee_indispo": "Storico non disponibile",
   "anim_ucan": "Ucan nella scena",
   "anim_ciel": "Cielo animato (uccelli, stelle, neve)",
   "anim_bandeau": "Banner degli eventi",
@@ -1503,6 +1579,21 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Visita guiada",
   "outil_animations": "Animaciones",
   "outil_cinema": "Modo cine",
+  "outil_replay": "Repetición del día",
+  "replay_charge": "Cargando el día…",
+  "replay_vide": "Todavía no hay medidas hoy.",
+  "replay_arreter": "Detener la repetición",
+  "replay_titre": "Repetición · {heure}",
+  "carte_trophees_nom": "UCANESS trofeos",
+  "carte_trophees_desc": "Récord de producción y días 100 % autónomos, calculados a partir del historial.",
+  "trophee_record": "Récord de producción",
+  "trophee_record_le": "el {date}",
+  "trophee_record_battu": "¡Récord batido hoy!",
+  "trophee_autonomes": "Días 100 % autónomos",
+  "trophee_derniere": "último el {date}",
+  "trophee_aucune": "todavía no",
+  "trophee_calcul": "Calculando…",
+  "trophee_indispo": "Historial no disponible",
   "anim_ucan": "Ucan en la escena",
   "anim_ciel": "Cielo animado (pájaros, estrellas, nieve)",
   "anim_bandeau": "Banner de eventos",
@@ -1744,6 +1835,21 @@ const UC_I18N = /* I18N-DEBUT */{
   "outil_visite": "Visita guiada",
   "outil_animations": "Animações",
   "outil_cinema": "Modo cinema",
+  "outil_replay": "Replay do dia",
+  "replay_charge": "A carregar o dia…",
+  "replay_vide": "Ainda sem medições hoje.",
+  "replay_arreter": "Parar o replay",
+  "replay_titre": "Replay · {heure}",
+  "carte_trophees_nom": "UCANESS troféus",
+  "carte_trophees_desc": "Recorde de produção e dias 100 % autónomos, calculados a partir do histórico.",
+  "trophee_record": "Recorde de produção",
+  "trophee_record_le": "em {date}",
+  "trophee_record_battu": "Recorde batido hoje!",
+  "trophee_autonomes": "Dias 100 % autónomos",
+  "trophee_derniere": "último em {date}",
+  "trophee_aucune": "ainda não",
+  "trophee_calcul": "A calcular…",
+  "trophee_indispo": "Histórico indisponível",
   "anim_ucan": "Ucan na cena",
   "anim_ciel": "Céu animado (aves, estrelas, neve)",
   "anim_bandeau": "Faixa de eventos",
@@ -2539,6 +2645,83 @@ class UcanessPanelCard extends HTMLElement {
 
 /* ------------------------------------------------------------------ vue en direct */
 
+/** Position du soleil (formules simplifiées de la NOAA, précision de quelques minutes) : élévation et azimut en degrés,
+ *  rising = avant midi solaire ; lever et coucher du jour (Date) pour le calcul des journées autonomes. */
+function ucSoleil(date, lat, lon) {
+  const rad = Math.PI / 180;
+  const debutAn = Date.UTC(date.getUTCFullYear(), 0, 1);
+  const jour = Math.floor((date.getTime() - debutAn) / 86400000) + 1;
+  const hUtc = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
+  const g = 2 * Math.PI / 365 * (jour - 1 + (hUtc - 12) / 24);
+  const eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const tst = hUtc * 60 + eqt + 4 * lon;                       // temps solaire vrai, en minutes
+  const ha = (tst / 4 - 180) * rad;
+  const phi = lat * rad;
+  const cosZ = Math.sin(phi) * Math.sin(decl) + Math.cos(phi) * Math.cos(decl) * Math.cos(ha);
+  const zen = Math.acos(Math.max(-1, Math.min(1, cosZ)));
+  let az = Math.acos(Math.max(-1, Math.min(1, (Math.sin(phi) * Math.cos(zen) - Math.sin(decl)) / (Math.cos(phi) * Math.sin(zen) || 1e-9)))) / rad;
+  az = ha > 0 ? (az + 180) % 360 : (540 - az) % 360;
+  const cosH = (Math.cos(90.833 * rad) - Math.sin(phi) * Math.sin(decl)) / (Math.cos(phi) * Math.cos(decl));
+  const midi = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) + (720 - 4 * lon - eqt) * 60000;
+  const demi = Math.abs(cosH) <= 1 ? Math.acos(cosH) / rad * 4 * 60000 : null;
+  return {
+    elevation: Math.round((90 - zen / rad) * 10) / 10,
+    azimuth: Math.round(az * 10) / 10,
+    rising: ha < 0,
+    lever: demi === null ? null : new Date(midi - demi),
+    coucher: demi === null ? null : new Date(midi + demi),
+  };
+}
+
+/** Images du replay : une par tranche de 5 minutes avec au moins une mesure ; une mesure manquante reprend la précédente. */
+function ucReplayFrames(stats, ids, debut, fin) {
+  const parId = {};
+  for (const id of ids) {
+    parId[id] = new Map(((stats || {})[id] || []).map((x) => [Number(typeof x.start === 'number' ? x.start : Date.parse(x.start)), x.mean]));
+  }
+  const frames = [];
+  const dernier = {};
+  for (let t = debut; t <= fin; t += 300000) {
+    let vu = false;
+    const v = {};
+    for (const id of ids) {
+      const m = parId[id].get(t);
+      if (m !== undefined && m !== null && Number.isFinite(Number(m))) { dernier[id] = Number(m); vu = true; }
+      if (dernier[id] !== undefined) v[id] = Math.round(dernier[id] * 10) / 10;
+    }
+    if (vu) frames.push({ t, v });
+  }
+  return frames;
+}
+
+/** Trophées (0.13.0) à partir des statistiques horaires : record de production sur une journée, et journées 100 %
+ *  autonomes (achats au réseau entre le lever et le coucher du soleil, heures entières, au plus « tolerance » kWh).
+ *  prod et achat : listes {start, change} heure par heure ; la journée en cours n'est comptée qu'après le coucher. */
+function ucTrophees(prod, achat, lat, lon, maintenant, tolerance) {
+  const tol = tolerance === undefined ? 0.1 : Number(tolerance);
+  const jourDe = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const ms = (x) => Number(typeof x.start === 'number' ? x.start : Date.parse(x.start));
+  const prodJour = {};
+  for (const x of prod || []) { const k = jourDe(ms(x)); prodJour[k] = (prodJour[k] || 0) + Math.max(0, Number(x.change) || 0); }
+  const aujourdhui = jourDe(maintenant);
+  let record = null;
+  for (const [k, v] of Object.entries(prodJour)) if (k !== aujourdhui && (!record || v > record.kwh)) record = { kwh: Math.round(v * 10) / 10, date: k };
+  const jours = {};
+  for (const x of achat || []) {
+    const t = ms(x);
+    const sol = ucSoleil(new Date(t + 1800000), lat, lon);
+    if (!sol.lever || !sol.coucher || t < sol.lever.getTime() || t + 3600000 > sol.coucher.getTime()) continue;
+    const k = jourDe(t);
+    if (k === aujourdhui && maintenant < sol.coucher.getTime()) continue;
+    jours[k] = (jours[k] || { kwh: 0, heures: 0 });
+    jours[k].kwh += Math.max(0, Number(x.change) || 0);
+    jours[k].heures += 1;
+  }
+  const autonomes = Object.keys(jours).filter((k) => jours[k].heures >= 4 && jours[k].kwh <= tol && (prodJour[k] || 0) > 0).sort();
+  return { record, prodAujourdhui: Math.round((prodJour[aujourdhui] || 0) * 10) / 10, autonomes: autonomes.length, derniere: autonomes.length ? autonomes[autonomes.length - 1] : null };
+}
+
 /** Photo à afficher selon l'ambiance : nuit, coucher de soleil, pluie ou orage, ciel couvert, sinon jour.
  *  Une photo absente est remplacée par la plus proche (pluie → couvert → jour), puis par l'image de base. */
 function ucPhoto(photos, amb, base) {
@@ -2586,6 +2769,7 @@ class UcanessFlowCard extends HTMLElement {
   }
 
   set hass(hass) {
+    if (this._rejeu) { this._rejeu.reel = hass; return; }   // replay en cours : la scène montre l'historique
     this._hass = hass;
     if (ucChanged(this, hass, this._ids())) this._render();
   }
@@ -2607,7 +2791,7 @@ class UcanessFlowCard extends HTMLElement {
   /* L'âge du relevé (« il y a 20 s ») avance même sans nouvelle mesure. */
   connectedCallback() { this._timer = setInterval(() => this._render(), 30000); }
 
-  disconnectedCallback() { clearInterval(this._timer); }
+  disconnectedCallback() { clearInterval(this._timer); this._replayStop(); }
 
   getCardSize() { return 8; }
 
@@ -3014,7 +3198,11 @@ class UcanessFlowCard extends HTMLElement {
           .outils button:focus-visible, .tiroir button:focus-visible, .visite button:focus-visible { outline: 2px solid #22E0F0; outline-offset: 2px; }
           .tiroir { position: absolute; right: 1%; bottom: calc(4% + max(30px, 4.2cqw)); min-width: min(260px, 62%); padding: 10px 12px; border: 1px solid var(--uc-card-border); border-radius: 12px; background: rgba(8,22,46,0.96); box-shadow: var(--uc-card-shadow); font-size: 13px; color: #E6ECF5; animation: ucTiroir .3s ease; }
           @keyframes ucTiroir { from { transform: translateY(12px); opacity: 0; } }
-          .tiroir[hidden], .visite[hidden] { display: none; }
+          .tiroir[hidden], .visite[hidden], .replay[hidden] { display: none; }
+          .replay { position: absolute; left: 50%; top: 13%; transform: translateX(-50%); min-width: min(300px, 70%); padding: 8px 12px; border: 1px solid var(--uc-tab); border-radius: 12px; background: rgba(8,22,46,0.9); box-shadow: 0 0 14px rgba(0,209,214,.3); color: #FFFFFF; font: 700 max(13px, 2cqw) var(--uc-font); text-align: center; }
+          .replay i { display: block; height: 4px; margin-top: 6px; border-radius: 2px; background: #16365F; overflow: hidden; }
+          .replay i u { display: block; height: 100%; width: 0; background: var(--uc-tab); }
+          .replay button { margin-top: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--uc-tab-border); border-radius: 16px; background: transparent; color: #CFE6FF; cursor: pointer; font: 400 13px var(--uc-font); }
           .tiroir .k { margin: 0 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--uc-label); }
           .tiroir .x { position: absolute; right: 4px; top: 2px; min-width: 32px; min-height: 32px; border: 0; background: none; color: #9CC9F5; font-size: 20px; cursor: pointer; }
           .tiroir .li { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; padding: 3px 0; --mdc-icon-size: 18px; }
@@ -3042,7 +3230,7 @@ class UcanessFlowCard extends HTMLElement {
           <div class="art"></div>
           <div class="lbls"></div>
           ${V ? '<div class="fx"><div class="fxc"></div><div class="ban" role="status"></div></div>' : ''}
-          ${V && c.outils !== false ? `<div class="outils noswipe">${[['infos', 'mdi:information-outline'], ['visite', 'mdi:map-marker-path'], ['animations', 'mdi:tune-variant'], ['cinema', 'mdi:fullscreen']].map(([o, i]) => `<button type="button" data-outil="${o}" aria-label="${esc(ucT(hass, 'outil_' + o))}" title="${esc(ucT(hass, 'outil_' + o))}"><ha-icon icon="${i}"></ha-icon></button>`).join('')}</div><div class="tiroir noswipe" hidden></div><div class="visite noswipe" hidden></div>` : ''}
+          ${V && c.outils !== false ? `<div class="outils noswipe">${[['infos', 'mdi:information-outline'], ['visite', 'mdi:map-marker-path'], ['animations', 'mdi:tune-variant'], ['replay', 'mdi:history'], ['cinema', 'mdi:fullscreen']].map(([o, i]) => `<button type="button" data-outil="${o}" aria-label="${esc(ucT(hass, 'outil_' + o))}" title="${esc(ucT(hass, 'outil_' + o))}"><ha-icon icon="${i}"></ha-icon></button>`).join('')}</div><div class="tiroir noswipe" hidden></div><div class="visite noswipe" hidden></div><div class="replay noswipe" hidden></div>` : ''}
           ${cal}
         </div>`;
       root.querySelector('.art').addEventListener('click', (ev) => {
@@ -3075,6 +3263,78 @@ class UcanessFlowCard extends HTMLElement {
       this._vivant({ amb, anime, uh, uhColor, soc, bat, grid, charging, discharging, sunOn, gridIn, gridOut, evOn, autonome });
       if (this._ouvert === 'infos') this._remplirTiroir();
     }
+  }
+
+  /** Replay de la journée (0.13.0) : la journée depuis minuit en 30 s, à partir des statistiques sur 5 minutes de
+   *  Home Assistant (puissances, charge). Le soleil suit le lever et le coucher calculés ; la météo reste celle du moment. */
+  async _replay() {
+    const root = this.shadowRoot;
+    const box = root && root.querySelector('.replay');
+    const reel = this._hass;
+    if (!box || !reel || typeof reel.callWS !== 'function') return;
+    const c = this._config;
+    const N = c.nodes;
+    const ids = [N.solar.entity, N.grid.entity, N.battery.entity, N.home.entity, N.battery.soc_entity, c.ev && c.ev.entity].filter(Boolean);
+    this._rejeu = { reel, frames: [], i: 0 };
+    const bouton = root.querySelector('[data-outil="replay"]');
+    if (bouton) bouton.setAttribute('aria-expanded', 'true');
+    box.hidden = false;
+    box.innerHTML = esc(ucT(reel, 'replay_charge'));
+    const debut = new Date(); debut.setHours(0, 0, 0, 0);
+    let stats = {};
+    try {
+      stats = await reel.callWS({ type: 'recorder/statistics_during_period', start_time: debut.toISOString(), period: '5minute', statistic_ids: ids, types: ['mean'] }) || {};
+    } catch (e) { stats = {}; }
+    if (!this._rejeu) return;
+    const frames = ucReplayFrames(stats, ids, debut.getTime(), Date.now());
+    if (!frames.length) { box.innerHTML = esc(ucT(reel, 'replay_vide')); setTimeout(() => this._replayStop(), 2500); return; }
+    const conf = reel.config || {};
+    const lat = Number(conf.latitude), lon = Number(conf.longitude);
+    this._rejeu.frames = frames;
+    box.innerHTML = `<span class="h"></span><i><u></u></i><button type="button" data-stop>${esc(ucT(reel, 'replay_arreter'))}</button>`;
+    box.querySelector('[data-stop]').addEventListener('click', () => this._replayStop());
+    const pas = Math.max(40, Math.round(30000 / frames.length));
+    const tick = () => {
+      const r = this._rejeu;
+      if (!r) return;
+      if (r.i >= r.frames.length) { this._replayStop(); return; }
+      const f = r.frames[r.i];
+      const states = Object.assign({}, r.reel.states);
+      for (const [id, v] of Object.entries(f.v)) {
+        const st = r.reel.states[id] || { attributes: {} };
+        states[id] = Object.assign({}, st, { state: String(v), last_updated: new Date(f.t).toISOString() });
+      }
+      const sol = Number.isFinite(lat) && Number.isFinite(lon) ? ucSoleil(new Date(f.t), lat, lon) : null;
+      if (sol) {
+        const sid = c.sun_entity || 'sun.sun';
+        const st = r.reel.states[sid] || { attributes: {} };
+        states[sid] = Object.assign({}, st, { state: sol.elevation > 0 ? 'above_horizon' : 'below_horizon', attributes: Object.assign({}, st.attributes, { elevation: sol.elevation, azimuth: sol.azimuth, rising: sol.rising }) });
+      }
+      this._hass = Object.assign({}, r.reel, { states });
+      this._render();
+      const d = new Date(f.t);
+      const deux = (n) => (n < 10 ? '0' : '') + n;
+      const heure = `${deux(d.getHours())}:${deux(d.getMinutes())}`;
+      box.querySelector('.h').textContent = ucT(r.reel, 'replay_titre', { heure });
+      box.querySelector('u').style.width = `${Math.round((r.i + 1) / r.frames.length * 100)}%`;
+      r.i += 1;
+      r.timer = setTimeout(tick, pas);
+    };
+    tick();
+  }
+
+  _replayStop() {
+    const r = this._rejeu;
+    if (!r) return;
+    clearTimeout(r.timer);
+    this._rejeu = null;
+    const root = this.shadowRoot;
+    const box = root && root.querySelector('.replay');
+    if (box) { box.hidden = true; box.innerHTML = ''; }
+    const bouton = root && root.querySelector('[data-outil="replay"]');
+    if (bouton) bouton.setAttribute('aria-expanded', 'false');
+    this._hass = r.reel;
+    this._render();
   }
 
   /** Photo de la maison (option photos, 0.12.0) : fondu enchaîné entre deux calques quand l'ambiance change. */
@@ -3209,6 +3469,7 @@ class UcanessFlowCard extends HTMLElement {
       if (!b) return;
       const o = b.dataset.outil;
       if (o === 'cinema') this._cinema();
+      else if (o === 'replay') { if (this._rejeu) this._replayStop(); else this._replay(); }
       else if (o === 'visite') this._visite(0);
       else this._panneau(this._ouvert === o ? null : o);
     });
@@ -5283,6 +5544,77 @@ function ucVoisin(chemins, ici, dx, dy, dt) {
   return j >= 0 && j < liste.length ? liste[j] : null;
 }
 
+/* custom:ucaness-trophees-card (0.13.0) : record de production et journées 100 % autonomes, calculés à l'affichage
+ * depuis les statistiques horaires de Home Assistant (gardées sans limite). production (statistique d'énergie du jour,
+ * par défaut sensor.uhome_production_solaire_aujourdhui), achat (énergie achetée au réseau, sensor.uhome_soutirage_reseau_total),
+ * tolerance (kWh achetés tolérés en journée, 0,1), depuis (date de début, AAAA-MM-JJ ; par défaut un an). */
+class UcanessTropheesCard extends HTMLElement {
+  setConfig(config) {
+    this._config = Object.assign({ production: 'sensor.uhome_production_solaire_aujourdhui', achat: 'sensor.uhome_soutirage_reseau_total', tolerance: 0.1 }, config || {});
+    this._res = null;
+    this._quand = 0;
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this._render();
+  }
+
+  set hass(hass) {
+    const premier = !this._hass;
+    this._hass = hass;
+    if (premier || Date.now() - this._quand > 3600000) this._calculer();
+    else if (ucChanged(this, hass, [this._config.production])) this._render();
+  }
+
+  getCardSize() { return 2; }
+
+  async _calculer() {
+    const hass = this._hass;
+    const c = this._config;
+    this._quand = Date.now();
+    if (!hass || typeof hass.callWS !== 'function') return;
+    const depuis = c.depuis ? new Date(c.depuis) : new Date(Date.now() - 366 * 86400000);
+    try {
+      const r = await hass.callWS({ type: 'recorder/statistics_during_period', start_time: depuis.toISOString(), period: 'hour', statistic_ids: [c.production, c.achat], types: ['change'] }) || {};
+      const conf = hass.config || {};
+      this._res = ucTrophees(r[c.production], r[c.achat], Number(conf.latitude), Number(conf.longitude), Date.now(), c.tolerance);
+    } catch (e) {
+      this._res = { erreur: true };
+    }
+    this._render();
+  }
+
+  _render() {
+    const hass = this._hass;
+    const r = this._res;
+    const date = (k) => { if (!k) return ''; const [a, m, j] = k.split('-'); return `${j}/${m}/${a}`; };
+    const live = ucNum(hass, this._config.production);
+    let corps;
+    if (!r) corps = `<p class="o">${esc(ucT(hass, 'trophee_calcul'))}</p>`;
+    else if (r.erreur) corps = `<p class="o">${esc(ucT(hass, 'trophee_indispo'))}</p>`;
+    else {
+      const battu = r.record && live !== null && live > r.record.kwh;
+      corps = `
+        <div class="t${battu ? ' or' : ''}"><ha-icon icon="mdi:trophy"></ha-icon><div><span>${esc(ucT(hass, 'trophee_record'))}</span>
+          <b>${r.record ? `${esc(ucNumber(hass, r.record.kwh, 1))} kWh` : '—'}</b>
+          <small>${battu ? esc(ucT(hass, 'trophee_record_battu')) : (r.record ? esc(ucT(hass, 'trophee_record_le', { date: date(r.record.date) })) : '')}</small></div></div>
+        <div class="t"><ha-icon icon="mdi:trophy-award"></ha-icon><div><span>${esc(ucT(hass, 'trophee_autonomes'))}</span>
+          <b>${esc(ucNumber(hass, r.autonomes, 0))}</b>
+          <small>${r.derniere ? esc(ucT(hass, 'trophee_derniere', { date: date(r.derniere) })) : esc(ucT(hass, 'trophee_aucune'))}</small></div></div>`;
+    }
+    this.shadowRoot.innerHTML = `<style>${UC_BASE_CSS}
+      :host { display: block; }
+      .g { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .t { display: flex; gap: 8px; align-items: flex-start; padding: 8px; border: 1px solid var(--uc-card-border); border-radius: 10px; background: rgba(8,22,46,0.5); --mdc-icon-size: 22px; color: #E6ECF5; }
+      .t ha-icon { color: #9CC9F5; flex: 0 0 auto; }
+      .t.or { border-color: #C9A227; box-shadow: 0 0 10px rgba(255,205,60,.35); }
+      .t.or ha-icon { color: #FFD86B; }
+      .t span { display: block; font-size: 12px; color: var(--uc-label); }
+      .t b { display: block; font: 700 20px var(--uc-font); color: #FFFFFF; }
+      .t small { font-size: 12px; color: #9CC9F5; }
+      .o { margin: 0; color: var(--uc-label); }
+    </style><div class="g">${corps}</div>`;
+  }
+}
+
 /* custom:ucaness-gauge-card : cadran à aiguille (« poste de supervision »). entity (ou attribute), name, min (0),
  * max, unit, digits, color, zones: [{ from, color }] (couleur de l'arc à partir d'une valeur). */
 class UcanessGaugeCard extends HTMLElement {
@@ -5841,6 +6173,7 @@ const UC_CARDS = [
   ['ucaness-bilan-card', UcanessBilanCard, ucT(null, 'carte_bilan_nom'), ucT(null, 'carte_bilan_desc')],
   ['ucaness-forecast-card', UcanessForecastCard, ucT(null, 'carte_forecast_nom'), ucT(null, 'carte_forecast_desc')],
   ['ucaness-gauge-card', UcanessGaugeCard, ucT(null, 'carte_gauge_nom'), ucT(null, 'carte_gauge_desc')],
+  ['ucaness-trophees-card', UcanessTropheesCard, ucT(null, 'carte_trophees_nom'), ucT(null, 'carte_trophees_desc')],
 ];
 
 for (const [tag, cls, name, description] of UC_CARDS) {
@@ -5853,4 +6186,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessBilanCard, UcanessForecastCard, UcanessGaugeCard, ucBilanJour, ucVoisin, ucPhoto, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessBilanCard, UcanessForecastCard, UcanessGaugeCard, ucBilanJour, ucVoisin, ucPhoto, ucSoleil, ucReplayFrames, ucTrophees, UcanessTropheesCard, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };

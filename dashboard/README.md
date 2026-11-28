@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.12.0`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.13.0`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -219,6 +219,11 @@ views:
 | `custom:ucaness-bilan-card` | Bilan chiffré de la journée : anneau d'autonomie (part des besoins couverte sans le réseau), soleil (et part utilisée), maison, réseau (et coût), économie. `production`, `consommation`, `achat` (une entité ou une liste, additionnées), `injection`, `cout` (sinon achat × prix), `economie` (sinon (consommation − achat) × prix, marquée « estimée »), `prix` (entité ou nombre). Compteurs du jour en kWh (Wh et MWh convertis). Un appui sur une tuile ouvre la fiche |
 | `custom:ucaness-forecast-card` | Météo des prochains jours (`entity`, `jours`, 5 par défaut), lue par l'abonnement aux prévisions quotidiennes de Home Assistant ; `solaire` : liste des capteurs de production prévue, un par jour (kWh) |
 | `custom:ucaness-ucan-card`, option `resume` | Résumé du soir dans la bulle d'Ucan, à partir de `heure` (`20:00` par défaut) quand aucun conseil n'attend ; mêmes clés que la carte de bilan |
+
+### Replay de la journée et trophées (0.13.0)
+
+- **Replay** : cinquième bouton des outils de la scène vivante. La journée depuis minuit défile en 30 secondes, à partir des statistiques sur 5 minutes de Home Assistant (puissances de la scène et charge de la batterie). Le soleil suit le lever et le coucher calculés pour la position de la maison (`latitude`, `longitude` de Home Assistant) ; la météo reste celle du moment. « Arrêter le replay » ou le même bouton pour revenir au direct.
+- **`custom:ucaness-trophees-card`** : record de production sur une journée et nombre de journées 100 % autonomes (aucun achat au réseau entre le lever et le coucher du soleil, heures entières, au plus `tolerance` kWh, 0,1 par défaut). Calculés à l'affichage depuis les statistiques horaires, gardées sans limite par Home Assistant ; rien à installer. Options : `production` (énergie produite, `sensor.uhome_production_solaire_aujourdhui` par défaut), `achat` (énergie achetée au réseau, `sensor.uhome_soutirage_reseau_total` par défaut), `tolerance`, `depuis` (AAAA-MM-JJ, un an par défaut). Le record passe en doré quand la production du jour le dépasse.
 
 ### Scène sur photo (0.12.0)
 

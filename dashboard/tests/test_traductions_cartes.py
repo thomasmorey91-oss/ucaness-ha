@@ -58,7 +58,7 @@ def test_toute_cle_utilisee_existe():
     utilisees |= {f"fiab_{k}" for k in ("fiable", "indicatif", "insuffisant")}
     utilisees |= {f"puissance_{k}" for k in ("garder", "baisser", "augmenter")}
     # outils de la scène vivante (0.11.0) : outil_…, anim_…, visite_…
-    utilisees |= {f"outil_{k}" for k in ("infos", "visite", "animations", "cinema")}
+    utilisees |= {f"outil_{k}" for k in ("infos", "visite", "animations", "replay", "cinema")}
     utilisees |= {f"anim_{k}" for k in ("ucan", "ciel", "bandeau", "reflet")}
     utilisees |= {f"visite_{k}" for k in ("solaire", "reseau", "batterie", "maison", "borne")}
     assert sorted(k for k in utilisees if k not in REF) == []

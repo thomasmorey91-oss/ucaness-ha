@@ -4,6 +4,10 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 28/11/2026
 
+### Cartes 0.13.0 : replay de la journée, trophées
+- Bouton « Replay de la journée » dans les outils de la scène : la journée en 30 s depuis les statistiques sur 5 minutes.
+- **`custom:ucaness-trophees-card`** : record de production et journées 100 % autonomes, calculés depuis les statistiques horaires.
+
 ### Cartes 0.12.0 : scène sur photo
 - Option `photos` de la vue 3D : une photo par ambiance (jour, coucher, nuit, couvert, pluie, orage) avec fondu enchaîné.
 - Option `nodes.battery.uhome.image` : image de la batterie à la place du dessin.
