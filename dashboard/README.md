@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.9.1`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.10.0`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -211,6 +211,14 @@ views:
 - **Reconnaissance** : volet, porte de garage ou portail (`cover`), sonnette vidéo, caméra, borne de recharge, compteur Linky, batterie (charge en % et puissance), téléviseur ou box (`media_player`), ouvrant (contact), sonde de température, et appareil branché sur une prise qui mesure, reconnu par son nom (lave-linge, lave-vaisselle, sèche-linge, sèche-serviettes, chauffe-eau, four, réfrigérateur, congélateur, téléviseur, hi-fi, cafetière…, en sept langues), sinon carte de prise connectée. Un appareil sans rien d'utile à montrer (téléphone, service) n'a pas de carte.
 - Sans les Appliance Électroménager Cards, Home Assistant affiche une carte d'erreur à la place de chaque appareil.
 - **Dans une page existante** (0.9.1) : `custom:ucaness-appareils-card`, mêmes options (`prix`, `exclure`, `appareils`) et `largeur` (largeur minimale d'une colonne, `320px` par défaut). Un panneau UCANESS par pièce, en colonnes ; la liste se refait quand un appareil est ajouté ou retiré. Par exemple dans une colonne de `custom:ucaness-layout-card` (onglet de la tablette) ou dans les `cards` de `custom:ucaness-app-card` (téléphone).
+
+### Bilan du jour, météo des 5 jours, résumé du soir (0.10.0)
+
+| Carte | Rôle et options |
+|---|---|
+| `custom:ucaness-bilan-card` | Bilan chiffré de la journée : anneau d'autonomie (part des besoins couverte sans le réseau), soleil (et part utilisée), maison, réseau (et coût), économie. `production`, `consommation`, `achat` (une entité ou une liste, additionnées), `injection`, `cout` (sinon achat × prix), `economie` (sinon (consommation − achat) × prix, marquée « estimée »), `prix` (entité ou nombre). Compteurs du jour en kWh (Wh et MWh convertis). Un appui sur une tuile ouvre la fiche |
+| `custom:ucaness-forecast-card` | Météo des prochains jours (`entity`, `jours`, 5 par défaut), lue par l'abonnement aux prévisions quotidiennes de Home Assistant ; `solaire` : liste des capteurs de production prévue, un par jour (kWh) |
+| `custom:ucaness-ucan-card`, option `resume` | Résumé du soir dans la bulle d'Ucan, à partir de `heure` (`20:00` par défaut) quand aucun conseil n'attend ; mêmes clés que la carte de bilan |
 
 ### `custom:ucaness-note-card`
 

@@ -4,6 +4,11 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 28/11/2026
 
+### Cartes 0.10.0 : bilan du jour, météo des 5 jours, résumé du soir
+- **`custom:ucaness-bilan-card`** : autonomie de la journée, soleil, maison, réseau et économie (estimée si aucun capteur ne la donne).
+- **`custom:ucaness-forecast-card`** : météo des prochains jours (prévisions quotidiennes de Home Assistant), avec le soleil prévu par jour.
+- **Résumé du soir d'Ucan** (`resume` de `custom:ucaness-ucan-card`) : la journée racontée dans la bulle à partir de 20 h.
+
 ### Cartes 0.9.1 : liste des appareils dans une page
 - **`custom:ucaness-appareils-card`** : la liste automatique des appareils (lecture seule) dans une page existante, un panneau UCANESS par pièce ; refaite quand un appareil est ajouté ou retiré.
 
