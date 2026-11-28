@@ -4,6 +4,11 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 28/11/2026
 
+### Cartes 0.11.0 : outils de la scène, glissement entre vues, cadran
+- Scène vivante : menu des animations (gardé sur l'appareil), tiroir d'infos du jour, visite guidée, mode cinéma ; reflet sur le sol mouillé quand il pleut.
+- Glissement entre vues sur écran tactile (tablette et téléphone).
+- **`custom:ucaness-gauge-card`** : cadran à aiguille.
+
 ### Cartes 0.10.0 : bilan du jour, météo des 5 jours, résumé du soir
 - **`custom:ucaness-bilan-card`** : autonomie de la journée, soleil, maison, réseau et économie (estimée si aucun capteur ne la donne).
 - **`custom:ucaness-forecast-card`** : météo des prochains jours (prévisions quotidiennes de Home Assistant), avec le soleil prévu par jour.
