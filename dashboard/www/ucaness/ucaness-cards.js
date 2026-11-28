@@ -21,8 +21,11 @@
  *   custom:ucaness-vehicle-card la voiture de la maison : silhouette ou photo détourée, charge, plan de recharge (0.7.0)
  *   custom:ucaness-appareil-card une carte d'appareil rendue inerte (aucune commande), appui = fiche (0.9.0)
  *   stratégie custom:ucaness-appareils  vue « Appareils » construite d'après les appareils de la maison (0.9.0)
+ *   custom:ucaness-appareils-card la même liste dans une page existante, un panneau par pièce (0.9.1)
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
+ *
+ * 0.9.1 (28/11/2026) : carte custom:ucaness-appareils-card (la liste automatique dans une page UCANESS, un panneau par pièce).
  *
  * 0.9.0 (28/11/2026) : vue « Appareils » automatique (stratégie custom:ucaness-appareils) : chaque appareil reconnu
  *   reçoit une carte « Appliance Électroménager Cards », en lecture seule ; les nouveaux appareils apparaissent seuls.
@@ -56,7 +59,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.9.0';
+const UC_VERSION = '0.9.1';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -258,7 +261,9 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_titre": "Appareils",
   "appareils_sans_piece": "Autres appareils",
   "appareils_ouvrir": "Ouvrir la fiche de {nom}",
-  "appareils_vide": "Aucun appareil reconnu."
+  "appareils_vide": "Aucun appareil reconnu.",
+  "carte_appareils_nom": "UCANESS appareils (liste automatique)",
+  "carte_appareils_desc": "Tous les appareils de la maison, un panneau par pièce, en lecture seule."
  },
  "en": {
   "meteo": "Weather: {etat}",
@@ -456,7 +461,9 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_titre": "Devices",
   "appareils_sans_piece": "Other devices",
   "appareils_ouvrir": "Open the details of {nom}",
-  "appareils_vide": "No device recognised."
+  "appareils_vide": "No device recognised.",
+  "carte_appareils_nom": "UCANESS devices (automatic list)",
+  "carte_appareils_desc": "Every device in the home, one panel per room, read-only."
  },
  "zh-Hans": {
   "meteo": "天气：{etat}",
@@ -654,7 +661,9 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_titre": "设备",
   "appareils_sans_piece": "其他设备",
   "appareils_ouvrir": "打开 {nom} 的详情",
-  "appareils_vide": "未识别到设备。"
+  "appareils_vide": "未识别到设备。",
+  "carte_appareils_nom": "UCANESS 设备（自动列表）",
+  "carte_appareils_desc": "家中所有设备，每个房间一个面板，只读。"
  },
  "de": {
   "meteo": "Wetter: {etat}",
@@ -852,7 +861,9 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_titre": "Geräte",
   "appareils_sans_piece": "Weitere Geräte",
   "appareils_ouvrir": "Details von {nom} öffnen",
-  "appareils_vide": "Kein Gerät erkannt."
+  "appareils_vide": "Kein Gerät erkannt.",
+  "carte_appareils_nom": "UCANESS Geräte (automatische Liste)",
+  "carte_appareils_desc": "Alle Geräte im Haus, ein Bereich pro Raum, nur zur Anzeige."
  },
  "it": {
   "meteo": "Meteo: {etat}",
@@ -1050,7 +1061,9 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_titre": "Dispositivi",
   "appareils_sans_piece": "Altri dispositivi",
   "appareils_ouvrir": "Apri i dettagli di {nom}",
-  "appareils_vide": "Nessun dispositivo riconosciuto."
+  "appareils_vide": "Nessun dispositivo riconosciuto.",
+  "carte_appareils_nom": "UCANESS dispositivi (elenco automatico)",
+  "carte_appareils_desc": "Tutti i dispositivi della casa, un pannello per stanza, in sola lettura."
  },
  "es": {
   "meteo": "Tiempo: {etat}",
@@ -1248,7 +1261,9 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_titre": "Aparatos",
   "appareils_sans_piece": "Otros aparatos",
   "appareils_ouvrir": "Abrir la ficha de {nom}",
-  "appareils_vide": "Ningún aparato reconocido."
+  "appareils_vide": "Ningún aparato reconocido.",
+  "carte_appareils_nom": "UCANESS aparatos (lista automática)",
+  "carte_appareils_desc": "Todos los aparatos de la casa, un panel por habitación, solo lectura."
  },
  "pt": {
   "meteo": "Meteorologia: {etat}",
@@ -1446,7 +1461,9 @@ const UC_I18N = /* I18N-DEBUT */{
   "appareils_titre": "Aparelhos",
   "appareils_sans_piece": "Outros aparelhos",
   "appareils_ouvrir": "Abrir a ficha de {nom}",
-  "appareils_vide": "Nenhum aparelho reconhecido."
+  "appareils_vide": "Nenhum aparelho reconhecido.",
+  "carte_appareils_nom": "UCANESS aparelhos (lista automática)",
+  "carte_appareils_desc": "Todos os aparelhos da casa, um painel por divisão, só leitura."
  }
 }/* I18N-FIN */;
 let UC_LANG_VUE = null;   // dernière langue vue, pour les appels sans hass (configuration, sélecteur de cartes)
@@ -4943,6 +4960,63 @@ class UcanessAppareilCard extends HTMLElement {
   }
 }
 
+/* custom:ucaness-appareils-card : la même liste automatique, dans n'importe quelle page (colonne d'un
+ * ucaness-layout-card, écran de téléphone ucaness-app-card…). Un panneau UCANESS par pièce ; la liste se refait
+ * quand un appareil est ajouté ou retiré. Options : celles de la stratégie (prix, exclure, appareils). */
+class UcanessAppareilsCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this.shadowRoot.innerHTML = `<style>
+      :host { display: block; }
+      .grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--uc-appareils-largeur, 320px)), 1fr)); gap: 10px; align-items: start; }
+    </style><div class="grille"></div>`;
+    this._grille = this.shadowRoot.querySelector('.grille');
+    this._cle = null;
+    this._cartes = [];
+  }
+
+  setConfig(config) {
+    this._c = { ...(config || {}) };
+    this.style.setProperty('--uc-appareils-largeur', this._c.largeur || '320px');
+    this._cle = null;
+    if (this._hass) this._construire();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    const cle = `${Object.keys(hass.devices || {}).length}/${Object.keys(hass.entities || {}).length}/${ucLang(hass)}`;
+    if (cle !== this._cle) {
+      this._cle = cle;
+      this._construire();
+    } else {
+      for (const el of this._cartes) el.hass = hass;
+    }
+  }
+
+  async _construire() {
+    const hass = this._hass;
+    const groupes = ucAppareilsCartes(hass, this._c);
+    const configs = groupes.map(({ piece, cartes }) => ({
+      type: 'custom:ucaness-panel-card',
+      title: piece || ucT(hass, 'appareils_sans_piece'),
+      cards: cartes,
+    }));
+    if (!configs.length) configs.push({ type: 'markdown', content: ucT(hass, 'appareils_vide') });
+    const els = await ucCreateCards(configs, hass, this);
+    this._cartes = els;
+    this._grille.replaceChildren(...els);
+  }
+
+  getCardSize() {
+    return 12;
+  }
+
+  getGridOptions() {
+    return { columns: 12, rows: 'auto' };
+  }
+}
+
 if (!customElements.get('ll-strategy-view-ucaness-appareils')) customElements.define('ll-strategy-view-ucaness-appareils', UcanessAppareilsStrategy);
 
 /* ------------------------------------------------------------------ enregistrement */
@@ -4964,6 +5038,7 @@ const UC_CARDS = [
   ['ucaness-hours-card', UcanessHoursCard, ucT(null, 'carte_hours_nom'), ucT(null, 'carte_hours_desc')],
   ['ucaness-vehicle-card', UcanessVehicleCard, ucT(null, 'carte_vehicle_nom'), ucT(null, 'carte_vehicle_desc')],
   ['ucaness-appareil-card', UcanessAppareilCard, ucT(null, 'carte_appareil_nom'), ucT(null, 'carte_appareil_desc')],
+  ['ucaness-appareils-card', UcanessAppareilsCard, ucT(null, 'carte_appareils_nom'), ucT(null, 'carte_appareils_desc')],
 ];
 
 for (const [tag, cls, name, description] of UC_CARDS) {
@@ -4976,4 +5051,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };

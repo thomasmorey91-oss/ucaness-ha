@@ -182,3 +182,31 @@ def test_carte_inerte_ouvre_la_fiche(module_page):
     assert got["clics"] == 0 and got["classe"] == "voile"
     assert got["inert"] is True and got["focusInterne"] is False
     assert got["libelle"] == "Ouvrir la fiche de Prise essai"
+
+
+def test_carte_liste_un_panneau_par_piece_et_suit_les_ajouts(module_page):
+    hass = _hass()
+    got = module_page.evaluate("""async ([hass]) => {
+        await import('/www/ucaness/ucaness-cards.js');
+        const el = document.createElement('ucaness-appareils-card');
+        el.setConfig({ exclure: ['Téléphone'] });
+        el.hass = hass;
+        document.body.appendChild(el);
+        await new Promise(r => setTimeout(r, 200));
+        const panneaux = () => [...el.shadowRoot.querySelectorAll('.grille > ucaness-panel-card')];
+        const avant = panneaux().length;
+        const titres = panneaux().map(p => p._config ? p._config.title : (p.config && p.config.title));
+        const h2 = { ...hass, devices: { ...hass.devices, d99: { id: 'd99', name: 'Sonde bureau', area_id: 'bureau' } },
+                     entities: { ...hass.entities, 'sensor.bureau_temperature': { entity_id: 'sensor.bureau_temperature', device_id: 'd99' } },
+                     states: { ...hass.states, 'sensor.bureau_temperature': { entity_id: 'sensor.bureau_temperature', state: '20', attributes: { device_class: 'temperature' } } } };
+        el.hass = h2;
+        await new Promise(r => setTimeout(r, 200));
+        const cartes = [];
+        const walk = (root) => { for (const x of root.querySelectorAll('*')) { if (x.tagName === 'UCANESS-APPAREIL-CARD') cartes.push(x._c.nom); if (x.shadowRoot) walk(x.shadowRoot); } };
+        walk(el.shadowRoot);
+        el.remove();
+        return { avant, apres: panneaux().length, cartes };
+    }""", [hass])
+    assert got["avant"] == 7                       # six pièces + « Autres appareils »
+    assert "Sonde bureau" in got["cartes"]          # appareil ajouté : la liste se refait seule
+    assert "Téléphone" not in got["cartes"]

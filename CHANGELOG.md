@@ -4,6 +4,9 @@ Versions de l'intégration (`custom_components/ucaness`) et des cartes du tablea
 
 ## 28/11/2026
 
+### Cartes 0.9.1 : liste des appareils dans une page
+- **`custom:ucaness-appareils-card`** : la liste automatique des appareils (lecture seule) dans une page existante, un panneau UCANESS par pièce ; refaite quand un appareil est ajouté ou retiré.
+
 ### Cartes 0.9.0 : vue « Appareils » automatique
 - Stratégie de vue **`custom:ucaness-appareils`** : une carte par appareil reconnu (Appliance Électroménager Cards, facultatives), groupées par pièce ; les nouveaux appareils apparaissent seuls. Réglages : `theme`, `prix`, `exclure`, `appareils`.
 - **`custom:ucaness-appareil-card`** : carte rendue inerte (aucune commande), un appui ouvre la fiche de l'appareil. Sept langues.
