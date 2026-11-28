@@ -2,6 +2,11 @@
 
 Versions de l'intégration (`custom_components/ucaness`) et des cartes du tableau de bord (`dashboard/www/ucaness/ucaness-cards.js`). Les packages de `pilotage/` n'ont pas de numéro : leurs changements sont datés.
 
+## 28/11/2026
+
+### Pilotage : vigilance du lendemain pour le secours
+- `jarvis_secours.yaml` : « Jarvis risque de coupure » lit aussi l'intégration communautaire **« Vigilance Météo France »** (`sensor.vigilance_<département>_aujourd_hui` et `_demain`, clé gratuite de l'API Météo-France). Un créneau orange ou rouge compte s'il commence dans les 12 h et n'est pas fini ; motif avec l'heure de début ; nouvel attribut `debut`, `fin` = fin du dernier créneau retenu. Capteur trouvé d'office (zone littorale écartée), sinon l'intégration Météo-France d'origine, inchangée.
+
 ## 27/11/2026
 
 ### Cartes 0.8.0 : scène vivante
