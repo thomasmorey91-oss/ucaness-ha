@@ -57,6 +57,10 @@ def test_toute_cle_utilisee_existe():
     utilisees |= {f"borne_{k}" for k in re.findall(r"\bB\('(\w+)'\)", code)}
     utilisees |= {f"fiab_{k}" for k in ("fiable", "indicatif", "insuffisant")}
     utilisees |= {f"puissance_{k}" for k in ("garder", "baisser", "augmenter")}
+    # outils de la scène vivante (0.11.0) : outil_…, anim_…, visite_…
+    utilisees |= {f"outil_{k}" for k in ("infos", "visite", "animations", "cinema")}
+    utilisees |= {f"anim_{k}" for k in ("ucan", "ciel", "bandeau", "reflet")}
+    utilisees |= {f"visite_{k}" for k in ("solaire", "reseau", "batterie", "maison", "borne")}
     assert sorted(k for k in utilisees if k not in REF) == []
 
 
@@ -64,5 +68,5 @@ def test_cles_inutilisees():
     """Une clé du dictionnaire que plus rien n'utilise est à retirer."""
     code = SOURCE.replace(re.search(r"/\* I18N-DEBUT \*/.*?/\* I18N-FIN \*/", SOURCE, re.S).group(0), "")
     inutiles = [k for k in REF if f"'{k}'" not in code and not any(
-        k.startswith(p) and f"'{p}" in code for p in ("borne_", "fiab_", "puissance_", "carte_"))]
+        k.startswith(p) and f"'{p}" in code for p in ("borne_", "fiab_", "puissance_", "carte_", "outil_", "anim_", "visite_"))]
     assert inutiles == []

@@ -39,7 +39,7 @@ Depuis la version 0.5.0 des cartes : panneaux arrondis et boutons en relief, ani
 
 1. **Fichiers.** Copier `www/ucaness/` dans `config/www/ucaness/` (application « Samba share » ou « File editor »). Le dossier `www` est servi à l'adresse `/local/`.
 2. **Ressource.** Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource :
-   - URL : `/local/ucaness/ucaness-cards.js?v=0.10.0`
+   - URL : `/local/ucaness/ucaness-cards.js?v=0.11.0`
    - Type : module JavaScript
 
    Changer le numéro après `?v=` à chaque mise à jour du fichier, pour forcer les navigateurs à le recharger.
@@ -219,6 +219,17 @@ views:
 | `custom:ucaness-bilan-card` | Bilan chiffré de la journée : anneau d'autonomie (part des besoins couverte sans le réseau), soleil (et part utilisée), maison, réseau (et coût), économie. `production`, `consommation`, `achat` (une entité ou une liste, additionnées), `injection`, `cout` (sinon achat × prix), `economie` (sinon (consommation − achat) × prix, marquée « estimée »), `prix` (entité ou nombre). Compteurs du jour en kWh (Wh et MWh convertis). Un appui sur une tuile ouvre la fiche |
 | `custom:ucaness-forecast-card` | Météo des prochains jours (`entity`, `jours`, 5 par défaut), lue par l'abonnement aux prévisions quotidiennes de Home Assistant ; `solaire` : liste des capteurs de production prévue, un par jour (kWh) |
 | `custom:ucaness-ucan-card`, option `resume` | Résumé du soir dans la bulle d'Ucan, à partir de `heure` (`20:00` par défaut) quand aucun conseil n'attend ; mêmes clés que la carte de bilan |
+
+### Outils de la scène, glissement entre vues, cadran (0.11.0)
+
+- **Outils de la scène vivante** (`vivant: true` ; `outils: false` pour les retirer) : quatre boutons en bas à droite de la scène.
+  - **Infos du jour** : lever et coucher du soleil, météo, état de la batterie (heure jusqu'à laquelle elle tient en décharge).
+  - **Visite guidée** : panneaux, réseau, batterie, maison et borne, l'un après l'autre, avec un halo et une explication.
+  - **Animations** : Ucan dans la scène, ciel animé, bandeau d'événement, reflet ; réglage gardé sur l'appareil.
+  - **Mode cinéma** : la scène seule sur tout l'écran (plein écran si le navigateur l'accepte) ; Échap ou le même bouton pour revenir.
+- **Reflet** : sous la pluie, la scène se reflète sur le sol mouillé (`reflet` : hauteur de l'axe en % de l'image, 85 par défaut ; coupé en mode allégé).
+- **Glissement entre vues** : sur écran tactile, un geste horizontal ouvre l'onglet voisin (`ucaness-layout-card`, onglets de l'en-tête) ou la page voisine de la navigation (`ucaness-app-card`). Pas sur la scène ni sur les curseurs ; `swipe: false` pour l'arrêter.
+- **`custom:ucaness-gauge-card`** : cadran à aiguille. `entity` (ou `attribute`), `name`, `min` (0), `max` ou `max_entity`, `unit`, `digits`, `color`, `zones: [{from, color}]`.
 
 ### `custom:ucaness-note-card`
 

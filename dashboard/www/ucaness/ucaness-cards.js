@@ -24,8 +24,12 @@
  *   custom:ucaness-appareils-card la même liste dans une page existante, un panneau par pièce (0.9.1)
  *   custom:ucaness-bilan-card    bilan chiffré de la journée : autonomie, soleil, maison, réseau, économie (0.10.0)
  *   custom:ucaness-forecast-card météo des 5 prochains jours, avec le soleil prévu (0.10.0)
+ *   custom:ucaness-gauge-card    cadran à aiguille (0.11.0)
  *
  * Conventions de signe de l'intégration ucaness : batterie > 0 = charge, réseau > 0 = soutirage.
+ *
+ * 0.11.0 (28/11/2026) : outils de la scène vivante (menu des animations, tiroir d'infos du jour, visite guidée, mode cinéma),
+ *   reflet sur le sol mouillé, glissement entre vues (tablette et téléphone), cadran à aiguille (custom:ucaness-gauge-card).
  *
  * 0.10.0 (28/11/2026) : bilan du jour (custom:ucaness-bilan-card), météo des 5 jours (custom:ucaness-forecast-card),
  *   résumé du soir dans la bulle d'Ucan (option resume de custom:ucaness-ucan-card).
@@ -64,7 +68,7 @@
  *   « ?coucher=1 » dans l'adresse (affichage seulement, cet appareil, cette page).
  */
 
-const UC_VERSION = '0.10.0';
+const UC_VERSION = '0.11.0';
 
 /* Traductions des cartes : français (référence), anglais, chinois simplifié, allemand, italien, espagnol, portugais.
  * Entre les marqueurs I18N : JSON strict, vérifié par dashboard/tests/test_traductions_cartes.py
@@ -287,7 +291,29 @@ const UC_I18N = /* I18N-DEBUT */{
   "meteo_attente": "Prévision en attente…",
   "resume_titre": "Ma journée",
   "resume_soir": "Aujourd'hui, {soleil} kWh de soleil : la maison a tenu à {pct} % sans le réseau, environ {eco} € économisés. Bonne soirée !",
-  "resume_soir_sans_eco": "Aujourd'hui, {soleil} kWh de soleil : la maison a tenu à {pct} % sans le réseau. Bonne soirée !"
+  "resume_soir_sans_eco": "Aujourd'hui, {soleil} kWh de soleil : la maison a tenu à {pct} % sans le réseau. Bonne soirée !",
+  "carte_gauge_nom": "UCANESS cadran",
+  "carte_gauge_desc": "Cadran à aiguille pour une mesure (production, autoconsommation…).",
+  "outil_infos": "Infos du jour",
+  "outil_visite": "Visite guidée",
+  "outil_animations": "Animations",
+  "outil_cinema": "Mode cinéma",
+  "anim_ucan": "Ucan dans la scène",
+  "anim_ciel": "Ciel animé (oiseaux, étoiles, neige)",
+  "anim_bandeau": "Bandeau d'événement",
+  "anim_reflet": "Reflet sous la pluie",
+  "infos_lever": "Lever du soleil",
+  "infos_coucher": "Coucher du soleil",
+  "infos_meteo": "Météo",
+  "infos_batterie": "Batterie",
+  "visite_etape": "Étape {n} sur {total}",
+  "visite_solaire": "Les panneaux solaires : la puissance produite en ce moment.",
+  "visite_reseau": "Le réseau : ce que la maison achète, ou renvoie quand il y a trop de soleil.",
+  "visite_batterie": "La batterie UHome : sa charge et ce qu'elle reçoit ou fournit. Un appui ouvre la page Batterie.",
+  "visite_maison": "La maison : ce qu'elle consomme en ce moment.",
+  "visite_borne": "La borne : la recharge de la voiture.",
+  "visite_suivant": "Suivant",
+  "visite_fin": "Terminer"
  },
  "en": {
   "meteo": "Weather: {etat}",
@@ -506,7 +532,29 @@ const UC_I18N = /* I18N-DEBUT */{
   "meteo_attente": "Forecast pending…",
   "resume_titre": "My day",
   "resume_soir": "Today, {soleil} kWh of sun: the home ran {pct} % without the grid, about {eco} € saved. Have a nice evening!",
-  "resume_soir_sans_eco": "Today, {soleil} kWh of sun: the home ran {pct} % without the grid. Have a nice evening!"
+  "resume_soir_sans_eco": "Today, {soleil} kWh of sun: the home ran {pct} % without the grid. Have a nice evening!",
+  "carte_gauge_nom": "UCANESS gauge",
+  "carte_gauge_desc": "Needle gauge for a measurement (production, self-consumption…).",
+  "outil_infos": "Today's info",
+  "outil_visite": "Guided tour",
+  "outil_animations": "Animations",
+  "outil_cinema": "Cinema mode",
+  "anim_ucan": "Ucan in the scene",
+  "anim_ciel": "Animated sky (birds, stars, snow)",
+  "anim_bandeau": "Event banner",
+  "anim_reflet": "Reflection in the rain",
+  "infos_lever": "Sunrise",
+  "infos_coucher": "Sunset",
+  "infos_meteo": "Weather",
+  "infos_batterie": "Battery",
+  "visite_etape": "Step {n} of {total}",
+  "visite_solaire": "The solar panels: the power produced right now.",
+  "visite_reseau": "The grid: what the home buys, or sends back when there is too much sun.",
+  "visite_batterie": "The UHome battery: its charge and what it receives or supplies. Tap to open the Battery page.",
+  "visite_maison": "The home: what it uses right now.",
+  "visite_borne": "The charger: the car's charging.",
+  "visite_suivant": "Next",
+  "visite_fin": "Finish"
  },
  "zh-Hans": {
   "meteo": "天气：{etat}",
@@ -725,7 +773,29 @@ const UC_I18N = /* I18N-DEBUT */{
   "meteo_attente": "等待预报…",
   "resume_titre": "我的一天",
   "resume_soir": "今天太阳能 {soleil} kWh：家里 {pct} % 的时间无需电网，约节省 {eco} €。晚上好！",
-  "resume_soir_sans_eco": "今天太阳能 {soleil} kWh：家里 {pct} % 的时间无需电网。晚上好！"
+  "resume_soir_sans_eco": "今天太阳能 {soleil} kWh：家里 {pct} % 的时间无需电网。晚上好！",
+  "carte_gauge_nom": "UCANESS 仪表盘",
+  "carte_gauge_desc": "用于某项测量的指针仪表（发电、自用…）。",
+  "outil_infos": "今日信息",
+  "outil_visite": "导览",
+  "outil_animations": "动画",
+  "outil_cinema": "影院模式",
+  "anim_ucan": "场景中的 Ucan",
+  "anim_ciel": "动态天空（飞鸟、星星、雪）",
+  "anim_bandeau": "事件横幅",
+  "anim_reflet": "雨中倒影",
+  "infos_lever": "日出",
+  "infos_coucher": "日落",
+  "infos_meteo": "天气",
+  "infos_batterie": "电池",
+  "visite_etape": "第 {n} 步，共 {total} 步",
+  "visite_solaire": "太阳能板：此刻的发电功率。",
+  "visite_reseau": "电网：家中购入的电，或阳光过多时回送的电。",
+  "visite_batterie": "UHome 电池：电量及其充入或供出的电。点按打开电池页面。",
+  "visite_maison": "家庭：此刻的用电。",
+  "visite_borne": "充电桩：汽车充电。",
+  "visite_suivant": "下一步",
+  "visite_fin": "完成"
  },
  "de": {
   "meteo": "Wetter: {etat}",
@@ -944,7 +1014,29 @@ const UC_I18N = /* I18N-DEBUT */{
   "meteo_attente": "Vorhersage folgt…",
   "resume_titre": "Mein Tag",
   "resume_soir": "Heute {soleil} kWh Sonne: Das Haus lief zu {pct} % ohne Netz, etwa {eco} € gespart. Schönen Abend!",
-  "resume_soir_sans_eco": "Heute {soleil} kWh Sonne: Das Haus lief zu {pct} % ohne Netz. Schönen Abend!"
+  "resume_soir_sans_eco": "Heute {soleil} kWh Sonne: Das Haus lief zu {pct} % ohne Netz. Schönen Abend!",
+  "carte_gauge_nom": "UCANESS Zeigerinstrument",
+  "carte_gauge_desc": "Zeigerinstrument für einen Messwert (Erzeugung, Eigenverbrauch…).",
+  "outil_infos": "Infos des Tages",
+  "outil_visite": "Rundgang",
+  "outil_animations": "Animationen",
+  "outil_cinema": "Kinomodus",
+  "anim_ucan": "Ucan in der Szene",
+  "anim_ciel": "Bewegter Himmel (Vögel, Sterne, Schnee)",
+  "anim_bandeau": "Ereignisbanner",
+  "anim_reflet": "Spiegelung bei Regen",
+  "infos_lever": "Sonnenaufgang",
+  "infos_coucher": "Sonnenuntergang",
+  "infos_meteo": "Wetter",
+  "infos_batterie": "Batterie",
+  "visite_etape": "Schritt {n} von {total}",
+  "visite_solaire": "Die Solarmodule: die gerade erzeugte Leistung.",
+  "visite_reseau": "Das Netz: was das Haus kauft oder bei zu viel Sonne zurückgibt.",
+  "visite_batterie": "Die UHome-Batterie: ihr Ladestand und was sie aufnimmt oder abgibt. Tippe, um die Batterieseite zu öffnen.",
+  "visite_maison": "Das Haus: was es gerade verbraucht.",
+  "visite_borne": "Die Ladestation: das Laden des Autos.",
+  "visite_suivant": "Weiter",
+  "visite_fin": "Fertig"
  },
  "it": {
   "meteo": "Meteo: {etat}",
@@ -1163,7 +1255,29 @@ const UC_I18N = /* I18N-DEBUT */{
   "meteo_attente": "Previsione in arrivo…",
   "resume_titre": "La mia giornata",
   "resume_soir": "Oggi {soleil} kWh di sole: la casa è andata al {pct} % senza rete, circa {eco} € risparmiati. Buona serata!",
-  "resume_soir_sans_eco": "Oggi {soleil} kWh di sole: la casa è andata al {pct} % senza rete. Buona serata!"
+  "resume_soir_sans_eco": "Oggi {soleil} kWh di sole: la casa è andata al {pct} % senza rete. Buona serata!",
+  "carte_gauge_nom": "UCANESS quadrante",
+  "carte_gauge_desc": "Quadrante a lancetta per una misura (produzione, autoconsumo…).",
+  "outil_infos": "Info del giorno",
+  "outil_visite": "Visita guidata",
+  "outil_animations": "Animazioni",
+  "outil_cinema": "Modalità cinema",
+  "anim_ucan": "Ucan nella scena",
+  "anim_ciel": "Cielo animato (uccelli, stelle, neve)",
+  "anim_bandeau": "Banner degli eventi",
+  "anim_reflet": "Riflesso sotto la pioggia",
+  "infos_lever": "Alba",
+  "infos_coucher": "Tramonto",
+  "infos_meteo": "Meteo",
+  "infos_batterie": "Batteria",
+  "visite_etape": "Passo {n} di {total}",
+  "visite_solaire": "I pannelli solari: la potenza prodotta in questo momento.",
+  "visite_reseau": "La rete: ciò che la casa compra, o restituisce quando c'è troppo sole.",
+  "visite_batterie": "La batteria UHome: la sua carica e ciò che riceve o fornisce. Tocca per aprire la pagina Batteria.",
+  "visite_maison": "La casa: ciò che consuma in questo momento.",
+  "visite_borne": "La colonnina: la ricarica dell'auto.",
+  "visite_suivant": "Avanti",
+  "visite_fin": "Fine"
  },
  "es": {
   "meteo": "Tiempo: {etat}",
@@ -1382,7 +1496,29 @@ const UC_I18N = /* I18N-DEBUT */{
   "meteo_attente": "Previsión pendiente…",
   "resume_titre": "Mi día",
   "resume_soir": "Hoy, {soleil} kWh de sol: la casa funcionó al {pct} % sin la red, unos {eco} € ahorrados. ¡Buenas noches!",
-  "resume_soir_sans_eco": "Hoy, {soleil} kWh de sol: la casa funcionó al {pct} % sin la red. ¡Buenas noches!"
+  "resume_soir_sans_eco": "Hoy, {soleil} kWh de sol: la casa funcionó al {pct} % sin la red. ¡Buenas noches!",
+  "carte_gauge_nom": "UCANESS indicador",
+  "carte_gauge_desc": "Indicador de aguja para una medida (producción, autoconsumo…).",
+  "outil_infos": "Datos del día",
+  "outil_visite": "Visita guiada",
+  "outil_animations": "Animaciones",
+  "outil_cinema": "Modo cine",
+  "anim_ucan": "Ucan en la escena",
+  "anim_ciel": "Cielo animado (pájaros, estrellas, nieve)",
+  "anim_bandeau": "Banner de eventos",
+  "anim_reflet": "Reflejo bajo la lluvia",
+  "infos_lever": "Salida del sol",
+  "infos_coucher": "Puesta del sol",
+  "infos_meteo": "Tiempo",
+  "infos_batterie": "Batería",
+  "visite_etape": "Paso {n} de {total}",
+  "visite_solaire": "Los paneles solares: la potencia producida ahora mismo.",
+  "visite_reseau": "La red: lo que la casa compra, o devuelve cuando hay demasiado sol.",
+  "visite_batterie": "La batería UHome: su carga y lo que recibe o entrega. Toca para abrir la página Batería.",
+  "visite_maison": "La casa: lo que consume ahora mismo.",
+  "visite_borne": "El cargador: la carga del coche.",
+  "visite_suivant": "Siguiente",
+  "visite_fin": "Terminar"
  },
  "pt": {
   "meteo": "Meteorologia: {etat}",
@@ -1601,7 +1737,29 @@ const UC_I18N = /* I18N-DEBUT */{
   "meteo_attente": "Previsão a chegar…",
   "resume_titre": "O meu dia",
   "resume_soir": "Hoje, {soleil} kWh de sol: a casa funcionou {pct} % sem a rede, cerca de {eco} € poupados. Boa noite!",
-  "resume_soir_sans_eco": "Hoje, {soleil} kWh de sol: a casa funcionou {pct} % sem a rede. Boa noite!"
+  "resume_soir_sans_eco": "Hoje, {soleil} kWh de sol: a casa funcionou {pct} % sem a rede. Boa noite!",
+  "carte_gauge_nom": "UCANESS mostrador",
+  "carte_gauge_desc": "Mostrador de ponteiro para uma medida (produção, autoconsumo…).",
+  "outil_infos": "Informações do dia",
+  "outil_visite": "Visita guiada",
+  "outil_animations": "Animações",
+  "outil_cinema": "Modo cinema",
+  "anim_ucan": "Ucan na cena",
+  "anim_ciel": "Céu animado (aves, estrelas, neve)",
+  "anim_bandeau": "Faixa de eventos",
+  "anim_reflet": "Reflexo à chuva",
+  "infos_lever": "Nascer do sol",
+  "infos_coucher": "Pôr do sol",
+  "infos_meteo": "Tempo",
+  "infos_batterie": "Bateria",
+  "visite_etape": "Passo {n} de {total}",
+  "visite_solaire": "Os painéis solares: a potência produzida neste momento.",
+  "visite_reseau": "A rede: o que a casa compra, ou devolve quando há sol a mais.",
+  "visite_batterie": "A bateria UHome: a sua carga e o que recebe ou fornece. Toque para abrir a página Bateria.",
+  "visite_maison": "A casa: o que consome neste momento.",
+  "visite_borne": "O carregador: o carregamento do carro.",
+  "visite_suivant": "Seguinte",
+  "visite_fin": "Terminar"
  }
 }/* I18N-FIN */;
 let UC_LANG_VUE = null;   // dernière langue vue, pour les appels sans hass (configuration, sélecteur de cartes)
@@ -2181,6 +2339,8 @@ class UcanessLayoutCard extends HTMLElement {
   connectedCallback() {
     ucWatchWidth(this, (this._config && this._config.mobile_breakpoint) || 1000);
     if (this._children && this._children.length) this._entree();
+    const c = this._config || {};
+    if (c.swipe !== false && c.header && Array.isArray(c.header.tabs)) ucSwipe(this, () => ((this._config.header || {}).tabs || []).map((x) => x.path));
   }
 
   disconnectedCallback() { ucUnwatchWidth(this); }
@@ -2752,6 +2912,7 @@ class UcanessFlowCard extends HTMLElement {
     const root = this.shadowRoot;
     if (!root.querySelector('.stage.scene')) {
       const ia = c.image_area;
+      const rf = Math.max(20, Math.min(100, Number(c.reflet) || 85));
       let cal = '';
       if (c.calibration) {
         for (let i = 5; i < 100; i += 5) cal += `<div class="cal v${i % 10 ? ' f' : ''}" style="left:${i}%"><span>${i % 10 ? '' : i}</span></div><div class="cal h${i % 10 ? ' f' : ''}" style="top:${i}%"><span>${i % 10 ? '' : i}</span></div>`;
@@ -2824,15 +2985,44 @@ class UcanessFlowCard extends HTMLElement {
           .cal.v { top: 0; bottom: 0; width: 1px; }
           .cal.h { left: 0; right: 0; height: 1px; }
           .cal span { position: absolute; font: 11px monospace; color: #FF8080; left: 2px; top: 2px; }
+          .reflet { position: absolute; left: ${ia.x}%; top: ${ia.y}%; width: ${ia.w}%; height: auto; pointer-events: none; user-select: none; display: none; transform-origin: 50% ${rf}%; transform: scaleY(-1); opacity: .22; filter: blur(1.5px) saturate(1.2); -webkit-mask-image: linear-gradient(to bottom, transparent ${rf - 18}%, #000 ${rf}%, transparent ${rf}%); mask-image: linear-gradient(to bottom, transparent ${rf - 18}%, #000 ${rf}%, transparent ${rf}%); }
+          .stage.mouille .reflet { display: block; }
+          .stage.sans-reflet .reflet, .stage.sans-ucan .ucan, .stage.sans-ciel .sky2, .stage.sans-bandeau .ban { display: none !important; }
+          .outils { position: absolute; right: 1%; bottom: 2%; display: flex; gap: .6cqw; }
+          .outils button { width: max(30px, 4.2cqw); height: max(30px, 4.2cqw); display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--uc-tab-border); border-radius: 50%; background: rgba(8,22,46,0.85); color: #CFE6FF; cursor: pointer; --mdc-icon-size: max(16px, 2.4cqw); }
+          .outils button[aria-expanded="true"] { border-color: var(--uc-tab); color: var(--uc-tab); }
+          .outils button:focus-visible, .tiroir button:focus-visible, .visite button:focus-visible { outline: 2px solid #22E0F0; outline-offset: 2px; }
+          .tiroir { position: absolute; right: 1%; bottom: calc(4% + max(30px, 4.2cqw)); min-width: min(260px, 62%); padding: 10px 12px; border: 1px solid var(--uc-card-border); border-radius: 12px; background: rgba(8,22,46,0.96); box-shadow: var(--uc-card-shadow); font-size: 13px; color: #E6ECF5; animation: ucTiroir .3s ease; }
+          @keyframes ucTiroir { from { transform: translateY(12px); opacity: 0; } }
+          .tiroir[hidden], .visite[hidden] { display: none; }
+          .tiroir .k { margin: 0 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--uc-label); }
+          .tiroir .x { position: absolute; right: 4px; top: 2px; min-width: 32px; min-height: 32px; border: 0; background: none; color: #9CC9F5; font-size: 20px; cursor: pointer; }
+          .tiroir .li { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; padding: 3px 0; --mdc-icon-size: 18px; }
+          .tiroir .li b { color: #FFFFFF; }
+          .tiroir label { display: flex; gap: 8px; align-items: center; min-height: 32px; cursor: pointer; }
+          .visite { position: absolute; inset: 0; overflow: hidden; }
+          .visite .halo { position: absolute; width: 12%; aspect-ratio: 1; transform: translate(-50%, -50%); border: 3px solid var(--uc-tab); border-radius: 50%; box-shadow: 0 0 0 9999px rgba(3,11,32,0.55), 0 0 18px var(--uc-tab); }
+          .visite .expl { position: absolute; max-width: 44%; padding: 10px 12px; border: 1px solid var(--uc-tab); border-radius: 12px; background: rgba(8,22,46,0.97); color: #E6ECF5; font-size: max(12px, 1.6cqw); }
+          .visite .expl p { margin: 0 0 6px; }
+          .visite .k { font-size: 11px; color: var(--uc-label); text-transform: uppercase; letter-spacing: .08em; }
+          .visite .btns { display: flex; gap: 6px; justify-content: flex-end; }
+          .visite button { min-height: 32px; padding: 0 12px; border: 1px solid var(--uc-tab-border); border-radius: 16px; background: transparent; color: #CFE6FF; cursor: pointer; font: inherit; }
+          .visite button.p { border-color: var(--uc-tab); background: var(--uc-tab); color: #031428; }
+          :host(:fullscreen) { display: flex; align-items: center; justify-content: center; background: #030B20; }
+          :host(:fullscreen) .stage, .stage.cinema { width: min(100vw, calc(100vh * ${Number(c.aspect_ratio) || 1.45})); }
+          .stage.cinema { position: fixed; inset: 0; z-index: 9999; margin: auto; background: #030B20; }
+          @media (prefers-reduced-motion: reduce) { .tiroir { animation: none; } }
           /* Petite largeur (téléphone) : seulement le nom et les chiffres principaux. */
           @container (max-width: 520px) { .tag { display: none; } .lb .o { display: none; } .lb.g { left: auto !important; right: 0; text-align: right; } }
         </style>
         <div class="stage scene" role="img">
           ${V ? '<div class="sky2" aria-hidden="true"></div>' : ''}
           <img class="house" src="${esc(c.image)}" alt="">
+          ${V ? `<img class="reflet" src="${esc(c.image)}" alt="" aria-hidden="true">` : ''}
           <div class="art"></div>
           <div class="lbls"></div>
           ${V ? '<div class="fx"><div class="fxc"></div><div class="ban" role="status"></div></div>' : ''}
+          ${V && c.outils !== false ? `<div class="outils noswipe">${[['infos', 'mdi:information-outline'], ['visite', 'mdi:map-marker-path'], ['animations', 'mdi:tune-variant'], ['cinema', 'mdi:fullscreen']].map(([o, i]) => `<button type="button" data-outil="${o}" aria-label="${esc(ucT(hass, 'outil_' + o))}" title="${esc(ucT(hass, 'outil_' + o))}"><ha-icon icon="${i}"></ha-icon></button>`).join('')}</div><div class="tiroir noswipe" hidden></div><div class="visite noswipe" hidden></div>` : ''}
           ${cal}
         </div>`;
       root.querySelector('.art').addEventListener('click', (ev) => {
@@ -2848,6 +3038,7 @@ class UcanessFlowCard extends HTMLElement {
         const el = ev.composedPath().find((x) => x.dataset && x.dataset.entity);
         if (el) { ev.preventDefault(); ucMoreInfo(this, el.dataset.entity); }
       });
+      if (V) this._outils();
       this._sceneSig = null;
     }
     root.querySelector('.stage').setAttribute('aria-label', label);
@@ -2857,7 +3048,12 @@ class UcanessFlowCard extends HTMLElement {
     }
     root.querySelector('.lbls').innerHTML = labels;
     ucCount(this, root.querySelector('.lbls'), hass);
-    if (V) this._vivant({ amb, anime, uh, uhColor, soc, bat, grid, charging, discharging, sunOn, gridIn, gridOut, evOn, autonome });
+    if (V) {
+      this._amb = amb;
+      this._appliquerPrefs(amb);
+      this._vivant({ amb, anime, uh, uhColor, soc, bat, grid, charging, discharging, sunOn, gridIn, gridOut, evOn, autonome });
+      if (this._ouvert === 'infos') this._remplirTiroir();
+    }
   }
 
   /** Scène vivante : ciel (soleil, lune, oiseaux, étoile filante, arc-en-ciel, neige), étiquette et carte de niveau
@@ -2917,6 +3113,7 @@ class UcanessFlowCard extends HTMLElement {
         bulle = ucT(hass, 'ucan_tient', { h: fin.toLocaleTimeString(ucLang(hass), { hour: '2-digit', minute: '2-digit' }), n: ucNumber(hass, heures, heures < 10 ? 1 : 0) });
       }
     }
+    this._autonomieTexte = e.discharging && bulle !== ucT(hass, 'ucan_repos') ? bulle : ucT(hass, e.charging ? 'en_charge' : 'au_repos');
     const limite = Number(N.grid.limit_kw) || null;
     const proche = limite && e.gridIn && e.grid / 1000 >= 0.8 * limite;
     const U = c.ucan || null;
@@ -2947,6 +3144,136 @@ class UcanessFlowCard extends HTMLElement {
     if (be !== null && this._banEtat !== undefined && be !== this._banEtat && !['unknown', 'unavailable', ''].includes(be)) msg = be;
     this._banEtat = be;
     if (msg) this.annoncer(msg);
+  }
+
+  /* --- 0.11.0 : outils de la scène vivante (option outils, active par défaut avec vivant: true) ---------------
+   * Menu des animations (préférences de cet appareil), tiroir d'infos du jour, visite guidée, mode cinéma ;
+   * reflet de la scène sur le sol mouillé quand il pleut (reflet: hauteur de l'axe en % de l'image, 85 par défaut). */
+  _prefs() {
+    let p = {};
+    try { p = JSON.parse(window.localStorage.getItem(UC_ANIM_PREFS) || '{}') || {}; } catch (x) { p = {}; }
+    return Object.assign({ ucan: true, ciel: true, bandeau: true, reflet: true }, p);
+  }
+
+  _appliquerPrefs(amb) {
+    const st = this.shadowRoot && this.shadowRoot.querySelector('.stage.scene');
+    if (!st) return;
+    const p = this._prefs();
+    for (const k of ['ucan', 'ciel', 'bandeau', 'reflet']) st.classList.toggle(`sans-${k}`, !p[k]);
+    const effet = (() => { try { return new URLSearchParams(window.location.search).get('effet'); } catch (x) { return null; } })();
+    st.classList.toggle('mouille', !UC_LIGHT && !!amb && (amb.meteo >= 2 || effet === 'pluie'));
+  }
+
+  _outils() {
+    const root = this.shadowRoot;
+    const bar = root.querySelector('.outils');
+    if (!bar) return;
+    bar.addEventListener('click', (ev) => {
+      const b = ev.composedPath().find((x) => x.dataset && x.dataset.outil);
+      if (!b) return;
+      const o = b.dataset.outil;
+      if (o === 'cinema') this._cinema();
+      else if (o === 'visite') this._visite(0);
+      else this._panneau(this._ouvert === o ? null : o);
+    });
+    root.querySelector('.tiroir').addEventListener('change', (ev) => {
+      const k = ev.target && ev.target.dataset && ev.target.dataset.pref;
+      if (!k) return;
+      const p = this._prefs();
+      p[k] = !!ev.target.checked;
+      try { window.localStorage.setItem(UC_ANIM_PREFS, JSON.stringify(p)); } catch (x) { /* stockage indisponible : réglage pour cette fois */ }
+      this._appliquerPrefs(this._amb);
+    });
+    root.querySelector('.tiroir').addEventListener('click', (ev) => {
+      if (ev.composedPath().some((x) => x.dataset && x.dataset.fermer !== undefined)) this._panneau(null);
+    });
+    root.querySelector('.visite').addEventListener('click', (ev) => {
+      const b = ev.composedPath().find((x) => x.dataset && x.dataset.etape !== undefined);
+      if (b) this._visite(Number(b.dataset.etape));
+    });
+    this._dejaPlein = false;
+    this._echapCine = () => {
+      if (document.fullscreenElement === this) { this._dejaPlein = true; return; }
+      if (this._dejaPlein) { this._dejaPlein = false; this.shadowRoot.querySelector('.stage').classList.remove('cinema'); }   // Échap
+    };
+    document.addEventListener('fullscreenchange', this._echapCine);
+  }
+
+  /** Ouvre le tiroir « infos » ou « animations » (null : ferme). */
+  _panneau(quoi) {
+    this._ouvert = quoi;
+    const t = this.shadowRoot.querySelector('.tiroir');
+    this.shadowRoot.querySelectorAll('.outils button').forEach((b) => b.setAttribute('aria-expanded', String(b.dataset.outil === quoi)));
+    if (!quoi) { t.hidden = true; t.innerHTML = ''; return; }
+    t.hidden = false;
+    this._remplirTiroir();
+  }
+
+  _remplirTiroir() {
+    const t = this.shadowRoot && this.shadowRoot.querySelector('.tiroir');
+    if (!t || !this._ouvert) return;
+    const h = this._hass || { states: {} };
+    const fermer = `<button type="button" class="x" data-fermer aria-label="${esc(ucT(h, 'fermer'))}">×</button>`;
+    if (this._ouvert === 'animations') {
+      const p = this._prefs();
+      const ligne = (k) => `<label><input type="checkbox" data-pref="${k}"${p[k] ? ' checked' : ''}> ${esc(ucT(h, 'anim_' + k))}</label>`;
+      t.innerHTML = `${fermer}<p class="k">${esc(ucT(h, 'outil_animations'))}</p>${['ucan', 'ciel', 'bandeau', 'reflet'].map(ligne).join('')}`;
+      return;
+    }
+    const lang = ucLang(h) === 'zh-Hans' ? 'zh-CN' : ucLang(h);
+    const sun = h.states[(this._amb && this._amb.sunId) || 'sun.sun'];
+    const a = (sun && sun.attributes) || {};
+    const heure = (v) => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }) : '—'; };
+    const w = this._amb && this._amb.weather;
+    const temp = w && Number.isFinite(Number(w.attributes.temperature)) ? `${ucNumber(h, Number(w.attributes.temperature), 1)} °` : '';
+    const lignes = [
+      ['mdi:weather-sunset-up', ucT(h, 'infos_lever'), heure(a.next_rising)],
+      ['mdi:weather-sunset-down', ucT(h, 'infos_coucher'), heure(a.next_setting)],
+      ['mdi:weather-partly-cloudy', ucT(h, 'infos_meteo'), w ? `${temp} ${(h.formatEntityState ? h.formatEntityState(w) : w.state)}`.trim() : '—'],
+      ['mdi:battery-clock-outline', ucT(h, 'infos_batterie'), this._autonomieTexte || '—'],
+    ];
+    t.innerHTML = `${fermer}<p class="k">${esc(ucT(h, 'outil_infos'))}</p>${lignes.map(([i, n, v]) => `<div class="li"><ha-icon icon="${i}"></ha-icon><span>${esc(n)}</span><b>${esc(v)}</b></div>`).join('')}`;
+  }
+
+  /** Visite guidée : une étape par élément de la scène, avec un halo et une explication. */
+  _visite(i) {
+    const v = this.shadowRoot.querySelector('.visite');
+    const c = this._config;
+    const N = c.nodes;
+    const h = this._hass;
+    const uh = Object.assign({ x: 33, y: 61, w: 9 }, N.battery.uhome || {});
+    const bulb = Object.assign({ x: 75, y: 73, w: 6 }, N.home.bulb || {});
+    const etapes = [
+      ['solaire', N.solar.x, N.solar.y + 4],
+      ['reseau', N.grid.x, N.grid.y + 4],
+      ['batterie', uh.x + uh.w / 2, uh.y + 8],
+      ['maison', bulb.x + bulb.w / 2, bulb.y + 3],
+      ...(c.ev && c.ev.borne ? [['borne', c.ev.borne.x + 1.5, c.ev.borne.y + 4]] : []),
+    ];
+    if (!(i >= 0 && i < etapes.length)) { v.hidden = true; v.innerHTML = ''; return; }
+    const [cle, x, y] = etapes[i];
+    const fin = i === etapes.length - 1;
+    const gauche = x > 55;
+    v.hidden = false;
+    v.innerHTML = `<div class="halo" style="left:${x}%;top:${y}%"></div>
+      <div class="expl" role="dialog" aria-label="${esc(ucT(h, 'outil_visite'))}" style="${gauche ? `right:${(100 - x + 4).toFixed(1)}%` : `left:${(x + 4).toFixed(1)}%`};top:${Math.min(70, Math.max(4, y - 6)).toFixed(1)}%">
+        <p class="k">${esc(ucT(h, 'visite_etape', { n: i + 1, total: etapes.length }))}</p><p>${esc(ucT(h, 'visite_' + cle))}</p>
+        <div class="btns"><button type="button" data-etape="-1">${esc(ucT(h, 'fermer'))}</button>
+        <button type="button" class="p" data-etape="${fin ? -1 : i + 1}">${esc(ucT(h, fin ? 'visite_fin' : 'visite_suivant'))}</button></div></div>`;
+    const p = v.querySelector('.p');
+    if (p) p.focus();
+  }
+
+  /** Mode cinéma : la scène seule, en plein écran (ou sur toute la fenêtre si le plein écran est refusé). */
+  _cinema() {
+    const st = this.shadowRoot.querySelector('.stage');
+    if (st.classList.contains('cinema') || document.fullscreenElement === this) {
+      st.classList.remove('cinema');
+      if (document.fullscreenElement === this) document.exitFullscreen().catch(() => {});
+      return;
+    }
+    st.classList.add('cinema');                      // toute la fenêtre tout de suite, plein écran si le navigateur l'accepte
+    if (this.requestFullscreen) this.requestFullscreen().catch(() => {});
   }
 
   /** Affiche un texte dans le bandeau de la scène pendant 6 s. */
@@ -3298,6 +3625,7 @@ class UcanessAppCard extends HTMLElement {
   }
 
   connectedCallback() {
+    if ((this._config || {}).swipe !== false) ucSwipe(this, () => ((this._config || {}).nav || []).map((n) => n.path));
     this._timer = setInterval(() => this._chrome(), 30000);
     if (this._children && this._children.length) this._entree();
     this._onLoc = () => this._chrome();
@@ -4114,6 +4442,7 @@ class UcanessHoursCard extends HTMLElement {
  * Boutons : « Je le fais », « Pas maintenant », « Ne plus proposer » (réponse au script).
  */
 const UC_UCAN_POS = 'ucaness-ucan-position';
+const UC_ANIM_PREFS = 'ucaness-animations';   // préférences d'animation de la scène, propres à cet appareil (0.11.0)
 
 function ucUcanSvg(humeur, charge, couleur) {
   const lum = humeur === 'alerte' ? '#F39C12' : (/^#[0-9a-f]{6}$/i.test(couleur || '') ? couleur : '#00D1D6');
@@ -4881,6 +5210,105 @@ const UC_VEHICLE_CSS = `
   .tol[hidden] { display: none; }
 `;
 
+/* ------------------------------------------------------------------ cadran, glissement entre vues (0.11.0) */
+/* Glissement entre vues : sur écran tactile, un geste horizontal franc (70 px au moins, nettement plus horizontal
+ * que vertical, en moins de 0,6 s) ouvre la page voisine de la liste (onglets de l'en-tête, navigation du
+ * téléphone). Rien sur la scène, les curseurs et les zones marquées « noswipe ». Option swipe: false pour l'arrêter. */
+function ucSwipe(host, chemins) {
+  if (host._ucSwipe) return;
+  host._ucSwipe = true;
+  let d = null;
+  host.addEventListener('touchstart', (e) => {
+    d = null;
+    if (e.touches.length !== 1) return;
+    const bloque = e.composedPath().some((el) => el.classList && (el.classList.contains('stage') || el.classList.contains('noswipe'))
+      || ['INPUT', 'TEXTAREA', 'HA-SLIDER', 'HA-CONTROL-SLIDER'].includes(el.tagName));
+    if (bloque) return;
+    const t = e.touches[0];
+    d = { x: t.clientX, y: t.clientY, t: Date.now() };
+  }, { passive: true });
+  host.addEventListener('touchend', (e) => {
+    if (!d) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - d.x, dy = t.clientY - d.y, dt = Date.now() - d.t;
+    d = null;
+    const voisin = ucVoisin(chemins(), window.location.pathname, dx, dy, dt);
+    if (voisin) ucNavigate(voisin);
+  }, { passive: true });
+}
+
+/** Page voisine pour un geste (dx, dy en px, dt en ms), ou null. Fonction pure (testée). */
+function ucVoisin(chemins, ici, dx, dy, dt) {
+  if (Math.abs(dx) < 70 || Math.abs(dx) < 1.5 * Math.abs(dy) || dt > 600) return null;
+  const liste = (chemins || []).filter(Boolean);
+  const i = liste.findIndex((p) => String(p).split('?')[0] === ici);
+  if (i < 0) return null;
+  const j = i + (dx < 0 ? 1 : -1);
+  return j >= 0 && j < liste.length ? liste[j] : null;
+}
+
+/* custom:ucaness-gauge-card : cadran à aiguille (« poste de supervision »). entity (ou attribute), name, min (0),
+ * max, unit, digits, color, zones: [{ from, color }] (couleur de l'arc à partir d'une valeur). */
+class UcanessGaugeCard extends HTMLElement {
+  setConfig(config) {
+    if (!config || !config.entity) throw new Error('ucaness-gauge-card : « entity » manquant');
+    this._config = Object.assign({ min: 0, max: 100, digits: 1 }, config);
+    if (!this.shadowRoot) this.attachShadow({ mode: 'open' });
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    const c = this._config;
+    if (ucChanged(this, hass, [c.entity, c.max_entity].filter(Boolean))) this._render();
+  }
+
+  getCardSize() { return 3; }
+
+  _render() {
+    if (!this.shadowRoot || !this._config) return;
+    const h = this._hass;
+    const c = this._config;
+    const st = h && h.states[c.entity];
+    const brut = st ? (c.attribute ? st.attributes[c.attribute] : st.state) : null;
+    const v = parseFloat(brut);
+    const maxLu = c.max_entity && h && h.states[c.max_entity] ? parseFloat(h.states[c.max_entity].state) : NaN;
+    const min = Number(c.min) || 0;
+    const max = Number.isFinite(maxLu) && maxLu > min ? maxLu : Number(c.max);
+    const f = Number.isFinite(v) && max > min ? Math.max(0, Math.min(1, (v - min) / (max - min))) : 0;
+    const unit = c.unit !== undefined ? c.unit : ((st && st.attributes.unit_of_measurement) || '');
+    const zones = (Array.isArray(c.zones) ? c.zones : []).slice().sort((a, b) => a.from - b.from);
+    const couleur = (zones.filter((z) => Number.isFinite(v) && v >= z.from).pop() || {}).color || c.color || 'var(--uc-tab)';
+    const R = 80, cx = 100, cy = 100;
+    const pt = (t) => [cx - R * Math.cos(Math.PI * t), cy - R * Math.sin(Math.PI * t)];
+    const arc = (t0, t1, col, w) => { const [x0, y0] = pt(t0), [x1, y1] = pt(t1); return `<path d="M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`; };
+    const graduations = Array.from({ length: 11 }, (x, i) => {
+      const t = i / 10, a = Math.PI * t, r1 = R - 14, r2 = R - (i % 5 ? 19 : 24);
+      return `<line x1="${(cx - r1 * Math.cos(a)).toFixed(1)}" y1="${(cy - r1 * Math.sin(a)).toFixed(1)}" x2="${(cx - r2 * Math.cos(a)).toFixed(1)}" y2="${(cy - r2 * Math.sin(a)).toFixed(1)}" stroke="#4E6C93" stroke-width="${i % 5 ? 1.2 : 2}"/>`;
+    }).join('');
+    const angle = -90 + 180 * f;
+    this.shadowRoot.innerHTML = `<style>${UC_BASE_CSS}
+        :host { display: block; }
+        .g { position: relative; max-width: 260px; margin: 0 auto; }
+        svg { display: block; width: 100%; height: auto; }
+        .aig { transform-origin: 100px 100px; transition: transform ${UC_REDUCED || UC_LIGHT ? '0s' : '1.2s'} cubic-bezier(.3,1.3,.5,1); }
+        .v { position: absolute; left: 0; right: 0; bottom: 2px; text-align: center; font: 700 22px var(--uc-font); color: var(--uc-value); }
+        .v small { font-size: 13px; color: var(--uc-muted); }
+        .n { margin: 2px 0 0; text-align: center; font-size: 13px; color: var(--uc-label); }
+        .b { display: flex; justify-content: space-between; padding: 0 6%; font-size: 11px; color: var(--uc-muted); }
+      </style>
+      <div class="g" role="meter" aria-valuemin="${min}" aria-valuemax="${max}" aria-valuenow="${Number.isFinite(v) ? v : ''}" aria-label="${esc(c.name || (st && st.attributes.friendly_name) || '')}">
+        <svg viewBox="0 0 200 112">${arc(0, 1, '#16365F', 12)}${f > 0 ? arc(0, f, couleur, 12) : ''}${graduations}
+          <g class="aig" style="transform: rotate(${angle.toFixed(1)}deg)"><path d="M97 100 L100 30 L103 100 Z" fill="#E6ECF5"/></g>
+          <circle cx="100" cy="100" r="7" fill="#0A1B36" stroke="#E6ECF5" stroke-width="2"/></svg>
+        <div class="v">${Number.isFinite(v) ? esc(ucNumber(h, v, Number(c.digits))) : '—'} <small>${esc(unit)}</small></div>
+      </div>
+      <div class="b"><span>${esc(ucNumber(h, min, 0))}</span><span>${esc(ucNumber(h, max, 0))}</span></div>
+      ${c.name ? `<p class="n">${esc(c.name)}</p>` : ''}`;
+    this.shadowRoot.querySelector('.g').addEventListener('click', () => ucMoreInfo(this, c.entity));
+  }
+}
+
 /* ------------------------------------------------------------------ bilan du jour, météo 5 jours (0.10.0) */
 /* Bilan de la journée d'après les compteurs du jour (kWh) : partagé par custom:ucaness-bilan-card et par le
  * résumé du soir d'Ucan. Options : production, consommation, achat (une entité ou une liste, additionnées),
@@ -5376,6 +5804,7 @@ const UC_CARDS = [
   ['ucaness-appareils-card', UcanessAppareilsCard, ucT(null, 'carte_appareils_nom'), ucT(null, 'carte_appareils_desc')],
   ['ucaness-bilan-card', UcanessBilanCard, ucT(null, 'carte_bilan_nom'), ucT(null, 'carte_bilan_desc')],
   ['ucaness-forecast-card', UcanessForecastCard, ucT(null, 'carte_forecast_nom'), ucT(null, 'carte_forecast_desc')],
+  ['ucaness-gauge-card', UcanessGaugeCard, ucT(null, 'carte_gauge_nom'), ucT(null, 'carte_gauge_desc')],
 ];
 
 for (const [tag, cls, name, description] of UC_CARDS) {
@@ -5388,4 +5817,4 @@ for (const [tag, cls, name, description] of UC_CARDS) {
 
 console.info(`%c UCANESS HOME ASSISTANT %c ${UC_VERSION} `, 'background:#0B4F8F;color:#fff;font-weight:700', 'background:#00D1D6;color:#06203F');
 
-export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessBilanCard, UcanessForecastCard, ucBilanJour, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
+export { UcanessFlowCard, UcanessNoteCard, UcanessPanelCard, UcanessLayoutCard, UcanessHeaderCard, UcanessSocCard, UcanessAppCard, UcanessStatusCard, UcanessStatsCard, UcanessInfoCard, UcanessShortcutsCard, UcanessDetailCard, UcanessHoursCard, UcanessUcanCard, UcanessVehicleCard, UcanessAppareilCard, UcanessAppareilsCard, UcanessBilanCard, UcanessForecastCard, UcanessGaugeCard, ucBilanJour, ucVoisin, UcanessAppareilsStrategy, ucAppareilsCartes, ucCarSvg, ucMasqueFondUni, ucUcanSvg, ucMiniMarkdown, ucWatts, ucNum, ucChanged, ucFormat, UC_LIGHT, UC_VERSION };
